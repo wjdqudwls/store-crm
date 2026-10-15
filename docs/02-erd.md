@@ -1,6 +1,7 @@
 # 02. 데이터 모델 (ERD)
 
 > 기준 문서: [01-requirements.md](01-requirements.md) · 작성일: 2026-10-15 · 상태: **확정** (2026-10-15 검토 완료. 이후 변경은 decisions.md에 기록)
+> 변경: 2026-10-15 API 설계 반영 — `sale.idempotency_key`·`request_hash`(ADR-006), `customer.created_at`, outbox 순서 보장 인덱스(ADR-007). `02-erd.png`는 아직 이전 그림이다.
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -81,6 +82,8 @@ erDiagram
         BIGINT id PK
         BIGINT store_id
         VARCHAR receipt_no UK "GN01-20261015-0012"
+        CHAR idempotency_key UK "UUID, 중복 요청 방지"
+        CHAR request_hash "요청 본문 SHA-256"
         BIGINT staff_id
         BIGINT customer_id "NULL이면 비회원 판매"
         VARCHAR applied_grade "판매 당시 등급, 비회원 NULL"
@@ -165,6 +168,7 @@ erDiagram
         DATETIME age14_confirmed_at
         DATETIME marketing_sms_agreed_at "NULL = 미동의"
         DATETIME marketing_kakao_agreed_at "NULL = 미동의"
+        DATETIME created_at "가입일"
     }
     customer_purchase {
         BIGINT id PK
@@ -275,7 +279,7 @@ erDiagram
 
 아동 신발은 MVP에서 다루지 않는다. 성별이 나뉘는 품목(아우터, 하의)은 상품의 `target`에 맞는 목록을 쓰고, 고객 프로필에서는 고객 성별에 맞는 목록을 보여준다.
 
-### 3.3 sales: `sale`, `sale_line`, `sale_return`, `sale_return_line`, `outbox_event`
+### 3.3 sales: `sale`, `sale_line`, `sale_return`, `sale_return_line`, `receipt_sequence`, `outbox_event`
 
 - **티켓 = `sale` 1행**(영수증 1장). BR-02.
 - `sale_line`은 상품 정보를 **판매 시점 값으로 복사**(스냅샷)해 둔다. 나중에 상품명이나 카테고리가 바뀌어도 과거 영수증은 그대로여야 하기 때문이다.
@@ -287,14 +291,16 @@ erDiagram
   - 할인이 라인별이라 부분 반품 환불액은 그 라인의 결제 금액에서 바로 계산된다.
   - `sale.applied_grade`에 판매 당시 등급을 남긴다. 이번 판매로 승급해도 할인은 판매 전 등급 기준이다.
 - **영수증 번호** = `매장코드-판매일자-순번4자리` (예: `GN01-20261015-0012`). `receipt_sequence`에서 (매장, 날짜) 행을 잠그고(`SELECT … FOR UPDATE`) 1 올린 값을 쓴다. 같은 매장에서 두 직원이 동시에 판매해도 번호가 겹치지 않는다. `sale.receipt_no` UNIQUE가 마지막 안전장치다.
-- `outbox_event`: 판매·반품을 저장하는 **같은 트랜잭션**에서 이벤트 행을 넣는다. 발행기가 `PENDING`을 읽어 고객 모듈에 전달하고 `PUBLISHED`로 바꾼다. 실패하면 `attempts`를 올리고 재시도한다 (BR-06).
+- **중복 요청 방지**: `sale.idempotency_key`(UNIQUE)에 화면이 만든 UUID를 저장한다. 같은 키가 다시 오면 저장된 판매로 응답을 다시 만든다. `request_hash`가 다르면 같은 키로 다른 내용을 보낸 것이므로 거절한다. 두 요청이 동시에 와도 UNIQUE 제약이 하나만 남긴다 (ADR-006).
+- `outbox_event`: 판매·반품을 저장하는 **같은 트랜잭션**에서 이벤트 행을 넣는다. 발행기가 `PENDING`을 읽어 고객 모듈에 전달하고 `PUBLISHED`로 바꾼다. 실패하면 `attempts`를 올리고 재시도하며, 10회를 넘으면 `FAILED`로 둔다 (BR-06).
+  - 같은 판매(`aggregate_id`)의 이벤트는 `created_at` 순서대로 처리한다. 앞 이벤트가 `PUBLISHED`가 아니면 뒤 이벤트는 건너뛰고 다음 주기에 다시 본다 (ADR-007).
 
 ### 3.4 customer
 
 | 테이블 | 설명 |
 | --- | --- |
 | `customer` | 고객 원본. 식별 키는 `id`(고객번호). 전화번호와 상세주소는 암호화 컬럼, 중복 확인은 `phone_hash`(UNIQUE) |
-| `customer_purchase` | 판매 이벤트로 받은 **라인 단위 구매 기록**. 등급 집계와 콜리스트의 '구매 카테고리' 필터에 쓴다. `sale_line_id` UNIQUE로 같은 라인이 두 번 쌓이지 않는다 |
+| `customer_purchase` | 판매 이벤트로 받은 **라인 단위 구매 기록**. 등급 집계와 콜리스트의 '구매 카테고리' 필터에 쓴다. `sale_line_id` UNIQUE로 같은 라인이 두 번 쌓이지 않는다. 상품명·색상·사이즈는 없으므로 화면의 구매이력(CUS-03)은 sales 모듈이 판매 테이블로 제공한다 |
 | `customer_summary` | 고객당 1행의 **조회용 요약**. 검색 목록, 상세, 콜리스트가 집계 쿼리 없이 이 테이블만 읽는다 |
 | `grade_policy` / `grade_rule` | 등급 기준. 수정하면 기존 행을 고치지 않고 **새 버전을 만든다**. 어느 기준으로 등급이 나왔는지 추적할 수 있다 |
 | `grade_history` | 등급이 바뀔 때마다 1행. 사유 4종 (GRD-06) |
@@ -305,7 +311,7 @@ erDiagram
 
 | 컬럼 | 뜻 | 언제 바뀌나 |
 | --- | --- | --- |
-| `computed_grade` | 지금 실적(최근 12개월)으로 계산한 등급 | 판매·반품 이벤트, 정기 산정, 기준 변경 |
+| `computed_grade` | 지금 실적(최근 12개월)으로 계산한 등급 | 판매·반품 이벤트, 매일 실적 갱신, 정기 산정, 기준 변경 |
 | `current_grade` | 지금 고객에게 적용 중인 등급 | 즉시 승급, 반품 승급 취소, 정기 산정 |
 | `confirmed_grade` | 마지막 정기 산정에서 확정된 등급 | 매월 정기 산정 |
 
@@ -314,12 +320,15 @@ erDiagram
 - 판매 이벤트: `computed > current`이면 `current = computed` (즉시 승급)
 - 반품 이벤트: `current = max(computed, confirmed)` (승급 취소, 단 확정 등급 아래로는 안 내려감)
 - 정기 산정: `current = confirmed = computed` (이때만 강등)
+- 매일 실적 갱신: `computed`와 12개월 집계만 다시 계산한다. 시간이 지나면 실적은 줄기만 하므로 `current`는 바뀌지 않는다 (ADR-008)
+
+등급 비교(`>`, `max`)는 등급 코드의 문자 순서가 아니라 기준의 등급 컷 점수(`grade_rule.min_value`, kind=GRADE) 순서로 한다. `*_12m` 컬럼은 기본 기간 기준의 이름이고, 실제 기간은 `grade_policy.period_months`를 따른다 (NFR-10의 36개월 테스트에서도 같은 컬럼을 쓴다).
 
 ## 4. 인덱스
 
 | 테이블 | 인덱스 | 쓰는 곳 |
 | --- | --- | --- |
-| `customer` | `(name)`, `(name, phone_last4)` | 고객명 검색, 뒷자리로 좁히기 (CUS-01) |
+| `customer` | `(name)`, `(name, phone_last4)` | 고객명 앞부분 일치 검색, 뒷자리로 좁히기 (CUS-01). 중간 일치(`%하늘%`)는 인덱스를 못 쓰지만 고객 5천 명 규모라 전체 스캔을 허용하고 NFR-01로 측정한다 |
 | `customer` | `UNIQUE(phone_hash)` | 중복 등록 방지 (REG-05) |
 | `customer` | `(staff_id)` | 콜리스트 '내 담당' |
 | `customer_summary` | `(current_grade, last_visit_at)` | 콜리스트 등급·미방문 필터 (CAL-01) |
@@ -328,8 +337,10 @@ erDiagram
 | `customer_purchase` | `UNIQUE(sale_line_id)` | 같은 라인 중복 적재 방지 |
 | `sale` | `UNIQUE(receipt_no)` | 영수증 번호 중복 방지 (번호에 매장코드 포함) |
 | `sale` | `(store_id, sold_at)` | 판매 내역 (SAL-05) |
-| `sale` | `(customer_id, sold_at)` | 고객 상세의 구매이력 (CUS-03) |
+| `sale` | `UNIQUE(idempotency_key)` | 같은 판매 요청 중복 저장 방지 (ADR-006) |
+| `sale` | `(customer_id, sold_at)` | 고객 상세의 구매이력 (CUS-03, sales 모듈의 조회) |
 | `outbox_event` | `(status, created_at)` | 발행기가 PENDING을 오래된 순으로 읽기 |
+| `outbox_event` | `(aggregate_id, created_at)` | 같은 판매의 앞 이벤트 처리 여부 확인 (ADR-007) |
 | `consult_note` | `(customer_id, created_at)` | 메모 목록 최신순 |
 
 ## 5. 설계 결정과 이유
@@ -345,6 +356,7 @@ erDiagram
 | 7 | 등급 3컬럼(computed / current / confirmed) | '승급 즉시, 강등 정기' 규칙을 조건문 3줄로 표현할 수 있다 | 등급 1컬럼: 반품 취소의 하한을 알 수 없다 |
 | 8 | outbox + `processed_event` | 판매는 됐는데 이벤트가 사라지는 일, 이벤트가 두 번 처리되는 일을 둘 다 막는다 | 메모리 이벤트만: 서버가 죽으면 이벤트가 사라진다 |
 | 9 | 쿠폰 대신 등급 할인, 라인 단위 저장 | CRM 등급 자체가 혜택이 된다. 테이블이 늘지 않고, 부분 반품 계산이 단순하다 | 쿠폰 발급·사용: 새 도메인이라 10~15시간 추가 |
+| 10 | 멱등 키를 `sale` 컬럼으로 | 판매 1건 = 키 1개라 테이블이 필요 없고, 응답은 저장된 판매로 다시 만든다 | 별도 멱등 키 테이블: 응답 본문까지 저장해야 해 무겁다 |
 
 ## 6. 확인 필요
 

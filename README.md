@@ -8,13 +8,17 @@
 
 | 순서 | 문서 | 내용 | 상태 |
 | --- | --- | --- | --- |
-| 0 | [docs/00-idea.md](docs/00-idea.md) | 왜 만드는가, 문제, 대상, 범위 | 완료 |
+| 0 | [docs/00-idea.md](docs/00-idea.md) | 왜 만드는가, 문제, 대상, 범위 | 확정 |
 | 1 | [docs/01-requirements.md](docs/01-requirements.md) | 기능·비기능 요구사항, 비즈니스 규칙, 8주 일정 | 초안 |
 | 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 (그림: [02-erd.png](docs/02-erd.png)) | 확정 |
-| 3 | docs/03-api.md | API 명세 | 예정 |
+| 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
 
-규칙: 앞 단계 문서가 확정되기 전에는 다음 단계로 넘어가지 않는다. 넘어간 뒤에 바뀌는 것은 `docs/decisions.md`에 남긴다.
+규칙
+
+- 앞 단계 문서의 핵심(범위, 규칙)이 정해지면 다음 단계를 시작한다. 다음 단계를 쓰다 드러난 문제는 앞 문서에 반영하고, 1주 차 안에 01~03을 모두 확정한다.
+- 확정된 문서를 바꾸면 그 문서 상단에 변경을 적고, 기술 결정이면 `docs/decisions.md`에 ADR로 남긴다.
+- 결정 기록은 두 곳이다: 업무 규칙 결정은 01-requirements.md 8장, 기술 결정은 decisions.md.
 
 ## 기술 스택 (예정)
 

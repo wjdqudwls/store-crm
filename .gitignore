@@ -1,0 +1,25 @@
+# OS
+.DS_Store
+
+# IDE / 도구 개인 설정
+.claude/settings.local.json
+.idea/
+.vscode/
+*.iml
+
+# Java / Gradle
+build/
+.gradle/
+out/
+
+# Vue / Node
+node_modules/
+dist/
+
+# 환경변수 (암호화 키, JWT 시크릿 — NFR-06)
+.env
+.env.*
+!.env.example
+
+# 로그
+*.log
