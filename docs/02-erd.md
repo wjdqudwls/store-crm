@@ -2,6 +2,7 @@
 
 > 기준 문서: [01-requirements.md](01-requirements.md) · 작성일: 2026-10-15 · 상태: **확정** (2026-10-15 검토 완료. 이후 변경은 decisions.md에 기록)
 > 변경: 2026-10-15 API 설계 반영 — `sale.idempotency_key`·`request_hash`(ADR-006), `customer.created_at`, outbox 순서 보장 인덱스(ADR-007). 그림 파일 `02-erd.png`는 지우고 2장의 mermaid ERD를 원본으로 쓴다.
+> 변경: 2026-10-15 API 검토 반영 — `sale_return.idempotency_key`·`request_hash`(반품 중복 요청 방지, ADR-006), `staff.store_id`는 본사 계정이면 NULL, `customer.gender`·`contact_channel` 값 목록.
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -60,7 +61,7 @@ erDiagram
         VARCHAR password_hash "BCrypt"
         VARCHAR name
         VARCHAR role "STAFF, MANAGER, KIOSK"
-        BIGINT store_id FK
+        BIGINT store_id FK "본사 계정은 NULL"
         VARCHAR staff_code UK "QR 담당 지정용"
         BOOLEAN active
     }
@@ -115,6 +116,8 @@ erDiagram
     sale_return {
         BIGINT id PK
         BIGINT sale_id FK
+        CHAR idempotency_key UK "UUID, 중복 요청 방지"
+        CHAR request_hash "요청 본문 SHA-256"
         BIGINT staff_id
         DATETIME returned_at
         BIGINT amount
@@ -154,13 +157,13 @@ erDiagram
         VARCHAR region_sido
         VARCHAR region_gu
         VARBINARY address_detail_enc "암호화"
-        VARCHAR gender
+        VARCHAR gender "F, M"
         JSON preferred_item_types "복수 선택, 예: OUTER, TOP"
         VARCHAR size_top
         VARCHAR size_outer
         VARCHAR size_bottom
         VARCHAR size_shoes
-        VARCHAR contact_channel
+        VARCHAR contact_channel "CALL, SMS, KAKAO"
         BIGINT home_store_id
         BIGINT staff_id "담당 직원"
         VARCHAR source "KIOSK, QR, STAFF"
@@ -291,7 +294,7 @@ erDiagram
   - 할인이 라인별이라 부분 반품 환불액은 그 라인의 결제 금액에서 바로 계산된다.
   - `sale.applied_grade`에 판매 당시 등급을 남긴다. 이번 판매로 승급해도 할인은 판매 전 등급 기준이다.
 - **영수증 번호** = `매장코드-판매일자-순번4자리` (예: `GN01-20261015-0012`). `receipt_sequence`에서 (매장, 날짜) 행을 잠그고(`SELECT … FOR UPDATE`) 1 올린 값을 쓴다. 같은 매장에서 두 직원이 동시에 판매해도 번호가 겹치지 않는다. `sale.receipt_no` UNIQUE가 마지막 안전장치다.
-- **중복 요청 방지**: `sale.idempotency_key`(UNIQUE)에 화면이 만든 UUID를 저장한다. 같은 키가 다시 오면 저장된 판매로 응답을 다시 만든다. `request_hash`가 다르면 같은 키로 다른 내용을 보낸 것이므로 거절한다. 두 요청이 동시에 와도 UNIQUE 제약이 하나만 남긴다 (ADR-006).
+- **중복 요청 방지**: 판매는 `sale.idempotency_key`, 반품은 `sale_return.idempotency_key`(각각 UNIQUE)에 화면이 만든 UUID를 저장한다. 같은 키가 다시 오면 저장된 판매·반품으로 응답을 다시 만든다. `request_hash`가 다르면 같은 키로 다른 내용을 보낸 것이므로 거절한다. 두 요청이 동시에 와도 UNIQUE 제약이 하나만 남긴다 (ADR-006).
 - `outbox_event`: 판매·반품을 저장하는 **같은 트랜잭션**에서 이벤트 행을 넣는다. 발행기가 `PENDING`을 읽어 고객 모듈에 전달하고 `PUBLISHED`로 바꾼다. 실패하면 `attempts`를 올리고 재시도하며, 10회를 넘으면 `FAILED`로 둔다 (BR-06).
   - 같은 판매(`aggregate_id`)의 이벤트는 `created_at` 순서대로 처리한다. 앞 이벤트가 `PUBLISHED`가 아니면 뒤 이벤트는 건너뛰고 다음 주기에 다시 본다 (ADR-007).
 
@@ -338,6 +341,7 @@ erDiagram
 | `sale` | `UNIQUE(receipt_no)` | 영수증 번호 중복 방지 (번호에 매장코드 포함) |
 | `sale` | `(store_id, sold_at)` | 판매 내역 (SAL-05) |
 | `sale` | `UNIQUE(idempotency_key)` | 같은 판매 요청 중복 저장 방지 (ADR-006) |
+| `sale_return` | `UNIQUE(idempotency_key)` | 같은 반품 요청 중복 저장 방지 (ADR-006) |
 | `sale` | `(customer_id, sold_at)` | 고객 상세의 구매이력 (CUS-03, sales 모듈의 조회) |
 | `outbox_event` | `(status, created_at)` | 발행기가 PENDING을 오래된 순으로 읽기 |
 | `outbox_event` | `(aggregate_id, created_at)` | 같은 판매의 앞 이벤트 처리 여부 확인 (ADR-007) |
@@ -356,7 +360,7 @@ erDiagram
 | 7 | 등급 3컬럼(computed / current / confirmed) | '승급 즉시, 강등 정기' 규칙을 조건문 3줄로 표현할 수 있다 | 등급 1컬럼: 반품 취소의 하한을 알 수 없다 |
 | 8 | outbox + `processed_event` | 판매는 됐는데 이벤트가 사라지는 일, 이벤트가 두 번 처리되는 일을 둘 다 막는다 | 메모리 이벤트만: 서버가 죽으면 이벤트가 사라진다 |
 | 9 | 쿠폰 대신 등급 할인, 라인 단위 저장 | CRM 등급 자체가 혜택이 된다. 테이블이 늘지 않고, 부분 반품 계산이 단순하다 | 쿠폰 발급·사용: 새 도메인이라 10~15시간 추가 |
-| 10 | 멱등 키를 `sale` 컬럼으로 | 판매 1건 = 키 1개라 테이블이 필요 없고, 응답은 저장된 판매로 다시 만든다 | 별도 멱등 키 테이블: 응답 본문까지 저장해야 해 무겁다 |
+| 10 | 멱등 키를 `sale`·`sale_return` 컬럼으로 | 판매·반품 1건 = 키 1개라 테이블이 필요 없고, 응답은 저장된 판매·반품으로 다시 만든다 | 별도 멱등 키 테이블: 응답 본문까지 저장해야 해 무겁다 |
 
 ## 6. 확인 필요
 
