@@ -3,11 +3,13 @@
 > 기준 문서: [01-requirements.md](01-requirements.md) · 작성일: 2026-10-15 · 상태: **확정** (2026-10-15 검토 완료. 이후 변경은 decisions.md에 기록)
 > 변경: 2026-10-15 API 설계 반영 — `sale.idempotency_key`·`request_hash`(ADR-006), `customer.created_at`, outbox 순서 보장 인덱스(ADR-007). 그림 파일 `02-erd.png`는 지우고 2장의 mermaid ERD를 원본으로 쓴다.
 > 변경: 2026-10-15 API 검토 반영 — `sale_return.idempotency_key`·`request_hash`(반품 중복 요청 방지, ADR-006), `staff.store_id`는 본사 계정이면 NULL, `customer.gender`·`contact_channel` 값 목록.
+> 변경: 2026-10-16 정기 산정 주기를 매월에서 매년 6월 1일로 (01-requirements.md GRD-05). 테이블은 그대로다.
+> 변경: 2026-10-16 가족 구성원 MVP 반영 — `customer_member` 추가(테이블 19개), 판매 라인 착용자 `sale_line.wearer_member_id`·`wearer_label`, 구성원 관계 인덱스 (ADR-009).
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
 
-테이블은 4개 모듈에 18개다. 핵심 규칙은 두 가지다.
+테이블은 4개 모듈에 19개다. 핵심 규칙은 두 가지다.
 
 1. **모듈끼리는 외래키(FK)를 걸지 않고 ID만 들고 있는다.** 같은 모듈 안에서만 FK를 쓴다.
 2. **고객 모듈은 판매 테이블을 직접 조인하지 않는다.** 판매 이벤트로 받은 데이터를 자기 테이블(`customer_purchase`)에 쌓아 쓴다.
@@ -17,7 +19,7 @@
 | common | `store`, `staff` | 매장, 직원·키오스크 계정 |
 | product | `product`, `product_sku` | 상품(품번)과 색상·사이즈 단위 SKU |
 | sales | `sale`, `sale_line`, `sale_return`, `sale_return_line`, `receipt_sequence`, `outbox_event` | 판매·반품 원본, 영수증 번호 채번, 발행할 이벤트 |
-| customer | `customer`, `customer_purchase`, `customer_summary`, `grade_policy`, `grade_rule`, `grade_history`, `consult_note`, `processed_event` | 고객, 구매 기록(이벤트로 받은 것), 등급, 메모 |
+| customer | `customer`, `customer_member`, `customer_purchase`, `customer_summary`, `grade_policy`, `grade_rule`, `grade_history`, `consult_note`, `processed_event` | 고객, 가족 구성원, 구매 기록(이벤트로 받은 것), 등급, 메모 |
 
 ## 2. ERD
 
@@ -33,6 +35,7 @@ erDiagram
     sale_return ||--|{ sale_return_line : "포함"
     sale_line ||--o{ sale_return_line : "반품된 라인"
 
+    customer ||--o{ customer_member : "가족 구성원"
     customer ||--o{ customer_purchase : "구매 기록"
     customer ||--|| customer_summary : "요약"
     customer ||--o{ grade_history : "등급 변경"
@@ -43,6 +46,7 @@ erDiagram
     sale }o..|| store : "store_id"
     receipt_sequence }o..|| store : "store_id"
     sale_line }o..|| product_sku : "sku_id"
+    sale_line }o..o| customer_member : "wearer_member_id (착용자)"
     customer }o..o| store : "home_store_id"
     customer }o..o| staff : "staff_id (담당)"
     consult_note }o..|| staff : "작성자"
@@ -112,6 +116,8 @@ erDiagram
         BIGINT discount_amount "원 미만 버림"
         BIGINT line_amount "결제 금액"
         INT returned_qty
+        BIGINT wearer_member_id "착용자, 선택"
+        VARCHAR wearer_label "착용자 호칭 스냅샷"
     }
     sale_return {
         BIGINT id PK
@@ -172,6 +178,19 @@ erDiagram
         DATETIME marketing_sms_agreed_at "NULL = 미동의"
         DATETIME marketing_kakao_agreed_at "NULL = 미동의"
         DATETIME created_at "가입일"
+    }
+    customer_member {
+        BIGINT id PK
+        BIGINT customer_id FK "대표 고객"
+        VARCHAR nickname "호칭, 실명 아님 (예: 첫째 딸)"
+        VARCHAR relation "SPOUSE, CHILD, PARENT, OTHER"
+        VARCHAR gender "F, M"
+        SMALLINT birth_year
+        VARCHAR size_top
+        VARCHAR size_outer
+        VARCHAR size_bottom
+        VARCHAR size_shoes
+        DATETIME created_at
     }
     customer_purchase {
         BIGINT id PK
@@ -280,7 +299,7 @@ erDiagram
 | ACC | FREE |
 | KIDS 상품 (의류) | 4, 6, 8, 10 (세) |
 
-아동 신발은 MVP에서 다루지 않는다. 성별이 나뉘는 품목(아우터, 하의)은 상품의 `target`에 맞는 목록을 쓰고, 고객 프로필에서는 고객 성별에 맞는 목록을 보여준다.
+아동 신발은 MVP에서 다루지 않는다. 성별이 나뉘는 품목(아우터, 하의)은 상품의 `target`에 맞는 목록을 쓰고, 고객 프로필에서는 고객 성별에 맞는 목록을 보여준다. 가족 구성원도 같은 규칙이고, 자녀(`CHILD`)는 아동 의류 사이즈(4·6·8·10)도 고를 수 있다.
 
 ### 3.3 sales: `sale`, `sale_line`, `sale_return`, `sale_return_line`, `receipt_sequence`, `outbox_event`
 
@@ -293,6 +312,7 @@ erDiagram
   - 비회원 판매: 할인 불가(`NONE`, 0%). 할인을 받으려면 먼저 고객등록을 해야 한다.
   - 할인이 라인별이라 부분 반품 환불액은 그 라인의 결제 금액에서 바로 계산된다.
   - `sale.applied_grade`에 판매 당시 등급을 남긴다. 이번 판매로 승급해도 할인은 판매 전 등급 기준이다.
+- **착용자**: `sale_line.wearer_member_id`는 고객 모듈의 가족 구성원 ID를 들고만 있다(FK 없음). 호칭은 `wearer_label`에 복사해 둔다. 구성원을 지우거나 호칭을 바꿔도 과거 영수증은 그대로다. 고르지 않으면 둘 다 NULL (ADR-009).
 - **영수증 번호** = `매장코드-판매일자-순번4자리` (예: `GN01-20261015-0012`). `receipt_sequence`에서 (매장, 날짜) 행을 잠그고(`SELECT … FOR UPDATE`) 1 올린 값을 쓴다. 같은 매장에서 두 직원이 동시에 판매해도 번호가 겹치지 않는다. `sale.receipt_no` UNIQUE가 마지막 안전장치다.
 - **중복 요청 방지**: 판매는 `sale.idempotency_key`, 반품은 `sale_return.idempotency_key`(각각 UNIQUE)에 화면이 만든 UUID를 저장한다. 같은 키가 다시 오면 저장된 판매·반품으로 응답을 다시 만든다. `request_hash`가 다르면 같은 키로 다른 내용을 보낸 것이므로 거절한다. 두 요청이 동시에 와도 UNIQUE 제약이 하나만 남긴다 (ADR-006).
 - `outbox_event`: 판매·반품을 저장하는 **같은 트랜잭션**에서 이벤트 행을 넣는다. 발행기가 `PENDING`을 읽어 고객 모듈에 전달하고 `PUBLISHED`로 바꾼다. 실패하면 `attempts`를 올리고 재시도하며, 10회를 넘으면 `FAILED`로 둔다 (BR-06).
@@ -303,6 +323,7 @@ erDiagram
 | 테이블 | 설명 |
 | --- | --- |
 | `customer` | 고객 원본. 식별 키는 `id`(고객번호). 전화번호와 상세주소는 암호화 컬럼, 중복 확인은 `phone_hash`(UNIQUE) |
+| `customer_member` | 대표 고객 아래 가족 구성원. 호칭(실명 아님), 관계, 사이즈. 전화번호·동의·등급이 없고, 판매와 등급은 대표 고객 하나로 쌓인다 (ADR-009) |
 | `customer_purchase` | 판매 이벤트로 받은 **라인 단위 구매 기록**. 등급 집계와 콜리스트의 '구매 카테고리' 필터에 쓴다. `sale_line_id` UNIQUE로 같은 라인이 두 번 쌓이지 않는다. 상품명·색상·사이즈는 없으므로 화면의 구매이력(CUS-03)은 sales 모듈이 판매 테이블로 제공한다 |
 | `customer_summary` | 고객당 1행의 **조회용 요약**. 검색 목록, 상세, 콜리스트가 집계 쿼리 없이 이 테이블만 읽는다 |
 | `grade_policy` / `grade_rule` | 등급 기준. 수정하면 기존 행을 고치지 않고 **새 버전을 만든다**. 어느 기준으로 등급이 나왔는지 추적할 수 있다 |
@@ -316,7 +337,7 @@ erDiagram
 | --- | --- | --- |
 | `computed_grade` | 지금 실적(최근 12개월)으로 계산한 등급 | 판매·반품 이벤트, 매일 실적 갱신, 정기 산정, 기준 변경 |
 | `current_grade` | 지금 고객에게 적용 중인 등급 | 즉시 승급, 반품 승급 취소, 정기 산정 |
-| `confirmed_grade` | 마지막 정기 산정에서 확정된 등급 | 매월 정기 산정 |
+| `confirmed_grade` | 마지막 정기 산정에서 확정된 등급 | 정기 산정 (매년 6월 1일) |
 
 규칙(BR-05)을 컬럼으로 옮기면 이렇게 된다.
 
@@ -335,6 +356,8 @@ erDiagram
 | `customer` | `UNIQUE(phone_hash)` | 중복 등록 방지 (REG-05) |
 | `customer` | `(staff_id)` | 콜리스트 '내 담당' |
 | `customer_summary` | `(current_grade, last_visit_at)` | 콜리스트 등급·미방문 필터 (CAL-01) |
+| `customer_member` | `(customer_id)` | 고객 상세의 구성원 목록 (CUS-05) |
+| `customer_member` | `(relation, customer_id)` | 콜리스트 가족 필터 (CAL-01) |
 | `customer_purchase` | `(customer_id, sold_at)` | 최근 12개월 집계 |
 | `customer_purchase` | `(item_type, customer_id)`, `(target, customer_id)` | 콜리스트 구매 품목·대상 필터 |
 | `customer_purchase` | `UNIQUE(sale_line_id)` | 같은 라인 중복 적재 방지 |
@@ -361,6 +384,7 @@ erDiagram
 | 8 | outbox + `processed_event` | 판매는 됐는데 이벤트가 사라지는 일, 이벤트가 두 번 처리되는 일을 둘 다 막는다 | 메모리 이벤트만: 서버가 죽으면 이벤트가 사라진다 |
 | 9 | 쿠폰 대신 등급 할인, 라인 단위 저장 | CRM 등급 자체가 혜택이 된다. 테이블이 늘지 않고, 부분 반품 계산이 단순하다 | 쿠폰 발급·사용: 새 도메인이라 10~15시간 추가 |
 | 10 | 멱등 키를 `sale`·`sale_return` 컬럼으로 | 판매·반품 1건 = 키 1개라 테이블이 필요 없고, 응답은 저장된 판매·반품으로 다시 만든다 | 별도 멱등 키 테이블: 응답 본문까지 저장해야 해 무겁다 |
+| 11 | 가족 구성원은 대표 고객 아래 테이블, 판매 라인에 착용자 | 등급 규칙을 바꾸지 않고 가족 필터와 착용자 기록을 얻는다 | 구성원도 고객으로: 전화번호 없는 고객과 가족 등급 합산 규칙이 생긴다 |
 
 ## 6. 확인 필요
 

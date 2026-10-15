@@ -1,6 +1,8 @@
 # 03. API 명세
 
 > 기준 문서: [01-requirements.md](01-requirements.md), [02-erd.md](02-erd.md) · 작성일: 2026-10-15 · 상태: **확정** (2026-10-15 검토 완료. 이후 변경은 decisions.md에 기록)
+> 변경: 2026-10-16 정기 산정 자동 실행을 매월 1일에서 매년 6월 1일로 (01-requirements.md GRD-05).
+> 변경: 2026-10-16 가족 구성원 MVP 반영 — 구성원 API 4개, 판매 라인 `memberId`(착용자), 콜리스트 `memberRelation`, `SALE_COMPLETED` 라인 `memberId`, `MEMBER_NOT_FOUND` (ADR-009).
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -50,7 +52,7 @@
 | --- | --- |
 | (없음) | `/public/**`, `/auth/login`, `/auth/refresh` |
 | KIOSK | `/kiosk/registrations`, `GET /me`, `/public/**` 만 |
-| STAFF (매장 직원·매장 매니저) | 판매·반품, 고객 등록·조회·수정, 메모, 콜리스트, 상품 조회, 등급 기준 **조회** |
+| STAFF (매장 직원·매장 매니저) | 판매·반품, 고객 등록·조회·수정(가족 구성원 포함), 메모, 콜리스트, 상품 조회, 등급 기준 **조회** |
 | MANAGER (본사) | STAFF 전부 + 등급 기준 수정·재산정, 직원 관리 |
 
 - `/auth/refresh`는 토큰이 유효해도 `staff.active = false`면 `401 AUTH_ACCOUNT_DISABLED`로 거절한다. 비활성화한 직원·키오스크가 Refresh 유효기간(14일) 동안 계속 쓰는 것을 막는다.
@@ -98,6 +100,10 @@
 | PATCH | `/customers/{id}` | 프로필, 담당 직원, 마케팅 수신 변경 | STAFF | CUS-04 |
 | GET | `/customers/{id}/purchases` | 구매이력 (영수증 단위, 최신순). 경로는 고객 아래지만 **sales 모듈이 제공**한다 (판매 테이블 조회) | STAFF | CUS-03 |
 | GET | `/customers/{id}/grade-history` | 등급 변경 이력 | STAFF | GRD-06 |
+| GET | `/customers/{id}/members` | 가족 구성원 목록 | STAFF | CUS-05 |
+| POST | `/customers/{id}/members` | 구성원 추가 (호칭, 관계 필수. 성별·출생연도·사이즈 선택) | STAFF | CUS-05 |
+| PATCH | `/members/{memberId}` | 구성원 수정 | STAFF | CUS-05 |
+| DELETE | `/members/{memberId}` | 구성원 삭제. 과거 판매의 착용자 호칭은 남는다 | STAFF | CUS-05 |
 | GET | `/customers/{id}/notes` | 메모 목록 (최신순) | STAFF | MEM-02 |
 | POST | `/customers/{id}/notes` | 메모 작성. 연락 결과는 `type=CALL` + `callResult` | STAFF | MEM-01, CAL-02 |
 | PATCH | `/notes/{noteId}` | 메모 수정 (본인, MANAGER는 전체) | STAFF | MEM-03 |
@@ -113,7 +119,10 @@
 | `inactiveDays` | `90` | `120` |
 | `target` | 없음 | `WOMEN` |
 | `itemType` | 없음 | `OUTER` |
+| `memberRelation` | 없음 | `CHILD` (그 관계의 가족 구성원이 있는 고객만) |
 | `page`, `size` | `0`, `20` | |
+
+`memberRelation` 값은 `SPOUSE`(배우자), `CHILD`(자녀), `PARENT`(부모), `OTHER`(기타). 구성원 API의 `relation`도 같은 값이다.
 
 정렬은 마지막 방문일이 오래된 순. 각 항목에 `marketingAllowed`(문자·카톡 중 하나라도 동의) 를 포함한다.
 
@@ -141,7 +150,7 @@
 | GET | `/grade-policy` | 현재 기준 (구간, 점수, 등급 컷, 등급 할인율, 수동 할인 상한) | STAFF | GRD-04 |
 | GET | `/grade-policy/versions` | 기준 버전 목록 | MANAGER | GRD-04 |
 | POST | `/grade-policy` | 새 기준 버전 등록 → 전체 재계산 (승급만 즉시) | MANAGER | GRD-04, BR-05 |
-| POST | `/grade-policy/periodic-runs` | 정기 산정 수동 실행 (매월 1일 자동 실행과 같은 처리. 데모용) | MANAGER | GRD-05 |
+| POST | `/grade-policy/periodic-runs` | 정기 산정 수동 실행 (매년 6월 1일 자동 실행과 같은 처리. 데모용) | MANAGER | GRD-05 |
 
 MVP는 재계산을 **동기**로 처리한다(고객 5천 명 기준, 처리 시간은 측정 후 판단). 오래 걸리면 비동기 + 상태 조회로 바꾼다.
 
@@ -173,7 +182,7 @@ Idempotency-Key: 6b0f6c1e-2f7a-4f3c-9a51-1d2c3e4f5a6b
   "customerId": 1024,
   "lines": [
     { "skuId": 5501, "qty": 1, "discountRate": 3 },
-    { "skuId": 7302, "qty": 1, "discountRate": 10 }
+    { "skuId": 7302, "qty": 1, "discountRate": 10, "memberId": 31 }
   ],
   "memo": "요청했던 롱코트 구매. 다음 시즌 스키 바지 관심."
 }
@@ -183,6 +192,7 @@ Idempotency-Key: 6b0f6c1e-2f7a-4f3c-9a51-1d2c3e4f5a6b
 - `memo`는 응대 메모다 (최대 1,000자). 비회원 판매에 `memo`가 있으면 `400 VALIDATION_FAILED`. 메모는 `SALE_COMPLETED` 이벤트로 고객 모듈에 전달되고, 고객 모듈이 `consult_note`(type=`PURCHASE`, `sale_id` 연결)로 저장한다 (SAL-04).
 - `discountRate`를 생략하면 고객의 현재 등급 할인율이 들어간다(`GRADE`). 값을 보내고 그 값이 등급 할인율과 다르면 `MANUAL`로 기록된다.
 - 할인율이 상한(`manualDiscountMax`)을 넘으면 `422 DISCOUNT_RATE_EXCEEDED`.
+- `memberId`는 그 라인의 착용자(가족 구성원)이고 생략할 수 있다. 판매 고객의 구성원이 아니면 `404 MEMBER_NOT_FOUND`, 비회원 판매에 있으면 `400 VALIDATION_FAILED`. 서버가 구성원 호칭을 판매 라인에 복사해 둔다 (CUS-05, ADR-009).
 - 금액 계산은 **서버가 한다**. 클라이언트가 보낸 합계는 믿지 않는다.
 - 실판매가(`unitPrice`)는 요청으로 받지 않는다. MVP는 상품 정가로 고정한다 (BR-10).
 - 판매 시각(`soldAt`)은 서버 시각이다. 더미 판매 생성기(ING-01)용으로 `seed` 프로필에서만 요청의 `soldAt`을 받는다. 운영 프로필에서 보내면 무시한다.
@@ -202,13 +212,15 @@ Idempotency-Key: 6b0f6c1e-2f7a-4f3c-9a51-1d2c3e4f5a6b
       "discountAmount": 23940, "lineAmount": 774060 },
     { "lineId": 2, "productCode": "K3402", "productName": "캐시미어 머플러", "color": "오트밀", "size": "FREE",
       "unitPrice": 242000, "qty": 1, "discountRate": 10, "discountSource": "MANUAL",
-      "discountAmount": 24200, "lineAmount": 217800 }
+      "discountAmount": 24200, "lineAmount": 217800, "wearerMemberId": 31, "wearerLabel": "남편" }
   ],
   "totalDiscount": 48140,
   "totalAmount": 991860,
   "totalQty": 2
 }
 ```
+
+착용자를 고르지 않은 라인은 `wearerMemberId`와 `wearerLabel`이 `null`이다 (위 예시의 첫 라인은 생략해서 보였다).
 
 **중복 요청 방지**: 직원이 "판매 등록"을 두 번 누르거나 네트워크가 재전송해도 판매가 두 번 생기면 안 된다. 같은 `Idempotency-Key`로 다시 오면 새로 저장하지 않고 저장된 판매로 **처음과 같은 응답**을 다시 만들어 `200`으로 돌려준다. 키는 화면이 판매 화면을 열 때 만든 UUID다.
 
@@ -318,6 +330,7 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 | `STORE_NOT_FOUND` | 404 | 매장 없음 (QR의 매장 코드 오류 포함) |
 | `STAFF_NOT_FOUND` | 404 | 직원 없음 |
 | `NOTE_NOT_FOUND` | 404 | 메모 없음 |
+| `MEMBER_NOT_FOUND` | 404 | 가족 구성원 없음 (판매 요청의 `memberId`가 그 고객의 구성원이 아닐 때 포함) |
 | `CUSTOMER_PHONE_DUPLICATED` | 409 | 같은 전화번호 고객 존재 (직원 등록). `details`에 기존 고객 |
 | `STAFF_LOGIN_ID_DUPLICATED` | 409 | 같은 로그인 ID 존재 (직원 등록) |
 | `RETURN_QTY_EXCEEDED` | 409 | 반품 가능 수량 초과 |
@@ -347,7 +360,7 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
   "memo": "요청했던 롱코트 구매. 다음 시즌 스키 바지 관심.",
   "lines": [
     { "saleLineId": 1, "target": "WOMEN", "itemType": "OUTER", "qty": 1, "lineAmount": 774060 },
-    { "saleLineId": 2, "target": "UNISEX", "itemType": "ACC", "qty": 1, "lineAmount": 217800 }
+    { "saleLineId": 2, "target": "UNISEX", "itemType": "ACC", "qty": 1, "lineAmount": 217800, "memberId": 31 }
   ]
 }
 ```
@@ -367,6 +380,7 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
 }
 ```
 
+- `SALE_COMPLETED`의 `lines[].memberId`는 착용자이고, 고르지 않았으면 빠진다. 판매 사실을 그대로 담기 위한 필드로, MVP의 고객 모듈은 쓰지 않는다.
 - 비회원 판매(`customerId` 없음)도 이벤트는 발행한다. 고객 모듈은 `customerId`가 없으면 처리 기록만 남기고 건너뛴다.
 - 같은 `saleId`의 이벤트는 발생 순서대로 전달한다. `SALE_COMPLETED`가 처리되기 전에는 `SALE_RETURNED`를 보내지 않는다 (BR-06, ADR-007).
 - 발행기는 1초마다 `PENDING`을 읽고, 실패하면 최대 10회 재시도한 뒤 `FAILED`로 둔다.
@@ -379,10 +393,10 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
 | --- | --- |
 | 고객 등록 폼 (QR) | `GET /public/join-info` (사이즈 선택지 포함), `POST /public/registrations` |
 | 고객 등록 폼 (iPad) | `GET /me`, `GET /public/join-info` (동의 문구, 사이즈 선택지 포함), `POST /kiosk/registrations` |
-| 판매등록 | `GET /customers?name=`, `GET /customers/{id}`, `GET /products?keyword=`, `GET /products/{code}`, `GET /grade-policy`, `POST /sales`, `POST /customers`, `GET /public/sizes` |
+| 판매등록 | `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자 선택), `GET /products?keyword=`, `GET /products/{code}`, `GET /grade-policy`, `POST /sales`, `POST /customers`, `GET /public/sizes` |
 | 고객등록 (직원) | `GET /public/sizes`, `POST /customers` |
 | 판매 내역 · 반품 | `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns` |
-| 고객 검색 · 상세 | `GET /customers`, `GET /customers/{id}`, `PATCH /customers/{id}`, `GET /customers/{id}/purchases`, `GET /customers/{id}/grade-history`, 메모 API, `GET /public/sizes` |
+| 고객 검색 · 상세 | `GET /customers`, `GET /customers/{id}`, `PATCH /customers/{id}`, `GET /customers/{id}/purchases`, `GET /customers/{id}/grade-history`, 구성원 API, 메모 API, `GET /public/sizes` |
 | 콜리스트 | `GET /call-list`, `POST /customers/{id}/notes` |
 | 등급 기준 | `GET /grade-policy`, `GET /grade-policy/versions`, `POST /grade-policy`, `POST /grade-policy/periodic-runs` |
 | 직원 관리 | `GET/POST/PATCH /staff`, `GET /staff/{id}/qr`, `GET /stores`, `GET /stores/{id}/qr` |
