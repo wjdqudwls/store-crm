@@ -1,7 +1,7 @@
 # 02. 데이터 모델 (ERD)
 
 > 기준 문서: [01-requirements.md](01-requirements.md) · 작성일: 2026-10-15 · 상태: **확정** (2026-10-15 검토 완료. 이후 변경은 decisions.md에 기록)
-> 변경: 2026-10-15 API 설계 반영 — `sale.idempotency_key`·`request_hash`(ADR-006), `customer.created_at`, outbox 순서 보장 인덱스(ADR-007). `02-erd.png`는 아직 이전 그림이다.
+> 변경: 2026-10-15 API 설계 반영 — `sale.idempotency_key`·`request_hash`(ADR-006), `customer.created_at`, outbox 순서 보장 인덱스(ADR-007). 그림 파일 `02-erd.png`는 지우고 2장의 mermaid ERD를 원본으로 쓴다.
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기

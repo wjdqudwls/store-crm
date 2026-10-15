@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | 0 | [docs/00-idea.md](docs/00-idea.md) | 왜 만드는가, 문제, 대상, 범위 | 확정 |
 | 1 | [docs/01-requirements.md](docs/01-requirements.md) | 기능·비기능 요구사항, 비즈니스 규칙, 8주 일정 | 초안 |
-| 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 (그림: [02-erd.png](docs/02-erd.png)) | 확정 |
+| 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 (ERD 그림은 문서 안 mermaid) | 확정 |
 | 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
 
