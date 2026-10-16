@@ -22,4 +22,4 @@
 
 ## 기술 스택 (예정)
 
-Java · Spring Boot 3 · Spring Data JPA · MariaDB · Vue 3 · Docker Compose
+Java 21 · Spring Boot 4 · Spring Data JPA · MariaDB · Vue 3 · Docker Compose
