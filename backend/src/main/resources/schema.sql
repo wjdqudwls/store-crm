@@ -42,9 +42,9 @@ CREATE TABLE IF NOT EXISTS staff (
 
 CREATE TABLE IF NOT EXISTS product (
     id           BIGINT       NOT NULL AUTO_INCREMENT,
-    product_code VARCHAR(20)  NOT NULL COMMENT '품번 (예: D2110)',
+    product_code VARCHAR(20)  NULL     COMMENT '품번 (예: D2110), 선택. NULL은 여러 개여도 UNIQUE에 걸리지 않는다',
     name         VARCHAR(100) NOT NULL COMMENT '품명',
-    target       VARCHAR(20)  NOT NULL COMMENT 'WOMEN, MEN, KIDS, UNISEX',
+    target       VARCHAR(20)  NULL     COMMENT 'WOMEN, MEN, KIDS, UNISEX, 선택',
     item_type    VARCHAR(20)  NOT NULL COMMENT 'OUTER, TOP, BOTTOM, SHOES, ACC',
     list_price   BIGINT       NOT NULL COMMENT '정가 (원)',
     PRIMARY KEY (id),
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS product (
 CREATE TABLE IF NOT EXISTS product_sku (
     id         BIGINT      NOT NULL AUTO_INCREMENT,
     product_id BIGINT      NOT NULL,
-    color      VARCHAR(30) NOT NULL,
+    color      VARCHAR(30) NOT NULL COMMENT '선택. 색상이 없으면 빈 문자열로 저장해 UNIQUE가 동작하게 한다',
     size       VARCHAR(20) NOT NULL COMMENT '품목별 허용값만 (02-erd.md 3.2)',
     PRIMARY KEY (id),
     CONSTRAINT uk_product_sku_product_color_size UNIQUE (product_id, color, size),
@@ -76,8 +76,7 @@ CREATE TABLE IF NOT EXISTS sale (
     customer_id     BIGINT      NULL     COMMENT 'NULL이면 비회원 판매',
     applied_grade   VARCHAR(20) NULL     COMMENT '판매 당시 등급, 비회원 NULL',
     sold_at         DATETIME(6) NOT NULL,
-    total_discount  BIGINT      NOT NULL,
-    total_amount    BIGINT      NOT NULL COMMENT '결제 합계',
+    total_amount    BIGINT      NOT NULL COMMENT '실제 결제 금액 합계 (ADR-014)',
     total_qty       INT         NOT NULL,
     status          VARCHAR(20) NOT NULL COMMENT 'COMPLETED, PARTIAL_RETURNED, RETURNED',
     PRIMARY KEY (id),
@@ -90,20 +89,16 @@ CREATE TABLE IF NOT EXISTS sale (
 CREATE TABLE IF NOT EXISTS sale_line (
     id               BIGINT       NOT NULL AUTO_INCREMENT,
     sale_id          BIGINT       NOT NULL,
-    sku_id           BIGINT       NOT NULL,
-    product_code     VARCHAR(20)  NOT NULL COMMENT '판매 시점 스냅샷',
+    sku_id           BIGINT       NULL     COMMENT 'NULL이면 직접 입력 (등록 상품 아님)',
+    product_code     VARCHAR(20)  NULL     COMMENT '판매 시점 스냅샷, 선택',
     product_name     VARCHAR(100) NOT NULL COMMENT '스냅샷',
-    target           VARCHAR(20)  NOT NULL COMMENT '스냅샷',
+    target           VARCHAR(20)  NULL     COMMENT '스냅샷, 선택',
     item_type        VARCHAR(20)  NOT NULL COMMENT '스냅샷',
-    color            VARCHAR(30)  NOT NULL COMMENT '스냅샷',
+    color            VARCHAR(30)  NULL     COMMENT '스냅샷, 선택',
     size             VARCHAR(20)  NOT NULL COMMENT '스냅샷',
-    list_price       BIGINT       NOT NULL COMMENT '정가 스냅샷',
-    unit_price       BIGINT       NOT NULL COMMENT '실판매가 (MVP는 정가와 같음, BR-10)',
+    list_price       BIGINT       NULL     COMMENT '정가 스냅샷, 등록 상품일 때만',
     qty              INT          NOT NULL,
-    discount_rate    INT          NOT NULL COMMENT '정수 %, 0~상한',
-    discount_source  VARCHAR(20)  NOT NULL COMMENT 'GRADE, MANUAL, NONE',
-    discount_amount  BIGINT       NOT NULL COMMENT '원 미만 버림',
-    line_amount      BIGINT       NOT NULL COMMENT '결제 금액',
+    line_amount      BIGINT       NOT NULL COMMENT '직원이 확인한 실제 결제 금액 (ADR-014)',
     returned_qty     INT          NOT NULL DEFAULT 0,
     wearer_member_id BIGINT       NULL     COMMENT '착용자, 선택 (ADR-009)',
     wearer_label     VARCHAR(30)  NULL     COMMENT '착용자 호칭 스냅샷',
@@ -160,7 +155,8 @@ CREATE TABLE IF NOT EXISTS outbox_event (
 
 -- ============================================================
 -- customer: customer, customer_member, customer_purchase, customer_summary,
---           grade_policy, grade_rule, grade_history, consult_note, processed_event
+--           grade_policy, grade_rule, grade_history, consult_note,
+--           follow_up_rule, follow_up_task, processed_event
 -- home_store_id, staff_id, sale_id, sale_line_id, store_id는 다른 모듈의 ID라 FK를 걸지 않는다 (ADR-003)
 -- ============================================================
 
@@ -225,7 +221,7 @@ CREATE TABLE IF NOT EXISTS customer_purchase (
     sale_line_id    BIGINT      NOT NULL,
     store_id        BIGINT      NOT NULL,
     sold_at         DATETIME(6) NOT NULL,
-    target          VARCHAR(20) NOT NULL,
+    target          VARCHAR(20) NULL     COMMENT '모르면 NULL',
     item_type       VARCHAR(20) NOT NULL,
     qty             INT         NOT NULL,
     amount          BIGINT      NOT NULL,
@@ -266,7 +262,6 @@ CREATE TABLE IF NOT EXISTS grade_policy (
     id                  BIGINT      NOT NULL AUTO_INCREMENT,
     version             INT         NOT NULL,
     period_months       INT         NOT NULL DEFAULT 12,
-    manual_discount_max INT         NOT NULL COMMENT '직원 수동 할인 상한 %',
     active              BOOLEAN     NOT NULL DEFAULT FALSE,
     created_by          BIGINT      NULL     COMMENT '만든 직원. 시드 데이터는 NULL',
     created_at          DATETIME(6) NOT NULL,
@@ -313,6 +308,49 @@ CREATE TABLE IF NOT EXISTS consult_note (
     INDEX idx_consult_note_customer_created_at (customer_id, created_at),
     CONSTRAINT fk_consult_note_customer FOREIGN KEY (customer_id) REFERENCES customer (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- 후속 연락 단계 설정. 브랜드 공통, MANAGER가 바꾼다 (BR-14, CAL-07)
+CREATE TABLE IF NOT EXISTS follow_up_rule (
+    id            BIGINT      NOT NULL AUTO_INCREMENT,
+    name          VARCHAR(50) NOT NULL COMMENT '단계 이름 (예: 감사 인사)',
+    offset_amount INT         NOT NULL COMMENT '판매일로부터 (예: 2)',
+    offset_unit   VARCHAR(20) NOT NULL COMMENT 'DAY, WEEK, MONTH',
+    promotional   BOOLEAN     NOT NULL DEFAULT FALSE COMMENT '홍보 연락 단계 (BR-08)',
+    sort_order    INT         NOT NULL,
+    active        BOOLEAN     NOT NULL DEFAULT TRUE,
+    updated_at    DATETIME(6) NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- 후속 연락 할 일. 회원 판매 이벤트 처리 때 활성 단계마다 1행 (ADR-016, CAL-06)
+-- staff_id: 고객의 담당 직원, 없으면 판매를 기록한 직원 (BR-14)
+CREATE TABLE IF NOT EXISTS follow_up_task (
+    id          BIGINT      NOT NULL AUTO_INCREMENT,
+    customer_id BIGINT      NOT NULL,
+    staff_id    BIGINT      NOT NULL COMMENT '받는 직원',
+    sale_id     BIGINT      NOT NULL COMMENT '기준 판매',
+    rule_id     BIGINT      NOT NULL,
+    rule_name   VARCHAR(50) NOT NULL COMMENT '단계 이름 스냅샷',
+    promotional BOOLEAN     NOT NULL COMMENT '홍보 여부 스냅샷',
+    due_date    DATE        NOT NULL COMMENT '만기일 = 판매일 + 단계 기간',
+    status      VARCHAR(20) NOT NULL COMMENT 'OPEN, DONE, SKIPPED, CANCELLED, REPLACED',
+    note_id     BIGINT      NULL     COMMENT '완료한 연락 기록 (consult_note)',
+    created_at  DATETIME(6) NOT NULL,
+    closed_at   DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    INDEX idx_follow_up_task_staff_status_due (staff_id, status, due_date),
+    INDEX idx_follow_up_task_customer_status (customer_id, status),
+    CONSTRAINT fk_follow_up_task_customer FOREIGN KEY (customer_id) REFERENCES customer (id),
+    CONSTRAINT fk_follow_up_task_rule FOREIGN KEY (rule_id) REFERENCES follow_up_rule (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- 기본 단계 3개 (BR-14). 표가 비어 있을 때만 넣는다
+INSERT INTO follow_up_rule (name, offset_amount, offset_unit, promotional, sort_order, active, updated_at)
+SELECT t.name, t.offset_amount, t.offset_unit, t.promotional, t.sort_order, TRUE, NOW(6)
+FROM (SELECT '감사 인사' AS name, 2 AS offset_amount, 'DAY' AS offset_unit, FALSE AS promotional, 1 AS sort_order
+      UNION ALL SELECT '착용감 확인', 2, 'WEEK', FALSE, 2
+      UNION ALL SELECT '신상·재방문 안내', 2, 'MONTH', TRUE, 3) t
+WHERE NOT EXISTS (SELECT 1 FROM follow_up_rule);
 
 -- 처리한 이벤트 ID. 같은 이벤트가 다시 오면 건너뛴다 (멱등, NFR-03)
 CREATE TABLE IF NOT EXISTS processed_event (
