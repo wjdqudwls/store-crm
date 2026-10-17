@@ -12,7 +12,9 @@
 | 1 | [docs/01-requirements.md](docs/01-requirements.md) | 기능·비기능 요구사항, 비즈니스 규칙, 8주 일정 | 확정 |
 | 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 (ERD 그림은 문서 안 mermaid) | 확정 |
 | 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
+| 4 | [docs/04-architecture.md](docs/04-architecture.md) | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
+| - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 인터뷰 질문) | 참고 |
 
 규칙
 

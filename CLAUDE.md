@@ -18,7 +18,8 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 3. `docs/01-requirements.md`: 기능(SAL, REG, CUS, GRD, MEM, CAL, AUTH, ADM), 업무 규칙(BR), 비기능(NFR), 일정, 8장 결정 기록
 4. `docs/02-erd.md`: 테이블, 컬럼, 인덱스
 5. `docs/03-api.md`: API, 에러 코드, 모듈 간 이벤트 계약
-6. `docs/decisions.md`: 기술 결정(ADR)
+6. `docs/04-architecture.md`: 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 스케줄, 보안, 실행 환경
+7. `docs/decisions.md`: 기술 결정(ADR)
 
 필요한 부분은 ID로 찾는다 (예: `SAL-01`, `BR-05`, `NFR-04`, `ADR-006`).
 
@@ -38,6 +39,9 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 패키지 루트는 `com.crmpos`. 모듈은 `com.crmpos.sales`, `com.crmpos.customer`, `com.crmpos.product`, `com.crmpos.common` 4개다 (ADR-001).
 - 모듈끼리는 FK 없이 ID만 들고 있는다. 고객 모듈은 판매 테이블을 조인하지 않고, 이벤트로 받은 `customer_purchase`를 쓴다 (ADR-003).
 - 판매 → 고객관리는 outbox 이벤트로 연결한다 (ADR-002, ADR-007).
+- 모듈 안은 `controller`, `service`, `domain`, `repository`로 나누고, 필요한 모듈에만 `event`와 `api`를 둔다. 여러 모듈이 같이 쓰는 enum은 `common.type`에 둔다 (ADR-011, 04-architecture.md 4장).
+- 다른 모듈의 데이터는 그 모듈의 `api` 인터페이스로만 읽고, 바꾸는 일은 outbox 이벤트로만 한다. 다른 모듈의 `controller`·`service`·`repository`·`domain`은 import하지 않는다 (ADR-012).
+- Vue 화면은 Spring Boot가 정적 파일로 같이 내보낸다 (ADR-013).
 
 ## DTO 규칙
 
@@ -54,7 +58,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 ## 의존성
 
-- 새 의존성은 필요할 때 추가한다. 예정: Spring Security + jjwt(로그인), springdoc-openapi(NFR-12), Testcontainers MariaDB(통합 테스트).
+- 새 의존성은 필요할 때 추가한다. 예정: Spring Security + jjwt(로그인), springdoc-openapi(NFR-12), Testcontainers MariaDB(통합 테스트), Apache POI(상품 엑셀, ADR-015).
 - 쓰지 않는다: OpenFeign, Kafka, Redis, MyBatis, ModelMapper. 통합 테스트에 H2 대신 Testcontainers MariaDB를 쓴다 (`FOR UPDATE`, JSON 컬럼, UNIQUE 제약을 실제 DB로 확인해야 하므로).
 
 ## 보안
