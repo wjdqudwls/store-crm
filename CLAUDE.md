@@ -14,12 +14,13 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 작업 전에 관련 문서를 먼저 읽는다. 코드는 문서를 따른다. 문서와 코드가 다르거나 문서에 없는 결정이 필요하면 혼자 정하지 말고 사용자에게 묻는다.
 
 1. `README.md`: 문서 목록과 규칙
-2. `docs/00-idea.md`: 왜 만드는가, 범위
-3. `docs/01-requirements.md`: 기능(SAL, REG, CUS, GRD, MEM, CAL, AUTH, ADM), 업무 규칙(BR), 비기능(NFR), 일정, 8장 결정 기록
-4. `docs/02-erd.md`: 테이블, 컬럼, 인덱스
-5. `docs/03-api.md`: API, 에러 코드, 모듈 간 이벤트 계약
-6. `docs/04-architecture.md`: 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 스케줄, 보안, 실행 환경
-7. `docs/decisions.md`: 기술 결정(ADR)
+2. `docs/project-plan.md`: 목표, 우선순위(Must·Should·Could), 주차별 일정, 리스크
+3. `docs/00-idea.md`: 왜 만드는가, 범위
+4. `docs/01-requirements.md`: 기능(SAL, REG, CUS, GRD, MEM, CAL, PRD, AUTH, ADM), 업무 규칙(BR), 비기능(NFR), 일정, 8장 결정 기록
+5. `docs/02-erd.md`: 테이블, 컬럼, 인덱스
+6. `docs/03-api.md`: API, 에러 코드, 모듈 간 이벤트 계약
+7. `docs/04-architecture.md`: 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 스케줄, 보안, 실행 환경
+8. `docs/decisions.md`: 기술 결정(ADR)
 
 필요한 부분은 ID로 찾는다 (예: `SAL-01`, `BR-05`, `NFR-04`, `ADR-006`).
 

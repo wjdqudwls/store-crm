@@ -13,8 +13,9 @@
 | 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 (ERD 그림은 문서 안 mermaid) | 확정 |
 | 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
 | 4 | [docs/04-architecture.md](docs/04-architecture.md) | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
+| - | [docs/project-plan.md](docs/project-plan.md) | 프로젝트 계획 (목표, 우선순위, 일정·마일스톤, 검증, 리스크) | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
-| - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 인터뷰 질문) | 참고 |
+| - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 시장 규모, 확인 못 한 가설) | 참고 |
 
 규칙
 
