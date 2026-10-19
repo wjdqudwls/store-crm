@@ -15,6 +15,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 1. `README.md`: 문서 목록과 규칙
 2. `docs/project-plan.md`: 목표, 우선순위(Must·Should·Could), 주차별 일정, 리스크
+   - `docs/dev-plan.md`: 백엔드(B0~B4)·프론트엔드(F0~F9) 작업 ID, 완료 기준, 테스트. 브랜치·PR 이름에 작업 ID를 쓴다
 3. `docs/00-idea.md`: 왜 만드는가, 범위
 4. `docs/01-requirements.md`: 기능(SAL, REG, CUS, GRD, MEM, CAL, PRD, AUTH, ADM), 업무 규칙(BR), 비기능(NFR), 일정, 8장 결정 기록
 5. `docs/02-erd.md`: 테이블, 컬럼, 인덱스
