@@ -7,7 +7,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 한국어로, 쉬운 말로 설명한다.
 - 이번 프로젝트의 목표는 개발 순서를 직접 익히는 것이다 (01-requirements.md 8장). 요청이 없으면 큰 코드를 한 번에 만들지 말고, 설명·검토·막힌 곳 풀기를 중심으로 돕는다. 사용자가 만들어 달라고 하면 만든다.
 - 커밋과 push는 사용자에게 확인받고 한다. 브랜치 없이 `main`에 바로 커밋한다.
-- 커밋 메시지는 `docs: …`, `feat: …`, `fix: …`, `chore: …`, `test: …` 형식으로 쓴다.
+- 커밋 메시지는 `docs: …`, `feat: …`, `fix: …`, `refactor: …`, `chore: …`, `test: …` 형식으로 쓴다.
 
 ## 문서 읽는 순서
 
@@ -42,7 +42,8 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 모듈끼리는 FK 없이 ID만 들고 있는다. 고객 모듈은 판매 테이블을 조인하지 않고, 이벤트로 받은 `customer_purchase`를 쓴다 (ADR-003).
 - 판매 → 고객관리는 outbox 이벤트로 연결한다 (ADR-002, ADR-007).
 - 모듈 안은 `controller`, `service`, `domain`, `repository`로 나누고, 필요한 모듈에만 `event`와 `api`를 둔다. 여러 모듈이 같이 쓰는 enum은 `common.type`에 둔다 (ADR-011, 04-architecture.md 4장).
-- 다른 모듈의 데이터는 그 모듈의 `api` 인터페이스로만 읽고, 바꾸는 일은 outbox 이벤트로만 한다. 다른 모듈의 `controller`·`service`·`repository`·`domain`은 import하지 않는다 (ADR-012).
+- 다른 모듈의 데이터는 그 모듈의 `api` 인터페이스로만 읽고, 바꾸는 일은 outbox 이벤트로만 한다 (예외: 직원 비활성화·이관은 같은 트랜잭션의 Spring 이벤트, ADR-024). 다른 모듈의 `controller`·`service`·`repository`·`domain`은 import하지 않는다 (ADR-012).
+- 역할은 `HQ`(본사)·`STORE`(매장 계정)·`MANAGER`·`SENIOR`·`JUNIOR`·`STAFF`(직원 직급)·`KIOSK`다. 접근 제한 기능은 HQ만, 판매 기록은 STORE만 한다 (01-requirements.md 2장, ADR-023).
 - 쓰기는 JPA 엔티티로, 목록·검색·집계 조회는 MyBatis로 할 수 있다. 매퍼는 `repository`에 `…QueryMapper`로, SQL은 `resources/mappers/{모듈}/`에 두고, SQL에서도 자기 모듈 테이블만 쓴다 (ADR-018).
 - Vue 화면은 Spring Boot가 정적 파일로 같이 내보낸다 (ADR-013).
 
@@ -52,6 +53,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 엔티티 → DTO 변환은 record 안의 `static from(...)` 메서드로 직접 한다. ModelMapper, MapStruct는 쓰지 않는다.
 - 엔티티를 API 응답으로 그대로 내보내지 않는다.
 - JSON 필드는 camelCase, enum은 대문자 문자열로 주고받는다 (03-api.md 1장).
+- 전화번호·주소가 든 record는 `toString()`을 직접 써서 가린다 (NFR-04b).
 
 ## 롬복 규칙
 
@@ -66,6 +68,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 ## 테스트 규칙
 
+- 기능 하나는 dev-plan.md 5장의 순서로 만든다: 테스트할 경우 적기 → Repository → Service → Controller → 통합 → `refactor:` → 화면(계산 함수는 Vitest 먼저) → PR.
 - 순서는 TDD 안쪽부터: Repository → Service → Controller. 실패 테스트 → 최소 구현 → 정리, 정상 → 경계 → 오류 순서로 쓴다 (ADR-017).
 - 층: 엔티티(업무 규칙), Repository(저장 후 다시 조회해 확인), Service(`@Mock`으로 DB 없이), Controller(MockMvc로 입력 검증·에러 형식·권한·상태 코드), 통합(`@SpringBootTest` + MockMvc, Controller부터 DB까지).
 - 이름은 `@DisplayName("한글 설명")` + 메서드 `should_동작_when_조건`.
@@ -77,6 +80,8 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 비밀번호, 암호화 키, JWT 시크릿은 환경변수로 받는다. 코드와 설정 파일에 직접 쓰지 않는다 (NFR-06).
 - `.env`는 커밋하지 않는다. 예시는 `.env.example`에만 둔다.
 - 실제 고객 데이터를 레포에 올리지 않는다. 문서·코드·테스트 예시는 가상 데이터만 쓴다 (NFR-07).
+- 로그에는 ID만 남긴다. 전화번호·상세주소·이름·생년월일, 요청 본문, SQL 바인딩 값(배포 환경)은 찍지 않는다 (NFR-04b).
+- 화면은 브라우저 저장소에 토큰만 두고 고객 데이터는 저장하지 않는다 (NFR-04c).
 
 ## 명령어
 
