@@ -7,6 +7,7 @@
 > 변경: 2026-10-16 가족 구성원 MVP 반영 — `customer_member` 추가(테이블 19개), 판매 라인 착용자 `sale_line.wearer_member_id`·`wearer_label`, 구성원 관계 인덱스 (ADR-009).
 > 변경: 2026-10-18 상품 등록은 선택, 판매는 실제 결제 금액을 기록 (01-requirements.md PRD-01·02, BR-10, ADR-014) — `product.product_code`·`target`과 `product_sku.color`는 선택, `sale_line.sku_id`는 직접 입력이면 NULL, `sale_line`의 `unit_price`·`discount_rate`·`discount_source`·`discount_amount`와 `sale.total_discount`, `grade_policy.manual_discount_max` 삭제.
 > 변경: 2026-10-18 후속 연락 반영 — `follow_up_rule`(단계 설정), `follow_up_task`(할 일) 추가, 테이블 21개 (01-requirements.md CAL-06·07, BR-14, ADR-016).
+> 변경: 2026-10-23 등급 실적을 시즌 단위로 (01-requirements.md BR-03·05, ADR-020) — `customer_summary`의 `ticket_count_12m`·`qty_12m`·`net_amount_12m`을 `season_ticket_count`·`season_qty`·`season_net_amount`로, 매일 실적 갱신 삭제. `schema.sql`과 엔티티는 B3-3 작업 때 바꾼다.
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -209,9 +210,9 @@ erDiagram
     }
     customer_summary {
         BIGINT customer_id PK, FK
-        INT ticket_count_12m
-        INT qty_12m
-        BIGINT net_amount_12m
+        INT season_ticket_count
+        INT season_qty
+        BIGINT season_net_amount
         BIGINT lifetime_amount
         DATETIME first_visit_at
         DATETIME last_visit_at
@@ -227,7 +228,7 @@ erDiagram
     grade_policy {
         BIGINT id PK
         INT version UK
-        INT period_months "기본 12"
+        INT period_months "시즌 길이 12"
         BOOLEAN active "활성 1개"
         BIGINT created_by
         DATETIME created_at
@@ -364,7 +365,7 @@ erDiagram
 
 | 컬럼 | 뜻 | 언제 바뀌나 |
 | --- | --- | --- |
-| `computed_grade` | 지금 실적(최근 12개월)으로 계산한 등급 | 판매·반품 이벤트, 매일 실적 갱신, 정기 산정, 기준 변경 |
+| `computed_grade` | 이번 시즌 누적 실적으로 계산한 등급 | 판매·반품 이벤트, 정기 산정, 기준 변경 |
 | `current_grade` | 지금 고객에게 적용 중인 등급 | 즉시 승급, 반품 승급 취소, 정기 산정 |
 | `confirmed_grade` | 마지막 정기 산정에서 확정된 등급 | 정기 산정 (매년 6월 1일) |
 
@@ -372,10 +373,9 @@ erDiagram
 
 - 판매 이벤트: `computed > current`이면 `current = computed` (즉시 승급)
 - 반품 이벤트: `current = max(computed, confirmed)` (승급 취소, 단 확정 등급 아래로는 안 내려감)
-- 정기 산정: `current = confirmed = computed` (이때만 강등)
-- 매일 실적 갱신: `computed`와 12개월 집계만 다시 계산한다. 시간이 지나면 실적은 줄기만 하므로 `current`는 바뀌지 않는다 (ADR-008)
+- 정기 산정: 막 끝난 시즌 실적으로 계산한 등급을 `current = confirmed`로 확정한다 (이때만 강등). 그다음 시즌 집계와 `computed`를 새 시즌 기준으로 다시 계산한다 (ADR-020)
 
-등급 비교(`>`, `max`)는 등급 코드의 문자 순서가 아니라 기준의 등급 컷 점수(`grade_rule.min_value`, kind=GRADE) 순서로 한다. `*_12m` 컬럼은 기본 기간 기준의 이름이고, 실제 기간은 `grade_policy.period_months`를 따른다 (NFR-10의 36개월 테스트에서도 같은 컬럼을 쓴다).
+등급 비교(`>`, `max`)는 등급 코드의 문자 순서가 아니라 기준의 등급 컷 점수(`grade_rule.min_value`, kind=GRADE) 순서로 한다. `season_*` 컬럼은 이번 시즌(6월 1일 0시부터) 누적이다. 시즌 길이는 `grade_policy.period_months`(12)이고 시작일은 6월 1일로 고정한다. 엑셀 툴 비교 테스트(NFR-10)는 등급 계산기에 36개월 기간을 직접 넣는다.
 
 ## 4. 인덱스
 
@@ -387,7 +387,7 @@ erDiagram
 | `customer_summary` | `(current_grade, last_visit_at)` | 콜리스트 등급·미방문 필터 (CAL-01) |
 | `customer_member` | `(customer_id)` | 고객 상세의 구성원 목록 (CUS-05) |
 | `customer_member` | `(relation, customer_id)` | 콜리스트 가족 필터 (CAL-01) |
-| `customer_purchase` | `(customer_id, sold_at)` | 최근 12개월 집계 |
+| `customer_purchase` | `(customer_id, sold_at)` | 고객별 시즌 집계 |
 | `customer_purchase` | `(item_type, customer_id)`, `(target, customer_id)` | 콜리스트 구매 품목·대상 필터 |
 | `customer_purchase` | `UNIQUE(sale_line_id)` | 같은 라인 중복 적재 방지 |
 | `sale` | `UNIQUE(receipt_no)` | 영수증 번호 중복 방지 (번호에 매장코드 포함) |
@@ -407,7 +407,7 @@ erDiagram
 | --- | --- | --- | --- |
 | 1 | 모듈 간 FK 없이 ID로만 참조 | 모듈 경계를 DB에서도 지킨다. 나중에 모듈을 서비스로 떼어낼 때 FK부터 풀 필요가 없다 | 모든 테이블에 FK: 편하지만 모듈이 DB로 묶인다 |
 | 2 | 고객 모듈은 `customer_purchase`(이벤트로 받은 사본)를 쓴다 | 판매 테이블 구조가 바뀌어도 고객 모듈이 깨지지 않는다. 판매 → 고객 흐름이 이벤트 하나로만 연결된다 | 판매 테이블 직접 조인: 쉽지만 결합도가 높다 |
-| 3 | 요약 테이블 `customer_summary` | 검색·콜리스트마다 12개월 집계를 돌리지 않는다. 엑셀의 느린 SUMIFS 문제를 푸는 지점 | 조회 때마다 집계: 고객이 늘면 느려진다 |
+| 3 | 요약 테이블 `customer_summary` | 검색·콜리스트마다 시즌 집계를 돌리지 않는다. 엑셀의 느린 SUMIFS 문제를 푸는 지점 | 조회 때마다 집계: 고객이 늘면 느려진다 |
 | 4 | 판매 라인에 상품 정보 스냅샷 | 과거 영수증은 판매 당시 값이어야 한다 | 상품 테이블 조인: 상품이 바뀌면 과거 기록이 바뀐다 |
 | 5 | 반품은 별도 테이블, 원 판매는 수정하지 않음 | 언제 무엇이 반품됐는지 이력이 남는다 | 판매 행 수정·삭제: 이력이 사라진다 |
 | 6 | 등급 기준은 버전으로 쌓는다 | "이 고객은 왜 B인가"를 기준 버전으로 설명할 수 있다 | 기준 행 덮어쓰기: 과거 근거가 사라진다 |
@@ -418,6 +418,7 @@ erDiagram
 | 11 | 가족 구성원은 대표 고객 아래 테이블, 판매 라인에 착용자 | 등급 규칙을 바꾸지 않고 가족 필터와 착용자 기록을 얻는다 | 구성원도 고객으로: 전화번호 없는 고객과 가족 등급 합산 규칙이 생긴다 |
 | 12 | 상품 마스터는 선택, 판매 라인은 상품 없이도 저장 | 상품을 등록하지 않은 매장도 바로 쓸 수 있다. 스냅샷 칸을 그대로 쓰므로 테이블이 늘지 않는다 | 상품 등록 필수: 시즌마다 수백 개를 입력해야 해 시작 문턱이 높다 |
 | 13 | 후속 연락은 판매 이벤트 때 할 일 행을 만들어 저장 | 완료·건너뛰기 상태와 연락 기록을 남길 수 있고, 설정이 바뀌어도 이미 만든 할 일은 그대로다 (ADR-016) | 조회할 때마다 판매일로 계산: 상태를 저장할 곳이 없다 |
+| 14 | 요약의 실적 컬럼은 이번 시즌 누적(`season_*`) | 시즌 단위 등급에 맞고(ADR-020), 판매·반품 때만 바뀌어 매일 다시 계산하지 않아도 된다 | 최근 12개월 집계 + 매일 새벽 재계산(ADR-008, 대체됨): 정기 산정의 시즌 기준과 섞인다 |
 
 ## 6. 확인 필요
 

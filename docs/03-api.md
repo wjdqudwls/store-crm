@@ -5,6 +5,7 @@
 > 변경: 2026-10-16 가족 구성원 MVP 반영 — 구성원 API 4개, 판매 라인 `memberId`(착용자), 콜리스트 `memberRelation`, `SALE_COMPLETED` 라인 `memberId`, `MEMBER_NOT_FOUND` (ADR-009).
 > 변경: 2026-10-18 상품 등록은 선택, 판매는 실제 결제 금액 기록 (01-requirements.md PRD-01·02, BR-10, ADR-014·015) — 상품 등록·수정·엑셀 폼·엑셀 올리기 API, `GET /products/{id}`로 변경, 판매 라인은 `skuId` 또는 직접 입력 + `lineAmount`, `discountRate`·할인 관련 응답 필드와 422 에러 2개 삭제, `PRODUCT_IMPORT_FAILED`·`PRODUCT_CODE_DUPLICATED` 추가.
 > 변경: 2026-10-18 후속 연락 API(오늘 할 일·완료·건너뛰기·설정), 판매 요청 `soldAt`은 같은 날 안의 이른 시각을 받음, `FOLLOW_UP_NOT_FOUND`·`FOLLOW_UP_ALREADY_CLOSED` 추가 (01-requirements.md CAL-06·07, BR-14, ADR-016).
+> 변경: 2026-10-23 등급 실적을 시즌 단위로 (01-requirements.md BR-03, ADR-020) — 고객 상세 `grade.ticketCount12m`·`netAmount12m`, `stats.qty12m`을 `seasonTicketCount`·`seasonNetAmount`·`seasonQty`로.
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -288,12 +289,12 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
   "staff": { "id": 17, "name": "이지은" },
   "grade": {
     "current": "B", "computed": "B", "confirmed": "C",
-    "ticketCount12m": 3, "ticketScore": 30,
-    "netAmount12m": 3420000, "amountScore": 40,
+    "seasonTicketCount": 3, "ticketScore": 30,
+    "seasonNetAmount": 3420000, "amountScore": 40,
     "totalScore": 70, "discountRate": 3, "policyVersion": 2
   },
   "stats": { "firstVisitAt": "2025-12-06T13:20:00+09:00", "lastVisitAt": "2026-08-28T15:10:00+09:00",
-             "qty12m": 5, "lifetimeAmount": 9200000 },
+             "seasonQty": 5, "lifetimeAmount": 9200000 },
   "profile": { "gender": "F", "birthYear": 1991, "regionSido": "서울", "regionGu": "강남구",
                "preferredItemTypes": ["OUTER", "TOP"],
                "sizes": { "top": "M", "outer": "90", "bottom": "26", "shoes": "240" },

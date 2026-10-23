@@ -43,6 +43,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 판매 → 고객관리는 outbox 이벤트로 연결한다 (ADR-002, ADR-007).
 - 모듈 안은 `controller`, `service`, `domain`, `repository`로 나누고, 필요한 모듈에만 `event`와 `api`를 둔다. 여러 모듈이 같이 쓰는 enum은 `common.type`에 둔다 (ADR-011, 04-architecture.md 4장).
 - 다른 모듈의 데이터는 그 모듈의 `api` 인터페이스로만 읽고, 바꾸는 일은 outbox 이벤트로만 한다. 다른 모듈의 `controller`·`service`·`repository`·`domain`은 import하지 않는다 (ADR-012).
+- 쓰기는 JPA 엔티티로, 목록·검색·집계 조회는 MyBatis로 할 수 있다. 매퍼는 `repository`에 `…QueryMapper`로, SQL은 `resources/mappers/{모듈}/`에 두고, SQL에서도 자기 모듈 테이블만 쓴다 (ADR-018).
 - Vue 화면은 Spring Boot가 정적 파일로 같이 내보낸다 (ADR-013).
 
 ## DTO 규칙
@@ -60,8 +61,16 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 ## 의존성
 
-- 새 의존성은 필요할 때 추가한다. 예정: Spring Security + jjwt(로그인), springdoc-openapi(NFR-12), Testcontainers MariaDB(통합 테스트), Apache POI(상품 엑셀, ADR-015).
-- 쓰지 않는다: OpenFeign, Kafka, Redis, MyBatis, ModelMapper. 통합 테스트에 H2 대신 Testcontainers MariaDB를 쓴다 (`FOR UPDATE`, JSON 컬럼, UNIQUE 제약을 실제 DB로 확인해야 하므로).
+- 새 의존성은 필요할 때 추가한다. 예정: Spring Security + jjwt(로그인), springdoc-openapi(NFR-12), Testcontainers MariaDB(테스트 DB, ADR-017), Apache POI(상품 엑셀, ADR-015), MyBatis(조회, ADR-018), ArchUnit(모듈 경계 테스트, ADR-018), ZXing(QR, ADR-019).
+- 쓰지 않는다: OpenFeign, Kafka, Redis, ModelMapper, H2. 테스트 DB는 H2 대신 Testcontainers MariaDB를 쓴다 (`FOR UPDATE`, JSON 컬럼, UNIQUE 제약을 실제 DB로 확인해야 하므로, ADR-017).
+
+## 테스트 규칙
+
+- 순서는 TDD 안쪽부터: Repository → Service → Controller. 실패 테스트 → 최소 구현 → 정리, 정상 → 경계 → 오류 순서로 쓴다 (ADR-017).
+- 층: 엔티티(업무 규칙), Repository(저장 후 다시 조회해 확인), Service(`@Mock`으로 DB 없이), Controller(MockMvc로 입력 검증·에러 형식·권한·상태 코드), 통합(`@SpringBootTest` + MockMvc, Controller부터 DB까지).
+- 이름은 `@DisplayName("한글 설명")` + 메서드 `should_동작_when_조건`.
+- 실패 응답(400·401·403·404·409)과 생성 응답(201)도 확인한다.
+- DB가 필요한 테스트는 Testcontainers MariaDB를 쓰므로 Docker를 켜고 돌린다.
 
 ## 보안
 

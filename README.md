@@ -26,4 +26,4 @@
 
 ## 기술 스택 (예정)
 
-Java 21 · Spring Boot 4 · Spring Data JPA · MariaDB · Vue 3 · Docker Compose
+Java 21 · Spring Boot 4 · Spring Data JPA · MyBatis · MariaDB · Vue 3 · Docker Compose

@@ -16,7 +16,7 @@ flowchart LR
     subgraph server["서버 1개 · Spring Boot"]
         web["Vue 화면 파일"]
         api["REST API<br/>/api/v1"]
-        jobs["스케줄 작업<br/>outbox 발행 · 일일 갱신 · 정기 산정"]
+        jobs["스케줄 작업<br/>outbox 발행 · 정기 산정"]
     end
 
     db[("MariaDB")]
@@ -74,7 +74,7 @@ com.crmpos
 │  ├─ controller   REST 컨트롤러, 요청·응답 record
 │  ├─ service      업무 흐름, 트랜잭션
 │  ├─ domain       엔티티, enum, 업무 규칙 (환불 금액 계산 등)
-│  ├─ repository   Spring Data JPA 리포지토리
+│  ├─ repository   Spring Data JPA 리포지토리(쓰기), MyBatis 조회 매퍼 `…QueryMapper` (ADR-018)
 │  └─ event        outbox 기록과 발행기
 ├─ customer
 │  ├─ api          다른 모듈이 읽을 수 있는 창구 (인터페이스 + record)
@@ -93,6 +93,7 @@ com.crmpos
 
 - 계층 방향은 `controller → service → repository · domain`이다. `domain`은 다른 계층을 모른다.
 - `api` 패키지에는 인터페이스와 반환 record만 둔다. 구현은 그 모듈의 `service`에 둔다.
+- MyBatis SQL 파일은 `resources/mappers/{모듈}/`에 두고 자기 모듈 테이블만 쓴다. SQL 경계 테스트와 import 경계 테스트(ArchUnit)가 이 규칙을 검사한다 (ADR-018).
 - 요청·응답은 record로 만들고, 엔티티를 응답으로 그대로 내보내지 않는다 (CLAUDE.md DTO 규칙).
 - 한 모듈의 패키지가 너무 커지면 그 모듈 안에서 기능별 하위 패키지(예: `customer.grade`)로 나눌 수 있다.
 
@@ -129,9 +130,9 @@ sequenceDiagram
 | 작업 | 주기 | 하는 일 | 근거 |
 | --- | --- | --- | --- |
 | outbox 발행기 | 1초마다 | PENDING 이벤트를 고객 모듈에 전달, 실패하면 재시도 | BR-06, ADR-007 |
-| 일일 실적 갱신 | 매일 새벽, 서버가 시작될 때도 1회 | 최근 12개월 집계와 실적 기준 등급을 다시 계산 (적용 중인 등급은 안 바꿈) | BR-05, ADR-008 |
-| 연 정기 산정 | 매년 6월 1일 새벽, 수동 실행 API | 전체 고객의 등급 확정. 이때만 강등 | GRD-05 |
+| 연 정기 산정 | 매년 6월 1일 새벽, 수동 실행 API | 막 끝난 시즌 실적으로 다음 시즌 등급 확정(이때만 강등), 집계를 새 시즌 기준으로 다시 계산 | GRD-05, ADR-020 |
 
+- 시즌 누적 실적은 판매·반품 이벤트 때만 바뀌므로 매일 도는 재계산 작업은 없다 (ADR-020, ADR-008 대체).
 - 서버가 1개라 같은 작업이 동시에 두 번 도는 일이 없으므로 분산 잠금(ShedLock 등)은 쓰지 않는다.
 - 잠드는 무료 서버에서 정기 산정을 놓쳤을 때의 처리는 1주 차 배포 확인 후 정한다 (01-requirements.md 10장).
 
@@ -167,8 +168,10 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 
 ### 8.3 테스트
 
-- **단위 테스트**: 등급 산정, 환불 금액, 결제 금액 기본값, 상품 엑셀 검증, 전화번호 정규화, 이벤트 처리 규칙 (NFR-09).
-- **통합 테스트**: Testcontainers로 실제 MariaDB를 띄워 이벤트 중복·순서, 동시 판매 시 영수증 번호, 중복 요청 방지를 확인한다 (NFR-03, NFR-03a).
+- **방식**: TDD 안쪽부터(Repository → Service → Controller), 테스트 층은 엔티티·Repository·Service·Controller·통합이다. 이름은 `@DisplayName` 한글 + `should_동작_when_조건` (ADR-017).
+- **단위 테스트**: 등급 산정, 환불 금액, 결제 금액 기본값, 상품 엑셀 검증, 전화번호 정규화, 이벤트 처리 규칙 (NFR-09). Service는 `@Mock`으로 DB 없이 확인한다.
+- **통합 테스트**: `@SpringBootTest` + MockMvc로 Controller부터 DB까지 실행한다. DB는 Testcontainers로 띄운 MariaDB 11이고 H2는 쓰지 않는다. 이벤트 중복·순서, 동시 판매 시 영수증 번호, 중복 요청 방지를 확인한다 (NFR-03, NFR-03a).
+- **경계 테스트**: MyBatis SQL이 다른 모듈 테이블을 쓰는지, 다른 모듈 코드를 import하는지 검사한다 (ADR-018).
 
 ## 9. 기술 스택
 
@@ -182,7 +185,9 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 | 인증 | Spring Security, jjwt | 예정 (1주 차) |
 | API 문서 | springdoc-openapi | 예정 (NFR-12) |
 | 엑셀 | Apache POI | 예정 (상품 엑셀 폼·가져오기, ADR-015) |
-| 테스트 | JUnit 5, Testcontainers (MariaDB) | 예정 |
+| 조회 SQL | MyBatis (`mybatis-spring-boot-starter` 4.1) | 예정 (목록·검색·집계 조회, ADR-018) |
+| QR | ZXing | 예정 (매장·직원 QR 이미지, ADR-019) |
+| 테스트 | JUnit 5, Mockito, MockMvc, Testcontainers (MariaDB), ArchUnit | JUnit 5 사용 중, 나머지 예정 (ADR-017·018) |
 | 프론트엔드 | Vue 3, Vite | 예정 |
 
 ## 10. 관련 결정
@@ -193,7 +198,7 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 | ADR-002 | 판매 → 고객관리는 outbox 이벤트 |
 | ADR-003 | 모듈 간 FK 없음, 고객 모듈은 구매 기록 사본 사용 |
 | ADR-007 | 같은 판매의 이벤트는 순서대로 처리 |
-| ADR-008 | 고객 요약을 매일 새벽 다시 계산 |
+| ADR-008 | 고객 요약을 매일 새벽 다시 계산 (**대체됨**: ADR-020) |
 | ADR-010 | 테이블은 `schema.sql`로, Hibernate는 검사만 |
 | ADR-011 | 모듈 안은 계층별 패키지 |
 | ADR-012 | 모듈 간 읽기는 `api` 창구, 쓰기는 이벤트 |
@@ -201,3 +206,7 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 | ADR-014 | 판매 금액은 실제 결제 금액을 기록, 등급 할인은 안내 |
 | ADR-015 | 상품 엑셀 폼과 가져오기는 Apache POI |
 | ADR-016 | 후속 연락은 판매 이벤트 때 할 일 행을 만들어 둔다 |
+| ADR-017 | 테스트는 CONK 방식, DB는 Testcontainers MariaDB |
+| ADR-018 | 조회는 MyBatis, 쓰기는 JPA, 모듈 경계는 테스트로 검사 |
+| ADR-019 | 전화번호 정규화·요청 수 제한·QR·기본 데이터 |
+| ADR-020 | 등급 실적은 시즌 단위 |
