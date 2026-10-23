@@ -6,7 +6,10 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 - 한국어로, 쉬운 말로 설명한다.
 - 이번 프로젝트의 목표는 개발 순서를 직접 익히는 것이다 (01-requirements.md 8장). 요청이 없으면 큰 코드를 한 번에 만들지 말고, 설명·검토·막힌 곳 풀기를 중심으로 돕는다. 사용자가 만들어 달라고 하면 만든다.
-- 커밋과 push는 사용자에게 확인받고 한다. 브랜치 없이 `main`에 바로 커밋한다.
+- 커밋과 push는 사용자에게 확인받고 한다.
+- 기획 문서(`docs/`, `README.md`, `CLAUDE.md`)만 바꿀 때는 `main`에 바로 커밋한다.
+- 코드와 설정은 기능 단위 브랜치(`feat/…`, `fix/…`, `refactor/…`, `chore/…`, `test/…`)에서 작업하고 PR로 `main`에 합친다. 브랜치 이름에는 dev-plan.md의 작업 ID를 넣는다 (예: `feat/B0-2-common-error`). PR 설명은 `.github/pull_request_template.md` 양식대로 쓰고 요구사항 ID(예: SAL-01, BR-10)를 적는다. PR의 테스트(`backend-ci`)가 통과해야 합친다.
+- 코드와 함께 바뀌는 문서는 같은 PR에 넣는다.
 - 커밋 메시지는 `docs: …`, `feat: …`, `fix: …`, `refactor: …`, `chore: …`, `test: …` 형식으로 쓴다.
 
 ## 문서 읽는 순서
