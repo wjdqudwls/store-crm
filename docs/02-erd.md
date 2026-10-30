@@ -9,6 +9,7 @@
 > 변경: 2026-10-18 후속 연락 반영 — `follow_up_rule`(단계 설정), `follow_up_task`(할 일) 추가, 테이블 21개 (01-requirements.md CAL-06·07, BR-14, ADR-016).
 > 변경: 2026-10-23 등급 실적을 시즌 단위로 (01-requirements.md BR-03·05, ADR-020) — `customer_summary`의 `ticket_count_12m`·`qty_12m`·`net_amount_12m`을 `season_ticket_count`·`season_qty`·`season_net_amount`로, 매일 실적 갱신 삭제. `schema.sql`과 엔티티는 B3-3 작업 때 바꾼다.
 > 변경: 2026-10-23 요구사항 점검 반영 (01-requirements.md 8장, ADR-021~027·029) — `staff.role` 값(HQ·STORE·MANAGER·SENIOR·JUNIOR·STAFF·KIOSK)·`manager_slot`·`tokens_valid_after`, `staff_notification`·`store_day_close`·`grade_discount` 추가(테이블 24개), `sale`의 `kind`·`origin_sale_id`·`recorded_by`·상태 `VOIDED`, `sale_return`의 `kind`·`recorded_by`, `customer_purchase`의 `purchase_group_id`·`counted_at`, `grade_policy.applies_from`(`active` 삭제), `grade_rule.discount_rate` 삭제, `grade_history`의 시즌·점수 칸, `consult_note`의 `channel`·`recorded_by`, 고객 인덱스 `(name, phone_last4)` 삭제. `schema.sql`과 엔티티는 해당 작업(dev-plan) 때 바꾼다.
+> 변경: 2026-10-30 ERD 개념·논리 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-022·026·030·031) — `sale.root_sale_id`(처음 판매)·`created_at`, `sale_return.new_sale_id`, `customer_purchase.voided_qty`, 구매 건 = 처음 판매(교환·정정은 티켓 없이 금액만), `UNIQUE(store_id, manager_slot)`, 반품·교환·정정·기록 취소 때 판매 행 잠금, 하루 마감 잠김·다시 마감 규칙, 요약 행은 고객 등록 때, 정기 산정 이력은 고객마다, 후속 연락 단계는 끄기만, 그림의 빠진 관계. 이 문서는 개념·논리이고, 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이다 (ADR-031).
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -27,7 +28,7 @@
 
 ## 2. ERD
 
-실선은 같은 모듈 안의 FK, 점선은 다른 모듈의 ID를 들고만 있는 논리 참조다.
+실선은 같은 모듈 안의 FK, 점선은 다른 모듈의 ID를 들고만 있는 논리 참조다. 계정 칸(`recorded_by`, `closed_by`, `reopened_by`, `created_by`, `updated_by`)은 모두 `staff`를 가리키는 논리 참조이고, 그림에는 판매·반품의 것만 그린다.
 
 ```mermaid
 erDiagram
@@ -38,6 +39,8 @@ erDiagram
     sale ||--|{ sale_line : "포함"
     sale ||--o{ sale_return : "반품·교환·기록 취소"
     sale ||--o{ sale : "origin_sale_id (교환·정정으로 생긴 판매)"
+    sale ||--o{ sale : "root_sale_id (처음 판매)"
+    sale_return }o--o| sale : "new_sale_id (교환·정정의 새 판매)"
     sale_return ||--|{ sale_return_line : "포함"
     sale_line ||--o{ sale_return_line : "반품된 라인"
 
@@ -48,6 +51,7 @@ erDiagram
     customer ||--o{ consult_note : "메모"
     customer ||--o{ follow_up_task : "후속 연락"
     follow_up_rule ||--o{ follow_up_task : "단계"
+    consult_note |o--o| follow_up_task : "note_id (완료한 연락)"
     grade_policy ||--|{ grade_rule : "구간"
 
     sale }o..o| customer : "customer_id (논리 참조)"
@@ -59,10 +63,15 @@ erDiagram
     customer }o..o| store : "home_store_id"
     customer }o..o| staff : "staff_id (담당)"
     consult_note }o..|| staff : "작성자"
-    outbox_event }o..|| sale : "aggregate_id"
+    consult_note }o..o| sale : "sale_id (응대 메모)"
+    sale }o..|| staff : "staff_id (판매 사원), recorded_by"
+    sale_return }o..|| staff : "staff_id (처리 직원), recorded_by"
+    outbox_event }o..|| sale : "aggregate_id (처음 판매)"
     customer_purchase }o..|| sale_line : "sale_line_id"
+    customer_purchase }o..|| sale : "sale_id, purchase_group_id"
     follow_up_task }o..|| staff : "staff_id (받는 직원)"
     follow_up_task }o..|| sale : "sale_id (기준 판매)"
+    staff_notification }o..o| customer : "customer_id"
 
     store {
         BIGINT id PK
@@ -76,7 +85,7 @@ erDiagram
         VARCHAR password_hash "BCrypt"
         VARCHAR name
         VARCHAR role "HQ, STORE, MANAGER, SENIOR, JUNIOR, STAFF, KIOSK"
-        VARCHAR manager_slot "MAIN, TEMP (MANAGER일 때만)"
+        VARCHAR manager_slot "MAIN, TEMP (활성 MANAGER만, 매장마다 UNIQUE)"
         BIGINT store_id FK "본사 계정은 NULL"
         VARCHAR staff_code UK "QR 담당 지정용"
         BOOLEAN active
@@ -120,8 +129,10 @@ erDiagram
         BIGINT total_amount "결제 합계"
         INT total_qty
         VARCHAR kind "NORMAL, EXCHANGE, CORRECTION"
-        BIGINT origin_sale_id FK "교환·정정의 원 판매"
+        BIGINT origin_sale_id FK "교환·정정의 원 판매 (바로 앞 판매)"
+        BIGINT root_sale_id FK "처음 판매 (일반 판매면 자기 ID)"
         VARCHAR status "COMPLETED, PARTIAL_RETURNED, RETURNED, VOIDED"
+        DATETIME created_at "기록한 시각"
     }
     sale_line {
         BIGINT id PK
@@ -150,6 +161,7 @@ erDiagram
         BIGINT recorded_by "기록한 계정"
         DATETIME returned_at
         BIGINT amount
+        BIGINT new_sale_id FK "교환·정정으로 생긴 판매, 아니면 NULL"
     }
     sale_return_line {
         BIGINT id PK
@@ -174,7 +186,7 @@ erDiagram
     outbox_event {
         CHAR event_id PK "UUID"
         VARCHAR event_type "SALE_COMPLETED, SALE_RETURNED"
-        BIGINT aggregate_id "sale.id"
+        BIGINT aggregate_id "처음 판매 ID (sale.root_sale_id)"
         JSON payload
         VARCHAR status "PENDING, PUBLISHED, FAILED"
         INT attempts
@@ -230,13 +242,14 @@ erDiagram
         BIGINT sale_line_id UK
         BIGINT store_id
         DATETIME sold_at
-        BIGINT purchase_group_id "구매 건 (판매 또는 추가 결제 교환의 sale_id)"
-        DATETIME counted_at "실적에 넣는 시각 (시즌 판정)"
+        BIGINT purchase_group_id "구매 건 = 처음 판매 ID (root)"
+        DATETIME counted_at "실적에 넣는 시각 = 처음 판매 시각"
         VARCHAR target "모르면 NULL"
         VARCHAR item_type
         INT qty
         BIGINT amount
-        INT returned_qty
+        INT returned_qty "나간 수량 (반품·교환·기록 취소)"
+        INT voided_qty "returned_qty 중 기록 취소분"
         BIGINT returned_amount
     }
     customer_summary {
@@ -341,7 +354,7 @@ erDiagram
 
 - `staff`는 사람과 기기 계정을 함께 담는다. `role`은 `HQ`(본사), `STORE`(매장 계정), `MANAGER`·`SENIOR`·`JUNIOR`·`STAFF`(직원 직급), `KIOSK`다 (01-requirements.md 2장, ADR-023). 본사 계정은 `store_id`가 NULL이다.
 - 매장마다 `STORE` 계정이 반드시 1개 있다 (시드로 만든다). 판매는 이 계정으로 기록하고, 판매 사원은 `sale.staff_id`에 따로 남긴다.
-- `manager_slot`은 매니저의 메인·임시 구분이다. 매장마다 활성 `MAIN` 1명, `TEMP` 1명까지다 (BR-15).
+- `manager_slot`은 매니저의 메인·임시 구분이다. 매장마다 활성 `MAIN` 1명, `TEMP` 1명까지다 (BR-15). 비활성화하거나 매니저가 아닌 직급으로 바꾸면 비운다. 그래서 `UNIQUE(store_id, manager_slot)`로 DB가 자리 수를 막는다(NULL은 여러 개 허용). 본사 두 명이 동시에 메인을 등록해도 하나만 들어간다.
 - `tokens_valid_after`보다 먼저 발급된 토큰은 거절한다. 비밀번호를 바꾸거나 "모든 기기에서 로그아웃"을 하면 지금 시각으로 바꾼다. 요청마다 `active`와 함께 확인한다 (ADR-025).
 - `KIOSK` 계정은 고객 등록 API만 호출할 수 있다 (REG-02, NFR-04a).
 - `store.code`와 `staff.staff_code`가 QR 링크에 들어간다 (`/join?store=GN01&staff=S017`). 내부 ID를 노출하지 않기 위해 별도 코드를 둔다.
@@ -375,16 +388,19 @@ erDiagram
 
 아동 신발은 MVP에서 다루지 않는다. 성별이 나뉘는 품목(아우터, 하의)은 상품의 `target`에 맞는 목록을 쓴다. 대상이 없는 상품(등록 상품의 대상 미입력, 판매 직접 입력)은 그 품목의 모든 허용값(여성·남성·아동 목록을 합친 것)에서 고른다. 고객 프로필에서는 고객 성별에 맞는 목록을 보여준다. 가족 구성원도 같은 규칙이고, 자녀(`CHILD`)는 아동 의류 사이즈(4·6·8·10)도 고를 수 있다.
 
-### 3.3 sales: `sale`, `sale_line`, `sale_return`, `sale_return_line`, `receipt_sequence`, `outbox_event`
+### 3.3 sales: `sale`, `sale_line`, `sale_return`, `sale_return_line`, `receipt_sequence`, `store_day_close`, `outbox_event`
 
 - **티켓은 고객 모듈이 '구매 건'으로 센다** (BR-02, ADR-022). 판매 모듈은 판매·교환·정정·기록 취소를 사실대로 남긴다.
-- `sale.staff_id`는 판매 화면에서 고른 **판매 사원**, `recorded_by`는 기록한 계정(보통 매장 계정, 마감 뒤 정정이면 본사)이다.
-- `sale.kind`: `NORMAL`(일반 판매), `EXCHANGE`(교환으로 받은 새 상품), `CORRECTION`(정정으로 다시 기록한 판매). 교환·정정 판매는 `origin_sale_id`로 원 판매를 가리키고 새 영수증 번호를 받는다.
-- `sale_return.kind`: `RETURN`(반품), `EXCHANGE`(교환으로 돌려받은 라인), `VOID`(기록 취소: 모든 라인). 기록 취소된 판매는 `sale.status = VOIDED`다 (BR-16, ADR-026).
-- `store_day_close`: 매장 계정이 "오늘 판매 마감"을 누르면 1행 생긴다. 이 행이 있거나 날짜가 지났으면 그날 판매는 잠긴다. 본사가 다시 열면 `reopened_*`를 채운다.
+- `sale.staff_id`는 판매 화면에서 고른 **판매 사원**, `recorded_by`는 기록한 계정(보통 매장 계정, 마감 뒤 정정이면 본사)이다. `created_at`은 기록한 시각이다. 판매 시각(`sold_at`)은 고를 수 있고 정정은 원래 시각을 쓰므로 둘이 다를 수 있다.
+- `sale.kind`: `NORMAL`(일반 판매), `EXCHANGE`(교환으로 받은 새 상품), `CORRECTION`(정정으로 다시 기록한 판매). 교환·정정 판매는 `origin_sale_id`로 원 판매(바로 앞 판매)를 가리키고 새 영수증 번호를 받는다.
+- `sale.root_sale_id`는 **처음 판매**다. 일반 판매는 자기 ID이고, 교환·정정 판매는 원 판매의 `root_sale_id`를 물려받는다. 교환·정정이 여러 번 이어져도(판매 1 → 교환 2 → 다시 교환 3) 모두 판매 1을 가리킨다. outbox 순서 묶음과 고객 모듈의 구매 건이 이 값이다 (ADR-022).
+- `sale_return.kind`: `RETURN`(반품), `EXCHANGE`(교환으로 돌려받은 라인), `VOID`(기록 취소: 남은 모든 라인). 기록 취소된 판매는 `sale.status = VOIDED`다 (BR-16, ADR-026).
+- `sale_return.new_sale_id`는 그 반품 행과 짝인 새 판매다. 교환이면 교환으로 받은 판매, 정정의 기록 취소 행이면 정정 판매, 일반 반품과 단순 기록 취소는 NULL이다. 한 판매에 교환이 여러 번 있어도 영수증 상세의 교환 내역과 추가 결제 금액을 짝지어 보여줄 수 있다.
+- `store_day_close`: 매장 계정이 "오늘 판매 마감"을 누르면 1행 생긴다. 그날 판매는 **날짜가 지났거나, 마감 행이 있고 `reopened_at`이 NULL이면** 잠긴다. 본사가 다시 열면 `reopened_*`를 채운다. 다시 연 날을 다시 마감하면 같은 행의 `closed_*`를 새로 쓰고 `reopened_*`를 비운다(이전 마감·다시 열기 기록은 로그에 남긴다).
 - `sale_line`은 상품 정보를 **판매 시점 값으로 복사**(스냅샷)해 둔다. 나중에 상품명이나 카테고리가 바뀌어도 과거 영수증은 그대로여야 하기 때문이다.
 - 상품을 등록하지 않은 매장은 직원이 상품명·품목·사이즈를 직접 입력한다. 이때 `sku_id`와 `list_price`는 NULL이고, 같은 스냅샷 칸에 입력값이 남는다 (PRD-01, SAL-01).
 - 반품·교환·기록 취소는 원 판매를 고치지 않고 `sale_return`으로 따로 남긴다. `sale_line.returned_qty`와 `sale.status`는 조회 편의를 위한 값이다.
+- **남은 수량 지키기**: 반품·교환·정정·기록 취소는 바꿀 판매 행을 먼저 잠그고(`SELECT … FOR UPDATE`) 남은 수량을 확인한다. 매장 노트북과 매장폰에서 다른 요청 키로 같은 상품을 동시에 반품해도 뒤 요청은 앞 요청이 끝난 뒤의 남은 수량을 보고 `409 RETURN_QTY_EXCEEDED`가 된다. UNIQUE로는 "반품 합계 ≤ 판매 수량"을 막을 수 없기 때문이다. 잠그는 순서는 항상 판매 행 → 영수증 번호 행이다 (ADR-030).
 - **금액은 실제 결제 금액을 라인 단위로 저장한다** (BR-10, ADR-014). 쿠폰은 쓰지 않는다.
   - `line_amount` = 직원이 확인한 실제 결제 금액. 등록 상품이면 화면이 정가와 고객 등급 할인율로 기본값을 채우고, 직원이 고칠 수 있다. 서버는 받은 값을 그대로 기록한다.
   - 등록 상품 라인은 `list_price`(정가)를 함께 남겨 영수증 상세에서 정가와 결제 금액을 비교한다. 할인 금액은 저장하지 않는다.
@@ -394,9 +410,10 @@ erDiagram
 - **착용자**: `sale_line.wearer_member_id`는 고객 모듈의 가족 구성원 ID를 들고만 있다(FK 없음). 호칭은 `wearer_label`에 복사해 둔다. 구성원을 지우거나 호칭을 바꿔도 과거 영수증은 그대로다. 고르지 않으면 둘 다 NULL (ADR-009).
 - **영수증 번호** = `매장코드-판매일자-순번4자리` (예: `GN01-20261015-0012`). `receipt_sequence`에서 (매장, 날짜) 행을 잠그고(`SELECT … FOR UPDATE`) 1 올린 값을 쓴다. 같은 매장에서 두 직원이 동시에 판매해도 번호가 겹치지 않는다. `sale.receipt_no` UNIQUE가 마지막 안전장치다.
 - **중복 요청 방지**: 판매는 `sale.idempotency_key`, 반품은 `sale_return.idempotency_key`(각각 UNIQUE)에 화면이 만든 UUID를 저장한다. 같은 키가 다시 오면 저장된 판매·반품으로 응답을 다시 만든다. `request_hash`가 다르면 같은 키로 다른 내용을 보낸 것이므로 거절한다. 두 요청이 동시에 와도 UNIQUE 제약이 하나만 남긴다 (ADR-006).
+  - 한 요청으로 생긴 행은 같은 키를 갖는다. 교환은 반품 행 + 새 판매, 정정은 기록 취소 행 + 새 판매, 기록 취소는 기록 취소 행이다. 다시 온 교환·정정은 키로 반품 행을 찾고 `new_sale_id`로 새 판매를 찾아 같은 응답을 만든다.
 - `outbox_event`: 판매·반품을 저장하는 **같은 트랜잭션**에서 이벤트 행을 넣는다. 발행기가 `PENDING`을 읽어 고객 모듈에 전달하고 `PUBLISHED`로 바꾼다. 실패하면 `attempts`를 올리고 재시도하며, 10회를 넘으면 `FAILED`로 둔다 (BR-06).
   - 같은 판매(`aggregate_id`)의 이벤트는 `created_at` 순서대로 처리한다. 앞 이벤트가 `PUBLISHED`가 아니면 뒤 이벤트는 건너뛰고 다음 주기에 다시 본다 (ADR-007).
-  - 교환·정정으로 생긴 판매의 이벤트는 `aggregate_id`에 **원 판매 ID**를 넣는다. 원 판매의 반품(기록 취소) 이벤트보다 먼저 처리되지 않게 하기 위해서다 (ADR-022).
+  - `aggregate_id`는 **처음 판매 ID**(`root_sale_id`)다. 교환·정정으로 생긴 판매와 그 판매의 반품까지 처음 판매 하나의 순서로 묶여, 원 판매의 반품(기록 취소) 이벤트보다 새 판매 이벤트가 먼저 처리되지 않는다. 교환이 이어져도 순서 묶음이 갈리지 않는다 (ADR-022).
 
 ### 3.4 customer
 
@@ -404,14 +421,14 @@ erDiagram
 | --- | --- |
 | `customer` | 고객 원본. 식별 키는 `id`(고객번호). 전화번호와 상세주소는 암호화 컬럼, 중복 확인은 `phone_hash`(UNIQUE) |
 | `customer_member` | 대표 고객 아래 가족 구성원. 호칭(실명 아님), 관계, 사이즈. 전화번호·동의·등급이 없고, 판매와 등급은 대표 고객 하나로 쌓인다 (ADR-009) |
-| `customer_purchase` | 판매 이벤트로 받은 **라인 단위 구매 기록**. 등급 집계와 콜리스트의 '구매 카테고리' 필터에 쓴다. `sale_line_id` UNIQUE로 같은 라인이 두 번 쌓이지 않는다. `purchase_group_id`는 이 라인이 속한 구매 건(판매 또는 추가 결제 교환의 판매 ID)이고, `counted_at`은 실적에 넣는 시각이다(추가 결제 없는 교환·정정은 원 판매 시각). 티켓 수 = 그 시즌에 상품이 남은 구매 건 수 (BR-02, ADR-022). 상품명·색상·사이즈는 없으므로 화면의 구매이력(CUS-03)은 sales 모듈이 판매 테이블로 제공한다 |
-| `customer_summary` | 고객당 1행의 **조회용 요약**. 검색 목록, 상세, 콜리스트가 집계 쿼리 없이 이 테이블만 읽는다 |
+| `customer_purchase` | 판매 이벤트로 받은 **라인 단위 구매 기록**. 등급 집계와 콜리스트의 '구매 카테고리' 필터에 쓴다. `sale_line_id` UNIQUE로 같은 라인이 두 번 쌓이지 않는다. `purchase_group_id`는 이 라인이 속한 구매 건 = **처음 판매 ID**(이벤트의 `rootSaleId`)이고, `counted_at`은 실적에 넣는 시각 = 처음 판매 시각이다. 교환·정정으로 받은 상품도 처음 판매의 구매 건에 붙으므로 티켓은 늘지 않고 금액만 바뀐다. 티켓 수 = 그 시즌에 상품이 남은 구매 건 수이고, 고객별로 센다 (BR-02·17, ADR-022). 행은 지우지 않는다. `returned_qty`는 나간 수량(반품·교환·기록 취소)이고 그중 기록 취소분은 `voided_qty`에 따로 적는다. 반품은 있었던 일이라 금액·수량·티켓에서만 빼고, 전부 기록 취소된 라인(`voided_qty = qty`)은 없던 일이라 방문일·"이 매장 고객"·품목 필터에서도 뺀다 (BR-09·16). 상품명·색상·사이즈는 없으므로 화면의 구매이력(CUS-03)은 sales 모듈이 판매 테이블로 제공한다 |
+| `customer_summary` | 고객당 1행의 **조회용 요약**. 검색 목록, 상세, 콜리스트가 집계 쿼리 없이 이 테이블만 읽는다. 고객을 등록하는 같은 트랜잭션에서 `NORMAL`·0으로 만들어(직원·키오스크·QR 모두) 1:1이 늘 지켜진다. 반품·교환·기록 취소 이벤트를 처리할 때 실적과 함께 첫/마지막 방문일도 `customer_purchase`로 다시 계산한다 |
 | `grade_policy` / `grade_rule` | 등급 기준. 수정하면 기존 행을 고치지 않고 **새 버전을 만든다**. `applies_from`부터 적용하고(다음 6월 1일, 6월에 저장하면 그날), 적용 중인 기준은 `applies_from`이 오늘 이전인 것 중 가장 최근 버전이다 (ADR-027) |
 | `grade_discount` | 등급별 할인율(안내용, BR-10). 등급 기준 버전과 따로 두고 바꾸면 바로 적용한다 (ADR-027) |
-| `grade_history` | 등급이 바뀔 때마다 1행. 사유 4종(즉시 승급, 정기 산정, 임시 등급 재계산, 승급 취소)과 그때의 시즌·티켓 수·순구매금액·합계 점수를 남겨 "왜 이 등급인지"를 보여준다 (GRD-03·06) |
-| `consult_note` | 상담·구매·연락 메모. 응대 메모는 `sale_id`로 판매와 연결. 연락이면 결과(`call_result`)와 채널(`channel`)을 남긴다. `staff_id`는 작성 직원(매장 계정에서 쓰면 고른 직원), `recorded_by`는 기록한 계정 |
-| `follow_up_rule` | 후속 연락 단계 설정. 브랜드 공통이고 본사(HQ)가 바꾼다. 기본 3행: 2일 "감사 인사", 2주 "착용감 확인", 2달 "신상·재방문 안내"(홍보) (BR-14, CAL-07) |
-| `follow_up_task` | 후속 연락 할 일. 회원 판매 이벤트를 처리할 때 활성 단계마다 1행 만든다. 단계 이름과 홍보 여부를 복사해 두어 설정이 바뀌어도 이미 만든 할 일은 그대로다. 연락 결과를 기록하면 `DONE`과 `note_id`, 건너뛰면 `SKIPPED`, 전부 반품·기록 취소되면 `CANCELLED`, 같은 고객의 새 구매로 대체되면 `REPLACED` (CAL-06). 받는 직원은 담당 직원(없거나 비활성이면 판매 사원), 매장 계정이 맡은 고객이면 매장 계정이다. 직원 퇴사 이관 때 `OPEN` 할 일의 `staff_id`를 한 번에 바꾼다 (BR-15) |
+| `grade_history` | 등급이 바뀔 때, 그리고 정기 산정·임시 재계산 때는 등급이 그대로여도 고객마다 1행. 사유 4종(즉시 승급, 정기 산정, 임시 등급 재계산, 승급 취소)과 그때의 시즌·티켓 수·순구매금액·합계 점수를 남겨 "왜 이 등급인지"를 보여준다 (GRD-03·06). 고객 상세의 지난 시즌 근거(`confirmedBasis`)는 가장 최근의 정기 산정·임시 재계산 행이다. 정기 산정이 다시 돌 때 같은 시즌의 마지막 정기 산정·임시 재계산 행과 등급·점수·기준 버전이 같으면 새로 쓰지 않아, 몇 번 돌아도 이력이 같다 (ADR-021) |
+| `consult_note` | 상담·구매·연락 메모. 응대 메모는 `sale_id`로 판매와 연결. 연락이면 결과(`call_result`)와 채널(`channel`)을 남긴다. `staff_id`는 작성 직원(매장 계정에서 쓰면 고른 직원), `recorded_by`는 기록한 계정. 판매를 정정하면 원 판매의 구매 메모를 정정 판매와 (바뀐) 고객으로 옮긴다 (BR-16). MEM-03의 "그 매장"은 작성 직원의 소속 매장이다 |
+| `follow_up_rule` | 후속 연락 단계 설정. 브랜드 공통이고 본사(HQ)가 바꾼다. 기본 3행: 2일 "감사 인사", 2주 "착용감 확인", 2달 "신상·재방문 안내"(홍보) (BR-14, CAL-07). 단계는 지우지 않고 끄기(`active = false`)만 한다. 이미 만든 할 일의 `rule_id`가 끊기지 않게 하기 위해서다 |
+| `follow_up_task` | 후속 연락 할 일. 회원 판매 이벤트를 처리할 때, 그 판매가 고객의 가장 최근 구매이면(판매 시각 ≥ 요약의 `last_visit_at`) 활성 단계마다 1행 만든다. 정정으로 다시 만들 때 만기일이 이미 지난 단계는 만들지 않는다. 단계 이름과 홍보 여부를 복사해 두어 설정이 바뀌어도 이미 만든 할 일은 그대로다. 연락 결과를 기록하면 `DONE`과 `note_id`, 건너뛰면 `SKIPPED`, 구매 건의 상품이 모두 나가면(반품·기록 취소) `CANCELLED`, 같은 고객의 새 구매로 대체되면 `REPLACED` (CAL-06, BR-14). 받는 직원은 담당 직원(없거나 비활성이면 판매 사원), 매장 계정이 맡은 고객이면 매장 계정이다. 직원 퇴사 이관 때 `OPEN` 할 일의 `staff_id`를 한 번에 바꾼다 (BR-15) |
 | `processed_event` | 처리한 이벤트 ID. 같은 이벤트가 다시 와도 이 테이블에 있으면 건너뛴다 (멱등, NFR-03) |
 
 **등급 컬럼이 3개인 이유** (`customer_summary`)
@@ -424,14 +441,16 @@ erDiagram
 
 규칙(BR-05)을 컬럼으로 옮기면 이렇게 된다.
 
-- 판매 이벤트: `computed > current`이면 `current = computed` (즉시 승급)
-- 반품·교환·기록 취소 이벤트: 실적을 다시 계산하고 `current = max(computed, confirmed)` (승급 취소, 단 임시·확정 등급 아래로는 안 내려감). 6월이고 지난 시즌 판매면 `confirmed`도 지난 시즌 실적으로 다시 계산한다
+- 판매 이벤트: 실적에 더하고 `computed > current`이면 `current = computed` (즉시 승급). 교환·정정 판매는 처음 판매의 시즌에 더하므로, 6월에 지난 시즌 구매 건에 붙으면 `confirmed`도 지난 시즌 실적으로 다시 계산한다
+- 반품·교환·기록 취소 이벤트: 실적과 방문일을 다시 계산하고 `current = max(computed, confirmed)` (승급 취소, 단 임시·확정 등급 아래로는 안 내려감). 6월이고 지난 시즌 판매면 `confirmed`도 지난 시즌 실적으로 다시 계산한다
 - 정기 산정: `confirmed = 막 끝난 시즌 등급`, `computed = 이번 시즌 등급`, `current = max(confirmed, computed)`. 6월 안에서는 몇 번 돌아도 결과가 같고 즉시 승급이 지워지지 않는다 (ADR-020·021)
-- 7월 1일이 지나면 `confirmed`는 확정이다. 날짜로 판단하므로 바꾸는 작업은 없다
+- 7월 1일이 지나면 `confirmed`는 확정이다. 날짜로 판단하므로 바꾸는 작업은 없다. 지난 시즌 판매가 반품·교환·정정돼도 `confirmed`는 바뀌지 않는다. 예외로 등급을 내려야 하면 본사가 고치는 기능(GRD-07)이 다음 단계다
 
 등급 비교(`>`, `max`)는 등급 코드의 문자 순서가 아니라 기준의 등급 컷 점수(`grade_rule.min_value`, kind=GRADE) 순서로 한다. `season_*` 컬럼은 이번 시즌(6월 1일 0시부터) 누적이다. 시즌 길이는 `grade_policy.period_months`(12)이고 시작일은 6월 1일로 고정한다. 엑셀 툴 비교 테스트(NFR-10)는 등급 계산기에 36개월 기간을 직접 넣는다.
 
 ## 4. 인덱스
+
+업무 규칙을 지키는 UNIQUE와 조회에 꼭 필요한 인덱스만 적는다. 성능을 재고 더하는 인덱스는 `schema.sql`에만 둔다 (ADR-031).
 
 | 테이블 | 인덱스 | 쓰는 곳 |
 | --- | --- | --- |
@@ -451,7 +470,10 @@ erDiagram
 | `sale` | `(customer_id, sold_at)` | 고객 상세의 구매이력 (CUS-03, sales 모듈의 조회) |
 | `sale` | `(origin_sale_id)` | 교환·정정으로 생긴 판매 찾기 |
 | `store_day_close` | PK `(store_id, business_date)` | 그날 마감 여부 |
-| `staff` | `(store_id, role, active)` | 매장 상세의 직원 목록, 매니저 메인·임시 수 확인 |
+| `staff` | `(store_id, role, active)` | 매장 상세의 직원 목록 |
+| `staff` | `UNIQUE(store_id, manager_slot)` | 매장마다 메인·임시 매니저 1명씩 (BR-15, NULL은 여러 개) |
+| `product` | `UNIQUE(product_code)` | 품번 중복 방지 (품번 없으면 NULL) |
+| `product_sku` | `UNIQUE(product_id, color, size)` | 같은 상품의 색상·사이즈 중복 방지 (색상 없으면 `''`, 3.2) |
 | `staff_notification` | `(staff_id, read_at, created_at)` | 알림함, 안 읽은 배지 |
 | `outbox_event` | `(status, created_at)` | 발행기가 PENDING을 오래된 순으로 읽기 |
 | `outbox_event` | `(aggregate_id, created_at)` | 같은 판매의 앞 이벤트 처리 여부 확인 (ADR-007) |
@@ -465,7 +487,7 @@ erDiagram
 | --- | --- | --- | --- |
 | 1 | 모듈 간 FK 없이 ID로만 참조 | 모듈 경계를 DB에서도 지킨다. 나중에 모듈을 서비스로 떼어낼 때 FK부터 풀 필요가 없다 | 모든 테이블에 FK: 편하지만 모듈이 DB로 묶인다 |
 | 2 | 고객 모듈은 `customer_purchase`(이벤트로 받은 사본)를 쓴다 | 판매 테이블 구조가 바뀌어도 고객 모듈이 깨지지 않는다. 판매 → 고객 흐름이 이벤트 하나로만 연결된다 | 판매 테이블 직접 조인: 쉽지만 결합도가 높다 |
-| 3 | 요약 테이블 `customer_summary` | 검색·콜리스트마다 시즌 집계를 돌리지 않는다. 엑셀의 느린 SUMIFS 문제를 푸는 지점 | 조회 때마다 집계: 고객이 늘면 느려진다 |
+| 3 | 요약 테이블 `customer_summary` | 검색·콜리스트마다 시즌 집계를 돌리지 않는다. 엑셀의 느린 SUMIFS 문제를 푸는 지점. 요약이 틀어지면 고객 1명 요약은 원본인 `customer_purchase`로 언제든 다시 계산할 수 있다(반품 처리와 같은 계산, 화면·API는 두지 않는다) | 조회 때마다 집계: 고객이 늘면 느려진다 |
 | 4 | 판매 라인에 상품 정보 스냅샷 | 과거 영수증은 판매 당시 값이어야 한다 | 상품 테이블 조인: 상품이 바뀌면 과거 기록이 바뀐다 |
 | 5 | 반품은 별도 테이블, 원 판매는 수정하지 않음 | 언제 무엇이 반품됐는지 이력이 남는다 | 판매 행 수정·삭제: 이력이 사라진다 |
 | 6 | 등급 기준은 버전으로 쌓는다 | "이 고객은 왜 B인가"를 기준 버전으로 설명할 수 있다 | 기준 행 덮어쓰기: 과거 근거가 사라진다 |
@@ -479,9 +501,14 @@ erDiagram
 | 14 | 요약의 실적 컬럼은 이번 시즌 누적(`season_*`) | 시즌 단위 등급에 맞고(ADR-020), 판매·반품 때만 바뀌어 매일 다시 계산하지 않아도 된다 | 최근 12개월 집계 + 매일 새벽 재계산(ADR-008, 대체됨): 정기 산정의 시즌 기준과 섞인다 |
 | 15 | 판매 사원(`sale.staff_id`)과 기록한 계정(`recorded_by`)을 나눔 | 매장 계정 하나로 여러 직원이 판매를 기록한다 (ADR-023) | 로그인한 계정 = 판매 사원: 공용 기기에서 틀어진다 |
 | 16 | 정정·교환은 `sale.kind`와 `origin_sale_id`로 원 판매에 연결, 기록 취소는 `sale_return.kind = VOID` | 원 판매를 고치지 않고 이력이 남는다. 이미 있는 판매·반품 흐름을 그대로 쓴다 (ADR-026) | 판매 행 직접 수정: 고객 모듈 반영과 이력이 깨진다 |
-| 17 | 티켓은 `customer_purchase.purchase_group_id`(구매 건)로 셈 | 교환이 섞여도 같은 규칙으로 센다 (ADR-022) | 티켓 = 판매 1행: 교환하면 티켓이 틀어진다 |
+| 17 | 티켓은 `customer_purchase.purchase_group_id`(구매 건 = 처음 판매)로 셈 | 교환·정정이 섞여도 같은 규칙으로 센다. 교환·정정은 티켓 없이 금액만 바꾼다 (ADR-022, 2026-10-24 변경) | 티켓 = 판매 1행: 교환하면 티켓이 틀어진다. 추가 결제 교환을 새 구매 건으로: 교환을 반복하면 티켓이 늘어 한도 규칙이 필요하다 |
 | 18 | 하루 마감은 `store_day_close` 행 + 날짜 | 자정 자동 잠금은 날짜로 판단해 스케줄 작업이 없다 (ADR-026) | 판매마다 잠금 칸: 마감·다시 열기가 매장 단위가 아니다 |
 | 19 | 할인율은 `grade_discount`로 분리 | 등급 기준은 다음 시즌부터, 할인율은 바로 적용하기 위해 (ADR-027) | 기준 버전 안에 할인율: 할인율만 바꿔도 새 버전이 다음 시즌에야 적용된다 |
+| 20 | 판매에 처음 판매 ID(`root_sale_id`) | 교환·정정이 여러 번 이어져도 이벤트 순서 묶음과 구매 건이 하나로 유지된다 (ADR-022) | 바로 앞 판매(`origin_sale_id`)만: 교환이 이어지면 순서 묶음이 갈리고, 고객 모듈은 판매 테이블을 읽을 수 없어 처음 판매를 찾지 못한다 |
+| 21 | 반품 행에 새 판매 ID(`sale_return.new_sale_id`) | 교환이 여러 번이어도 돌려받은 라인과 새 판매를 짝짓고, 같은 키 재전송에 같은 응답을 만든다 (ADR-006) | 원 판매로 찾기: 교환이 두 번이면 짝을 알 수 없다 |
+| 22 | 기록 취소 수량을 따로(`customer_purchase.voided_qty`) | 반품(있었던 일)과 기록 취소(없던 일)를 구별해 방문일·"이 매장 고객"을 바르게 센다. 일부 반품 뒤 나머지를 기록 취소해도 담긴다 (ADR-026) | 행 삭제: 이력이 사라진다. 취소 시각 칸: 일부 반품 뒤 기록 취소를 담지 못한다 |
+| 23 | 남은 수량은 판매 행 잠금으로 지킴 | UNIQUE로 못 막는 "반품 합계 ≤ 판매 수량"을 칸 추가 없이 지킨다. 영수증 번호 채번과 같은 방식이다 (ADR-030) | 낙관적 잠금(`version` 칸): 충돌하면 다시 읽고 판단하는 코드가 더 든다. 조건부 UPDATE: 여러 라인과 판매 상태를 함께 바꾸면 조건이 복잡해진다 |
+| 24 | 매니저 자리는 `UNIQUE(store_id, manager_slot)` | 동시에 등록해도 DB가 자리 수를 막는다 | 코드에서만 확인: 동시 요청이면 둘 다 들어간다 |
 
 ## 6. 확인 필요
 

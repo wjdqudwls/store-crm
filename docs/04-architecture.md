@@ -3,6 +3,7 @@
 > 기준 문서: [01-requirements.md](01-requirements.md), [02-erd.md](02-erd.md), [03-api.md](03-api.md), [decisions.md](decisions.md) · 작성일: 2026-10-17 · 상태: 초안
 > 여러 문서에 흩어져 있던 구조 결정(ADR-001~003, 007, 008, 010)을 한곳에 모으고, 코드를 쓰기 전에 필요한 세 가지(ADR-011~013)를 정한다.
 > 2026-10-23 요구사항 점검 반영: 역할·기기(2장), 공통 → 고객 동기 이벤트(3장), 교환·정정 이벤트(5장), 정기 산정 임시/확정(6장), 보안(7장) (ADR-021~029).
+> 2026-10-30 ERD 점검 반영: 공통 → 판매는 부르지 않음(3장), 이벤트 순서 묶음 = 처음 판매(5장), 물리 명세는 `schema.sql`(8.1), 동시 반품 테스트(8.3) (ADR-030·031).
 
 ## 1. 한눈에 보기
 
@@ -65,6 +66,7 @@ flowchart LR
 | 판매 → 고객 (읽기) | `customer.api`의 인터페이스 호출 | 현재 등급·할인율(안내용), 착용자가 그 고객의 가족인지 |
 | 판매 → 고객 (쓰기) | outbox 이벤트만 | 구매 기록, 등급 반영 (5장) |
 | 고객 → 판매 | 부르지 않는다 | 순환을 막는다. 구매이력 화면(CUS-03)은 판매 모듈이 제공한다 |
+| 공통 → 판매 | 부르지 않는다 | 순환을 막는다. 본사 매장 목록의 오늘 판매 수·마감 여부는 판매 모듈이 `GET /sales/daily-summary`로 주고 화면이 합친다 (ADR-012) |
 | 공통 → 고객 (쓰기) | 같은 트랜잭션의 Spring 이벤트 (`StaffDeactivated`, `StaffHandover`) | 직원 비활성화·이관 때 담당 고객과 열린 할 일 옮기기. 사람이 화면에서 하는 드문 관리 작업이라 한 트랜잭션으로 끝낸다 (ADR-024) |
 | 모든 모듈 → 공통 | 자유롭게 | 로그인 사용자, 매장·직원, 에러 형식, 직원 알림 보내기 |
 
@@ -117,7 +119,7 @@ sequenceDiagram
     UI->>S: POST /sales (Idempotency-Key)
     S->>DB: 한 트랜잭션: sale · sale_line · outbox_event(PENDING)
     S-->>UI: 201 영수증
-    P->>DB: PENDING을 오래된 순으로 읽기 (같은 판매의 앞 이벤트가 남았으면 건너뜀)
+    P->>DB: PENDING을 오래된 순으로 읽기 (같은 처음 판매의 앞 이벤트가 남았으면 건너뜀)
     P->>C: OutboxMessage (이벤트 ID, 종류, JSON payload)
     C->>DB: 한 트랜잭션: 처리 여부 확인 → 구매 기록 · 요약 · 즉시 승급 · 후속 연락 할 일 · processed_event
     C-->>P: 성공
@@ -127,9 +129,9 @@ sequenceDiagram
 
 - 판매 저장과 이벤트 기록이 한 트랜잭션이라, 판매는 됐는데 이벤트가 사라지는 일이 없다 (ADR-002).
 - 발행기는 outbox 행을 공통 형식 `OutboxMessage`로 Spring 이벤트에 실어 보낸다. 고객 모듈은 이벤트 종류로 골라 받고, JSON을 자기 record로 읽는다. 판매 모듈은 고객 모듈 코드를 모른다 (ADR-012).
-- 같은 이벤트가 두 번 와도 `processed_event`에 있으면 건너뛴다 (NFR-03). 같은 판매의 이벤트는 발생 순서대로 처리한다 (ADR-007).
+- 같은 이벤트가 두 번 와도 `processed_event`에 있으면 건너뛴다 (NFR-03). 같은 처음 판매(`aggregate_id`)의 이벤트는 발생 순서대로 처리한다 (ADR-007).
 - 비회원 판매도 이벤트는 발행하고, 고객 모듈은 처리 기록만 남긴다 (03-api.md 6장).
-- 교환은 원 판매의 `SALE_RETURNED`(kind=EXCHANGE)와 새 판매의 `SALE_COMPLETED`(kind=EXCHANGE), 정정은 `SALE_RETURNED`(kind=VOID)와 `SALE_COMPLETED`(kind=CORRECTION)를 같은 트랜잭션에서 outbox에 쓴다. 새 판매의 이벤트도 `aggregate_id`에 원 판매 ID를 넣어 순서대로 처리된다. 고객 모듈은 이 이벤트로 구매 건과 티켓을 정한다 (ADR-022·026).
+- 교환은 원 판매의 `SALE_RETURNED`(kind=EXCHANGE)와 새 판매의 `SALE_COMPLETED`(kind=EXCHANGE), 정정은 `SALE_RETURNED`(kind=VOID)와 `SALE_COMPLETED`(kind=CORRECTION)를 같은 트랜잭션에서 outbox에 쓴다. 이벤트의 `aggregate_id`는 처음 판매 ID(`sale.root_sale_id`)라, 교환·정정이 여러 번 이어져도 한 줄로 순서대로 처리된다. 고객 모듈은 이벤트의 `rootSaleId`를 구매 건으로 써서 교환·정정 상품을 처음 판매에 붙인다(티켓은 그대로, 금액만) (ADR-022·026).
 - 고객 모듈은 같은 처리 안에서 후속 연락 할 일(2일·2주·2달)도 만든다. "오늘 할 일"은 만기일로 조회하므로 따로 도는 스케줄 작업은 없다 (BR-14, ADR-016).
 
 ## 6. 스케줄 작업
@@ -168,7 +170,7 @@ sequenceDiagram
 Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면 작업 때)
 ```
 
-- 테이블은 `schema.sql`로 만들고, Hibernate는 엔티티와 테이블이 맞는지 검사만 한다 (ADR-010).
+- 테이블은 `schema.sql`로 만들고, Hibernate는 엔티티와 테이블이 맞는지 검사만 한다 (ADR-010). 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이고, 02-erd.md는 개념·논리를 남긴다 (ADR-031).
 - 프로필: 기본(로컬), `seed`(과거 판매 시각 허용과 더미 판매 생성기, ING-01), 배포용(이름은 배포 확인 때 정한다).
 
 ### 8.2 배포
@@ -181,7 +183,7 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 
 - **방식**: TDD 안쪽부터(Repository → Service → Controller), 테스트 층은 엔티티·Repository·Service·Controller·통합이다. 이름은 `@DisplayName` 한글 + `should_동작_when_조건` (ADR-017).
 - **단위 테스트**: 등급 산정, 환불 금액, 결제 금액 기본값, 상품 엑셀 검증, 전화번호 정규화, 이벤트 처리 규칙 (NFR-09). Service는 `@Mock`으로 DB 없이 확인한다.
-- **통합 테스트**: `@SpringBootTest` + MockMvc로 Controller부터 DB까지 실행한다. DB는 Testcontainers로 띄운 MariaDB 11이고 H2는 쓰지 않는다. 이벤트 중복·순서, 동시 판매 시 영수증 번호, 중복 요청 방지를 확인한다 (NFR-03, NFR-03a).
+- **통합 테스트**: `@SpringBootTest` + MockMvc로 Controller부터 DB까지 실행한다. DB는 Testcontainers로 띄운 MariaDB 11이고 H2는 쓰지 않는다. 이벤트 중복·순서, 동시 판매 시 영수증 번호, 중복 요청 방지, 다른 키로 동시에 반품할 때 남은 수량(행 잠금)을 확인한다 (NFR-03, NFR-03a, ADR-030).
 - **경계 테스트**: MyBatis SQL이 다른 모듈 테이블을 쓰는지, 다른 모듈 코드를 import하는지 검사한다 (ADR-018).
 
 ## 9. 기술 스택
@@ -230,3 +232,5 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 | ADR-027 | 등급 기준은 다음 정기 산정부터, 할인율은 따로 |
 | ADR-028 | 여러 브랜드는 나중에 `brand_id` 논리 분리 |
 | ADR-029 | 직원 알림 인터페이스와 연락 채널 (나중 기능 자리) |
+| ADR-030 | 남은 수량은 판매 행 잠금으로 지킨다 |
+| ADR-031 | ERD 문서는 개념·논리, 물리 명세는 `schema.sql` |

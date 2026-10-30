@@ -7,6 +7,7 @@
 > 변경: 2026-10-18 후속 연락 API(오늘 할 일·완료·건너뛰기·설정), 판매 요청 `soldAt`은 같은 날 안의 이른 시각을 받음, `FOLLOW_UP_NOT_FOUND`·`FOLLOW_UP_ALREADY_CLOSED` 추가 (01-requirements.md CAL-06·07, BR-14, ADR-016).
 > 변경: 2026-10-23 등급 실적을 시즌 단위로 (01-requirements.md BR-03, ADR-020) — 고객 상세 `grade.ticketCount12m`·`netAmount12m`, `stats.qty12m`을 `seasonTicketCount`·`seasonNetAmount`·`seasonQty`로.
 > 변경: 2026-10-23 요구사항 점검 반영 (01-requirements.md 8장, ADR-021~027·029) — 역할(본사·매장·직원·KIOSK, 2장), `PATCH /me/password`·`POST /auth/logout-all`, 판매 `sellerStaffId`, 교환·정정·기록 취소·하루 마감 API(4.8~4.10), 본사 매장 목록·직원 관리 API(`/stores/{storeId}/...`, 4.11), 고객 검색은 이름만, 콜리스트 `scope`·`promoOnly`, 연락 `channel`, 알림함, 등급 `confirmedStatus`·`confirmedBasis`, 할인율 `PUT /grade-discounts`, 시즌 중 재계산 삭제, 이벤트 `kind`·`originSaleId`·`exchange`, 에러 코드 7개.
+> 변경: 2026-10-30 ERD 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-006·022·026·030) — `GET /sales/daily-summary`(본사 매장 목록의 판매 요약, `GET /stores`는 판매 데이터를 읽지 않음), 영수증 상세 라인 `returnedQty`, 구매이력 `keyword`, 반품·교환·정정·기록 취소의 동시 요청과 다른 영수증 줄, 교환 티켓 문구(금액만), 정정 본문에서 `sellerStaffId`·`memo`를 빼고 `staffId`, 남은 라인 없음 409, 다시 마감, 이벤트 `rootSaleId`·`recordedBy`와 `aggregate_id` = 처음 판매, 후속 연락·메모 처리 규칙.
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -110,7 +111,7 @@
 | GET | `/customers?name=김하늘` | 고객명 검색(부분 일치). 목록에 뒷자리 4개 | 로그인 | CUS-01 |
 | GET | `/customers/{id}` | 상세 요약 + 프로필 + 등급(현재·실적 기준·임시/확정·근거) + 등급 할인율 | 로그인 | CUS-02·04, GRD-03 |
 | PATCH | `/customers/{id}` | 프로필, 담당 직원, 마케팅 수신 변경 | 매장·본사 | CUS-04 |
-| GET | `/customers/{id}/purchases` | 구매이력 (영수증 단위, 최신순, 기록 취소 제외). 경로는 고객 아래지만 **sales 모듈이 제공**한다 (판매 테이블 조회) | 로그인 | CUS-03 |
+| GET | `/customers/{id}/purchases?keyword=코트` | 구매이력 (영수증 단위, 최신순, 기록 취소 제외, 라인별 `returnedQty`). `keyword`가 있으면 상품명·품번으로 거른다(환불·교환할 상품 찾기, SAL-03). 경로는 고객 아래지만 **sales 모듈이 제공**한다 (판매 테이블 조회) | 로그인 | CUS-03, SAL-03 |
 | GET | `/customers/{id}/grade-history` | 등급 변경 이력 (사유, 시즌, 그때의 점수) | 로그인 | GRD-06 |
 | GET | `/customers/{id}/members` | 가족 구성원 목록 | 로그인 | CUS-05 |
 | POST | `/customers/{id}/members` | 구성원 추가 (호칭, 관계 필수. 성별·출생연도·사이즈 선택) | 매장 | CUS-05 |
@@ -168,7 +169,8 @@
 | --- | --- | --- | --- | --- |
 | POST | `/sales` | 판매 기록. **`Idempotency-Key` 헤더 필수**, `sellerStaffId`(판매 사원) 필수. 매장은 매장 계정의 소속 매장. 마감된 날이면 `409 DAY_CLOSED` | 매장 | SAL-01·02·04 |
 | GET | `/sales?from=2026-10-01&to=2026-10-15` | 판매 내역. 매장 계정은 자기 매장, 본사는 `storeId` 필수 | 매장·본사 | SAL-05 |
-| GET | `/sales/{id}` | 영수증 상세 (라인, 판매 사원, 정가·결제 금액, 반품·교환 내역, 원 판매·정정 판매 연결) | 매장·본사 | SAL-05 |
+| GET | `/sales/{id}` | 영수증 상세 (라인과 라인별 반품된 수량 `returnedQty`, 판매 사원, 정가·결제 금액, 반품·교환 내역(교환마다 새 판매와 추가 결제 금액), 원 판매·정정 판매 연결). 남은 수량은 화면이 `qty − returnedQty`로 계산한다 | 매장·본사 | SAL-05 |
+| GET | `/sales/daily-summary?date=2026-10-30` | 매장별 그날 판매 수와 마감 여부 `[{ "storeId": 1, "saleCount": 12, "closed": true }]`. `storeId`로 한 매장만 받을 수 있다. 본사 매장 목록·상세가 `GET /stores`와 합쳐 보여준다 (3.7) | 본사 | ADM-03 |
 | POST | `/sales/{id}/returns` | 반품 (라인별 수량). **`Idempotency-Key` 필수**. 마감된 날이면 `409 DAY_CLOSED` | 매장 | SAL-03 |
 | POST | `/sales/{id}/exchanges` | 교환: 반품할 라인 + 새 상품 (4.8). **`Idempotency-Key` 필수** | 매장 | SAL-06 |
 | PUT | `/sales/{id}` | 정정: 기록 취소 + 원래 시각으로 다시 기록 (4.9). **`Idempotency-Key` 필수**. 매장 계정은 판매한 날·마감 전만, 그 뒤는 본사 | 매장·본사 | SAL-07 |
@@ -195,8 +197,8 @@
 
 | Method | Path | 설명 | 역할 | 요구사항 |
 | --- | --- | --- | --- | --- |
-| GET | `/stores` | 매장 목록 (오늘 판매 수, 마감 여부, 활성 직원 수 요약) | 본사 | ADM-03 |
-| GET | `/stores/{storeId}` | 매장 상세 요약 | 본사 | ADM-03 |
+| GET | `/stores` | 매장 목록 (매장 정보, 활성 직원 수) | 본사 | ADM-03 |
+| GET | `/stores/{storeId}` | 매장 상세 요약 (매장 정보, 활성 직원 수) | 본사 | ADM-03 |
 | GET | `/stores/{storeId}/staff` | 매장의 계정 목록 (매장 계정·직원·키오스크). 매장 계정은 판매 사원 고르기용으로 활성 직원만 받는다 | 본사·매장 | ADM-01 |
 | POST | `/stores/{storeId}/staff` | 직원·키오스크 계정 등록 (이름, 직급, 매니저면 `managerSlot`, 로그인 ID, 처음 비밀번호). 매니저 자리가 차 있으면 `409 MANAGER_SLOT_TAKEN` | 본사 | ADM-01 |
 | PATCH | `/staff/{id}` | 이름·직급·매니저 자리 변경 | 본사 | ADM-01 |
@@ -208,6 +210,7 @@
 | GET | `/stores/{storeId}/qr` | 매장 QR 이미지 (PNG) | 본사 | REG-03 |
 
 - 매장 추가·정보 수정 API는 다음 단계다 (ADM-02). MVP는 시드 데이터로 매장과 매장 계정을 넣는다.
+- `/stores`는 common 모듈이 제공하고 판매 데이터를 읽지 않는다. 판매가 이미 common을 쓰므로 common이 판매를 부르면 순환이 된다. 오늘 판매 수·마감 여부는 화면이 `GET /sales/daily-summary`(sales 모듈)로 따로 받아 매장 ID로 합친다. 구매이력을 sales 모듈이 주는 것과 같은 방식이다 (04 3장, ADR-012).
 
 ### 4.1 판매등록 `POST /sales`
 
@@ -293,6 +296,8 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 - **중복 요청 방지**는 판매(4.1)와 같다. 키는 화면이 반품 창을 열 때 만든 UUID이고, `sale_return.idempotency_key`(UNIQUE)와 `sale_return.request_hash`에 저장한다. 같은 키로 다시 오면 저장된 반품으로 같은 응답을 `200`으로 주고, 해시가 다르면 `409 IDEMPOTENCY_KEY_REUSED` (ADR-006). 이것이 없으면 "1개 반품"을 두 번 눌렀을 때 2개가 반품된다.
 - 환불 금액 = 그 라인의 결제 금액 ÷ 판매 수량 × 반품 수량 (원 미만 버림). 그 라인의 마지막 남은 수량을 반품하면 남은 결제 금액 전부 (BR-11).
 - 남은 수량보다 많이 반품하면 `409 RETURN_QTY_EXCEEDED`. 마감된 날이면 `409 DAY_CLOSED`, 기록 취소된 판매면 `409 SALE_ALREADY_VOIDED`.
+- **다른 키로 동시에 반품**(매장 노트북과 매장폰): 서버는 판매 행을 잠그고(`SELECT … FOR UPDATE`) 남은 수량을 확인하므로, 뒤 요청은 앞 요청이 끝난 뒤의 남은 수량을 보고 `409 RETURN_QTY_EXCEEDED`가 된다. 교환·정정·기록 취소도 같다 (ADR-030).
+- `lineId`가 이 판매의 라인이 아니면(다른 영수증의 줄) `400 VALIDATION_FAILED`.
 - 본문에 처리한 직원 `staffId`를 함께 보낸다 (매장 계정, 2장).
 - 응답 `201`: 반품 ID, 반품 금액, 판매의 새 상태(`PARTIAL_RETURNED` / `RETURNED`).
 
@@ -437,24 +442,26 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 ```
 
 - `staffId`는 교환을 처리한 직원이고, 새 상품의 판매 사원도 이 직원이다.
-- 한 트랜잭션으로 `sale_return`(kind=`EXCHANGE`)과 새 `sale`(kind=`EXCHANGE`, `origin_sale_id` = 원 판매)을 만든다. 새 판매는 새 영수증 번호를 받는다. 반품 라인의 환불 금액은 BR-11과 같고, 새 상품 라인 규칙은 4.1과 같다.
+- 한 트랜잭션으로 `sale_return`(kind=`EXCHANGE`, `new_sale_id` = 새 판매)과 새 `sale`(kind=`EXCHANGE`, `origin_sale_id` = 원 판매, `root_sale_id` = 원 판매의 처음 판매)을 만든다. 새 판매는 새 영수증 번호를 받는다. 반품 라인의 환불 금액은 BR-11과 같고, 새 상품 라인 규칙은 4.1과 같다.
 - 응답 `201`: `{ "returnId": 5030, "returnedAmount": 1000000, "newSale": { 4.1 응답과 같은 모양 }, "extraPaid": 100000 }`. `extraPaid` = 새 상품 합계 − 반품 금액이고, 음수면 차액 환불이다.
-- 티켓은 고객 모듈이 이벤트를 받아 정한다. 추가 결제(`extraPaid` > 0)면 새 구매 건, 아니면 원 구매 건에 붙는다. 원 판매에서 이미 교환 티켓이 생겼으면 붙인다 (BR-17).
-- 남은 수량 초과면 `409 RETURN_QTY_EXCEEDED`, 마감된 날이면 `409 DAY_CLOSED`. 중복 요청 방지는 4.1과 같다.
+- 티켓은 늘지 않는다. 추가 결제·차액 환불 모두 새 상품은 처음 판매의 구매 건에 붙어 금액만 바뀌고, 처음 판매 날짜의 시즌으로 센다. 고객 모듈이 이벤트의 `rootSaleId`로 정한다 (BR-17).
+- 남은 수량 초과면 `409 RETURN_QTY_EXCEEDED`, 마감된 날이면 `409 DAY_CLOSED`. 동시 요청은 4.2와 같다.
+- **중복 요청 방지**: 반품 행과 새 판매가 같은 `Idempotency-Key`를 갖는다. 같은 키로 다시 오면 키로 반품 행을 찾고 `new_sale_id`로 새 판매를 찾아 같은 응답을 `200`으로 준다 (ADR-006).
 
 ### 4.9 정정 `PUT /sales/{id}` · 기록 취소 `POST /sales/{id}/void`
 
 - **기록 취소**: 본문은 처리한 직원 `staffId`(매장 계정일 때)뿐이다. 남은 모든 라인을 `sale_return`(kind=`VOID`)으로 돌리고 `sale.status = VOIDED`로 바꾼다. 응답 `200`: 취소된 판매.
-- **정정**: 본문은 `POST /sales`와 같다(`sellerStaffId`, `customerId`, `lines`, `memo`). 원 판매를 기록 취소하고, 고친 내용으로 **원 판매 시각**에 새 판매(kind=`CORRECTION`, `origin_sale_id`)를 만든다. 새 영수증 번호를 받는다. 응답 `201`: 새 판매(4.1 응답 모양 + `originSaleId`).
+- **정정**: 본문은 처리한 직원 `staffId`(매장 계정일 때), `customerId`, `lines`다. 라인 규칙은 `POST /sales`와 같다. 판매 사원(`sellerStaffId`)은 받지 않고 원 판매의 판매 사원을 그대로 쓴다(BR-16). 응대 메모(`memo`)도 받지 않는다. 원 판매의 구매 메모는 고객 모듈이 정정 판매로 옮긴다(6장). 원 판매를 기록 취소하고, 고친 내용으로 **원 판매 시각**에 새 판매(kind=`CORRECTION`, `origin_sale_id`, `root_sale_id` = 원 판매의 처음 판매)를 만든다. 기록 취소 행의 `new_sale_id`가 정정 판매다. 새 영수증 번호를 받는다. 응답 `201`: 새 판매(4.1 응답 모양 + `originSaleId`).
 - 권한: 매장 계정은 판매한 날이고 마감 전일 때만 된다. 그 밖에는 `409 SALE_LOCKED`. 본사는 마감된 판매도 고칠 수 있다 (BR-16).
-- 이미 기록 취소된 판매면 `409 SALE_ALREADY_VOIDED`. 반품·교환이 있었던 판매는 남은 라인만 취소·정정한다.
-- 중복 요청 방지는 4.1과 같다 (`Idempotency-Key`).
+- 이미 기록 취소된 판매면 `409 SALE_ALREADY_VOIDED`. 반품·교환이 있었던 판매는 남은 라인만 취소·정정한다. 남은 라인이 없으면(전부 반품) `409 RETURN_QTY_EXCEEDED`. 동시 요청은 4.2와 같다.
+- 중복 요청 방지는 4.1과 같다 (`Idempotency-Key`). 정정은 기록 취소 행과 정정 판매가, 기록 취소는 기록 취소 행이 같은 키를 갖는다 (ADR-006).
 
 ### 4.10 하루 마감 `POST /day-closes`
 
 - 본문 없음. 매장 계정의 매장과 오늘(한국 시간) 날짜로 마감한다. 이미 마감됐으면 `200`으로 그대로 돌려준다.
-- 마감된 날, 그리고 지난 날짜의 판매에는 매장 계정이 판매·반품·교환·정정·기록 취소를 할 수 없다 (`409 DAY_CLOSED`, `409 SALE_LOCKED`). 자정이 지나면 날짜로 잠기므로 따로 도는 작업은 없다.
+- 마감된 날, 그리고 지난 날짜의 판매에는 매장 계정이 판매·반품·교환·정정·기록 취소를 할 수 없다 (`409 DAY_CLOSED`, `409 SALE_LOCKED`). 잠김은 "날짜가 지났거나, 마감 행이 있고 다시 열지 않았을 때"다. 자정이 지나면 날짜로 잠기므로 따로 도는 작업은 없다.
 - 본사가 `DELETE /stores/{storeId}/day-closes/{date}`로 다시 열면 그날은 다시 기록할 수 있다. 다시 열 수 있는 날은 오늘뿐이고, 지난 날짜는 본사가 정정(4.9)으로 고친다.
+- 다시 연 날에 `POST /day-closes`를 부르면 다시 마감된다(같은 행의 마감 계정·시각을 새로 쓰고 다시 열기 기록을 비운다, 이전 기록은 로그).
 
 ### 4.11 직원 비활성화 `POST /staff/{id}/deactivate`
 
@@ -490,7 +497,7 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 | `MEMBER_NOT_FOUND` | 404 | 가족 구성원 없음 (판매 요청의 `memberId`가 그 고객의 구성원이 아닐 때 포함) |
 | `CUSTOMER_PHONE_DUPLICATED` | 409 | 같은 전화번호 고객 존재 (직원 등록). `details`에 기존 고객 |
 | `STAFF_LOGIN_ID_DUPLICATED` | 409 | 같은 로그인 ID 존재 (직원 등록) |
-| `RETURN_QTY_EXCEEDED` | 409 | 반품 가능 수량 초과 |
+| `RETURN_QTY_EXCEEDED` | 409 | 반품 가능 수량 초과 (반품·교환), 남은 라인이 없음 (정정·기록 취소) |
 | `IDEMPOTENCY_KEY_REUSED` | 409 | 같은 키로 **다른 내용**의 요청 (판매·반품) |
 | `FOLLOW_UP_ALREADY_CLOSED` | 409 | 이미 완료·건너뛰기·취소·대체된 할 일 |
 | `INVALID_SIZE` | 400 | 품목·대상에 맞지 않는 사이즈 |
@@ -520,8 +527,10 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
   "storeId": 1,
   "customerId": 1024,
   "staffId": 17,
+  "recordedBy": 3,
   "kind": "NORMAL",
   "originSaleId": null,
+  "rootSaleId": 88231,
   "exchange": null,
   "memo": "요청했던 롱코트 구매. 다음 시즌 스키 바지 관심.",
   "lines": [
@@ -549,15 +558,16 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
 
 - `lines[].target`은 대상을 모르는 라인(직접 입력에서 대상을 비운 경우, 대상이 없는 등록 상품)이면 빠진다. 고객 모듈은 `customer_purchase.target`을 NULL로 저장하고, 콜리스트의 대상 필터에는 걸리지 않는다.
 - `SALE_COMPLETED`의 `lines[].memberId`는 착용자이고, 고르지 않았으면 빠진다. 판매 사실을 그대로 담기 위한 필드로, MVP의 고객 모듈은 쓰지 않는다.
-- 고객 모듈은 `SALE_COMPLETED`를 처리할 때 후속 연락 할 일도 만든다. 받는 직원은 고객의 담당 직원(없거나 비활성이면 이벤트의 `staffId`), 매장 계정이 맡은 고객이면 매장 계정이다. `kind=EXCHANGE`면 할 일을 만들지 않는다. 같은 고객의 이전 `OPEN` 할 일은 `REPLACED`로 닫는다. `SALE_RETURNED`로 그 판매가 전부 반품되거나 기록 취소(`kind=VOID`)되면 남은 할 일을 `CANCELLED`로 닫는다 (BR-14).
-- `SALE_COMPLETED`의 `staffId`는 판매 사원(판매 화면에서 고른 직원)이다. `kind`는 `NORMAL`·`EXCHANGE`·`CORRECTION`이고, 교환·정정이면 `originSaleId`(원 판매)가 있다. 교환이면 `exchange: { "returnId": 5030, "returnedAmount": 1000000 }`이 들어가, 고객 모듈이 추가 결제 여부(새 상품 합계 > 반품 금액)로 구매 건을 정한다 (BR-17, ADR-022). 정정이면 `occurredAt`은 원 판매 시각이다.
-- `SALE_RETURNED`의 `kind`는 `RETURN`·`EXCHANGE`·`VOID`다. `VOID`(기록 취소)면 고객 모듈은 그 구매 건을 없던 것으로 처리한다. 6월에 지난 시즌 판매가 반품·교환·기록 취소되면 임시 등급도 다시 계산한다 (BR-05).
-- 교환·정정으로 생긴 판매의 이벤트는 원 판매 ID를 `aggregate_id`로 써서, 원 판매의 반품 이벤트 다음에 처리된다 (ADR-022).
+- 고객 모듈은 `SALE_COMPLETED`를 처리할 때 후속 연락 할 일도 만든다. 받는 직원은 고객의 담당 직원(없거나 비활성이면 이벤트의 `staffId`), 매장 계정이 맡은 고객이면 매장 계정이다. `kind=EXCHANGE`면 할 일을 만들지 않는다. 그 판매가 고객의 가장 최근 구매일 때만(`occurredAt` ≥ 요약의 마지막 방문일) 할 일을 만들고 같은 고객의 이전 `OPEN` 할 일을 `REPLACED`로 닫는다. `kind=CORRECTION`이면 만기일이 이미 지난 단계는 만들지 않는다. `SALE_RETURNED`로 그 **구매 건**의 상품이 모두 나가면(반품·기록 취소) 남은 할 일을 `CANCELLED`로 닫는다. 원 판매의 상품을 전부 교환해도 구매 건에 교환 상품이 남아 있으면 닫지 않는다 (BR-14).
+- `SALE_COMPLETED`의 `staffId`는 판매 사원(판매 화면에서 고른 직원), `recordedBy`는 기록한 계정(매장 계정, 마감 뒤 정정이면 본사)이다. 고객 모듈은 구매 메모(`consult_note`)의 작성 직원·기록한 계정으로 쓴다. `kind`는 `NORMAL`·`EXCHANGE`·`CORRECTION`이고, 교환·정정이면 `originSaleId`(원 판매, 바로 앞 판매)가 있다. `rootSaleId`는 처음 판매이고 일반 판매면 자기 `saleId`다. 고객 모듈은 `rootSaleId`를 구매 건(`purchase_group_id`)으로 쓰고, 교환·정정 라인의 실적 시각은 그 구매 건의 처음 판매 시각으로 한다. 그래서 교환·정정은 티켓을 만들지 않고 금액만 바꾼다 (BR-02·17, ADR-022). 교환이면 `exchange: { "returnId": 5030, "returnedAmount": 1000000 }`이 들어가지만, 영수증 사실을 담는 필드라 고객 모듈은 쓰지 않는다. 정정이면 `occurredAt`은 원 판매 시각이다.
+- 고객 모듈은 `kind=CORRECTION`을 처리할 때 원 판매(`originSaleId`)에 연결된 구매 메모를 정정 판매와 이벤트의 고객으로 옮긴다. 정정 요청에는 메모가 없다 (BR-16).
+- `SALE_RETURNED`의 `kind`는 `RETURN`·`EXCHANGE`·`VOID`다. 고객 모듈은 나간 수량을 `returned_qty`에 더하고, `VOID`(기록 취소)면 같은 수량을 `voided_qty`에도 더해 없던 구매로 처리한다(방문일·이 매장 고객·품목 필터에서 뺌). 반품·교환·기록 취소 뒤에는 실적과 방문일을 다시 계산한다. 6월에 지난 시즌 판매가 반품·교환·기록 취소되면 임시 등급도 다시 계산한다 (BR-05·09).
+- outbox의 `aggregate_id`는 처음 판매 ID(`rootSaleId`)다. 교환·정정으로 생긴 판매와 그 반품까지 처음 판매 하나의 순서로 묶여, 원 판매의 반품 이벤트 다음에 처리된다 (ADR-022).
 - 비회원 판매(`customerId` 없음)도 이벤트는 발행한다. 고객 모듈은 `customerId`가 없으면 처리 기록만 남기고 건너뛴다.
-- 같은 `saleId`의 이벤트는 발생 순서대로 전달한다. `SALE_COMPLETED`가 처리되기 전에는 `SALE_RETURNED`를 보내지 않는다 (BR-06, ADR-007).
+- 같은 처음 판매(`aggregate_id`)의 이벤트는 발생 순서대로 전달한다. `SALE_COMPLETED`가 처리되기 전에는 `SALE_RETURNED`를 보내지 않는다 (BR-06, ADR-007).
 - 발행기는 1초마다 `PENDING`을 읽고, 실패하면 최대 10회 재시도한 뒤 `FAILED`로 둔다.
 - `occurredAt`은 판매·반품 시각이다. 고객 모듈은 `SALE_COMPLETED`의 `occurredAt`을 `customer_purchase.sold_at`으로 쓴다 (`seed` 프로필에서는 요청한 과거 시각).
-- 필드를 추가하는 변경은 같은 버전에서 허용한다. 필드를 빼거나 뜻을 바꾸면 `version`을 올린다. 2026-10-23의 `kind`·`originSaleId`·`exchange`는 추가라 v1 그대로다.
+- 필드를 추가하는 변경은 같은 버전에서 허용한다. 필드를 빼거나 뜻을 바꾸면 `version`을 올린다. 2026-10-23의 `kind`·`originSaleId`·`exchange`와 2026-10-30의 `rootSaleId`·`recordedBy`는 추가라 v1 그대로다. `exchange`는 고객 모듈이 쓰지 않게 됐지만 빼지 않는다.
 
 **모듈 안 동기 이벤트 (outbox 아님)**: `StaffDeactivated`(staffId, handoverToStaffId, storeId)와 `StaffHandover`(fromStaffId, toStaffId)는 같은 트랜잭션의 Spring 이벤트다. 고객 모듈이 받아 `customer.staff_id`와 `OPEN` 할 일의 `staff_id`를 일괄로 바꾼다 (ADR-024, NFR-02a).
 
@@ -567,13 +577,13 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
 | --- | --- |
 | 고객 등록 폼 (QR) | `GET /public/join-info` (사이즈 선택지 포함), `POST /public/registrations` |
 | 고객 등록 폼 (iPad, KIOSK) | `GET /me`, `GET /public/join-info` (동의 문구, 사이즈 선택지 포함), `POST /kiosk/registrations` |
-| 판매 기록 (매장 계정, 노트북) | `GET /stores/{storeId}/staff`(판매 사원 고르기), `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자), `GET /products?keyword=`, `POST /sales`, `POST /customers`, `GET /public/sizes` |
+| 판매 기록 (매장 계정, 노트북) | `GET /stores/{storeId}/staff`(판매 사원 고르기), `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자), `GET /products?keyword=`, `POST /sales`, `POST /customers`, `GET /public/sizes`. 환불·교환을 고르면 `GET /customers/{id}/purchases?keyword=`(회원의 구매 목록에서 상품 찾기), `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges` |
 | 판매 내역 · 반품 · 교환 · 정정 · 마감 (매장 계정) | `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges`, `PUT /sales/{id}`, `POST /sales/{id}/void`, `POST /day-closes`, `GET /stores/{storeId}/day-closes` |
 | 고객등록 (매장 계정) | `GET /public/sizes`, `POST /customers` |
 | 상품 관리 (매장 계정·본사) | `GET /products?keyword=`, `GET /products/{id}`, `POST /products`, `PATCH /products/{id}`, `GET /products/import-template`, `POST /products/import`, `GET /public/sizes` |
 | 고객 검색 · 상세 (모두) | `GET /customers`, `GET /customers/{id}`, `PATCH /customers/{id}`, `GET /customers/{id}/purchases`, `GET /customers/{id}/grade-history`, 구성원 API, 메모 API, `GET /public/sizes` |
 | 오늘 할 일 · 콜리스트 (매장폰·직원 폰) | `GET /follow-ups/today`, `GET /call-list`, `POST /follow-ups/{id}/complete`, `POST /follow-ups/{id}/skip`, `POST /customers/{id}/notes`, `GET /notifications`, `POST /notifications/{id}/read` |
-| 매장 목록 · 상세 (본사) | `GET /stores`, `GET /stores/{storeId}`, `GET/POST /stores/{storeId}/staff`, `PATCH /staff/{id}`, `POST /staff/{id}/deactivate`, `POST /staff/{id}/promote`, `POST /staff/{id}/handover`, `POST /staff/{id}/password`, QR API, `GET /sales?storeId=`, `PUT /sales/{id}`, `POST /sales/{id}/void`, `GET /stores/{storeId}/day-closes`, `DELETE /stores/{storeId}/day-closes/{date}` |
+| 매장 목록 · 상세 (본사) | `GET /stores`, `GET /stores/{storeId}`, `GET /sales/daily-summary`(오늘 판매 수·마감 여부, 매장 ID로 합침), `GET/POST /stores/{storeId}/staff`, `PATCH /staff/{id}`, `POST /staff/{id}/deactivate`, `POST /staff/{id}/promote`, `POST /staff/{id}/handover`, `POST /staff/{id}/password`, QR API, `GET /sales?storeId=`, `PUT /sales/{id}`, `POST /sales/{id}/void`, `GET /stores/{storeId}/day-closes`, `DELETE /stores/{storeId}/day-closes/{date}` |
 | 등급 기준 · 후속 연락 설정 (본사) | `GET /grade-policy`, `GET /grade-policy/versions`, `POST /grade-policy`, `PUT /grade-discounts`, `GET /follow-up-rules`, `PUT /follow-up-rules`, `POST /grade-policy/periodic-runs` |
 | 로그인 · 내 정보 | `POST /auth/login`, `POST /auth/refresh`, `GET /me`, `PATCH /me/password`, `POST /auth/logout-all` |
 
