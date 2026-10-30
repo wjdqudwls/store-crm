@@ -2,7 +2,7 @@
 
 패션 오프라인 매장용 클라이언텔링 CRM. 판매를 기록하는 순간 고객관리가 시작되고, 언제 누구에게 연락할지 알려 준다. POS·ERP 옆에 붙어 상담 기록·콜리스트·고객 등급·후속 연락을 제공한다.
 
-> 서비스 이름: CRM pos · 상태: 개발 2주 차 (2026-10-23, 마감 12/09)
+> 서비스 이름: CRM pos · 상태: WBS 3단계 (2026-10-30, 마감 12/09) · 진행 순서와 상태는 [docs/wbs.md](docs/wbs.md)
 
 ## 문서 (읽는 순서 = 만드는 순서)
 
@@ -14,6 +14,7 @@
 | 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
 | 4 | [docs/04-architecture.md](docs/04-architecture.md) | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
 | - | [docs/project-plan.md](docs/project-plan.md) | 프로젝트 계획 (목표, 우선순위, 일정·마일스톤, 검증, 리스크) | 초안 |
+| - | [docs/wbs.md](docs/wbs.md) | WBS: 12단계 진행 순서와 작업 상태 (매일 갱신) | 계속 갱신 |
 | - | [docs/dev-plan.md](docs/dev-plan.md) | 개발 계획 (백엔드·프론트엔드 PR 단위 작업, 완료 기준, 테스트, 정할 기술 결정) | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
 | - | [docs/erd-review.md](docs/erd-review.md) | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정) | 완료 (2026-10-30) |

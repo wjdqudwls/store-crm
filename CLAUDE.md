@@ -72,7 +72,8 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 ## 테스트 규칙
 
-- 기능 하나는 dev-plan.md 5장의 순서로 만든다: 테스트할 경우 적기 → Repository → Service → Controller → 통합 → `refactor:` → 화면(계산 함수는 Vitest 먼저) → PR.
+- 진행 순서는 `docs/wbs.md`의 12단계다. 화면은 8단계에서 가짜 데이터로 먼저 만들고, 백엔드는 10단계에서 작업 하나씩 만든다. 로그인(B0-3)은 11단계이고 그 전에는 테스트용 가짜 계정을 쓴다 (ADR-032). `wbs.md`의 상태는 매일 갱신한다.
+- 백엔드 기능 하나는 dev-plan.md 5장의 순서로 만든다: 테스트할 경우 적기 → Repository → Service → Controller → 통합 → `refactor:` → PR. 화면 계산 함수는 Vitest 먼저 쓴다.
 - 순서는 TDD 안쪽부터: Repository → Service → Controller. 실패 테스트 → 최소 구현 → 정리, 정상 → 경계 → 오류 순서로 쓴다 (ADR-017).
 - 층: 엔티티(업무 규칙), Repository(저장 후 다시 조회해 확인), Service(`@Mock`으로 DB 없이), Controller(MockMvc로 입력 검증·에러 형식·권한·상태 코드), 통합(`@SpringBootTest` + MockMvc, Controller부터 DB까지).
 - 이름은 `@DisplayName("한글 설명")` + 메서드 `should_동작_when_조건`.
