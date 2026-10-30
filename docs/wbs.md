@@ -55,7 +55,7 @@
 
 | ID | 작업 | 산출물 | 상태 |
 | --- | --- | --- | --- |
-| 6-1 | 아키텍처 확정 (초안 → 확정) | [04-architecture.md](04-architecture.md) | 대기 |
+| 6-1 | 아키텍처 점검과 그림 (초안으로 두고 개발하면서 고침, 정할 것 A1~A10은 해당 작업 때) | [04-architecture.md](04-architecture.md), [architecture-review.md](architecture-review.md), [images/architecture.png](images/architecture.png) | 초안 (10/30) |
 | 6-2 | **B0-5** 물리 ERD: `schema.sql`과 엔티티를 02에 맞추기 (24개 테이블, 새 칸, UNIQUE) | `schema.sql`, 엔티티 | 대기 |
 | 6-3 | **B0-4** 무료 배포 확인: 지금 뼈대를 무료 서비스에 올려 `/actuator/health`와 잠드는지 확인 | README 실행·배포 절 | 대기 |
 

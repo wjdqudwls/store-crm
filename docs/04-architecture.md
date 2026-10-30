@@ -4,12 +4,16 @@
 > 여러 문서에 흩어져 있던 구조 결정(ADR-001~003, 007, 008, 010)을 한곳에 모으고, 코드를 쓰기 전에 필요한 세 가지(ADR-011~013)를 정한다.
 > 2026-10-23 요구사항 점검 반영: 역할·기기(2장), 공통 → 고객 동기 이벤트(3장), 교환·정정 이벤트(5장), 정기 산정 임시/확정(6장), 보안(7장) (ADR-021~029).
 > 2026-10-30 ERD 점검 반영: 공통 → 판매는 부르지 않음(3장), 이벤트 순서 묶음 = 처음 판매(5장), 물리 명세는 `schema.sql`(8.1), 동시 반품 테스트(8.3) (ADR-030·031).
+> 2026-10-30 시스템 아키텍처 그림 추가: [images/architecture.png](images/architecture.png) (원본 `images/architecture.svg`). 점검 결과는 [architecture-review.md](architecture-review.md)이고, 정할 것(A1~A10)은 개발하면서 해당 작업 때 정해 이 문서와 그림을 고친다. 그때까지 이 문서는 **초안**이다.
 
 ## 1. 한눈에 보기
+
+![CRM pos 시스템 아키텍처](images/architecture.png)
 
 - 웹사이트 1개, 서버 1개, DB 1개 (ADR-001). Spring Boot 서버가 API와 Vue 화면 파일을 함께 내보낸다 (ADR-013).
 - 코드 안에서 판매(`sales`), 고객관리(`customer`), 상품(`product`), 공통(`common`) 4개 모듈로 나눈다.
 - 판매 → 고객관리는 outbox 이벤트로만 연결한다 (ADR-002).
+- 그림의 원본은 `images/architecture.svg`다. 구조가 바뀌면 SVG를 고치고 PNG를 다시 만든다 (headless Chrome으로 SVG를 2배 크기로 캡처). 아래 mermaid 그림들은 장마다 자세히 보여주는 용도다.
 
 ```mermaid
 flowchart LR
