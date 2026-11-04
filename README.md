@@ -2,7 +2,7 @@
 
 패션 오프라인 매장용 클라이언텔링 CRM. 판매를 기록하는 순간 고객관리가 시작되고, 언제 누구에게 연락할지 알려 준다. POS·ERP 옆에 붙어 상담 기록·콜리스트·고객 등급·후속 연락을 제공한다.
 
-> 서비스 이름: CRM pos · 상태: WBS 3단계 (2026-10-30, 마감 12/09) · 진행 순서와 상태는 [docs/wbs.md](docs/wbs.md)
+> 서비스 이름: CRM pos · 상태: WBS 4단계 화면설계 (2026-11-04, 마감 12/09) · 진행 순서와 상태는 [docs/wbs.md](docs/wbs.md)
 
 ## 시스템 아키텍처
 
@@ -19,12 +19,14 @@
 | 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 개념·논리 (ERD 그림은 문서 안 mermaid). 구현 뒤 물리 명세는 `schema.sql` | 확정 |
 | 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
 | 4 | [docs/04-architecture.md](docs/04-architecture.md) | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
+| 5 | [docs/05-screens.md](docs/05-screens.md) | 화면설계: 계정별 화면·메뉴, 화면 흐름, 화면별 칸·검증·버튼·쓰는 API (그림은 피그마) | 정함 |
 | - | [docs/project-plan.md](docs/project-plan.md) | 프로젝트 계획 (목표, 우선순위, 일정·마일스톤, 검증, 리스크) | 초안 |
 | - | [docs/wbs.md](docs/wbs.md) | WBS: 12단계 진행 순서와 작업 상태 (매일 갱신) | 계속 갱신 |
 | - | [docs/dev-plan.md](docs/dev-plan.md) | 개발 계획 (백엔드·프론트엔드 PR 단위 작업, 완료 기준, 테스트, 정할 기술 결정) | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
-| - | [docs/architecture-review.md](docs/architecture-review.md) | 시스템 아키텍처 점검 (통과한 것, 개발하면서 정할 것 A1~A10) | 초안 |
+| - | [docs/architecture-review.md](docs/architecture-review.md) | 시스템 아키텍처 점검 (통과한 것, 개발하면서 정할 것 A1~A12, 요구사항 대조) | 초안 |
 | - | [docs/erd-review.md](docs/erd-review.md) | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정) | 완료 (2026-10-30) |
+| - | [docs/screen-interview.md](docs/screen-interview.md) | 화면설계 인터뷰 기록 (질문과 답, 추천안대로 정한 것 W1~W14) | 완료 (2026-11-04) |
 | - | [docs/worklog.md](docs/worklog.md) | 작업 시간 기록 (날짜, 한 일, 걸린 시간). 일정 점검의 근거 | 계속 추가 |
 | - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 시장 규모, 확인 못 한 가설) | 참고 |
 

@@ -23,6 +23,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 4. `docs/01-requirements.md`: 기능(SAL, REG, CUS, GRD, MEM, CAL, PRD, AUTH, ADM), 업무 규칙(BR), 비기능(NFR), 일정, 8장 결정 기록
 5. `docs/02-erd.md`: 테이블, 컬럼, 인덱스
 6. `docs/03-api.md`: API, 에러 코드, 모듈 간 이벤트 계약
+   - `docs/05-screens.md`: 계정별 화면·메뉴, 화면 흐름, 화면별 칸·검증·버튼·쓰는 API (그림은 피그마)
 7. `docs/04-architecture.md`: 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 스케줄, 보안, 실행 환경
 8. `docs/decisions.md`: 기술 결정(ADR)
 

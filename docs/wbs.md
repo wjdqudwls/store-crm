@@ -11,7 +11,7 @@
 - 개발(9~12단계)은 작업을 **하나씩** 한다. 기능 하나는 dev-plan.md 5장 순서(테스트할 경우 적기 → Repository → Service → Controller → 통합 → 정리 → PR)로 만든다.
 - 작업 ID가 있는 코드 작업은 그 ID로 브랜치를 만든다 (예: `feat/B0-2-common-error`). 문서만 바꾸는 작업은 `main`에 바로 커밋한다.
 
-**지금**: 3단계 WBS 완료 · 다음: 4단계 화면설계서
+**지금**: 4단계 화면설계 — 글 설계 완료(11/04), 피그마는 사용자가 그리는 중 · 다음: 5-3 화면과 ERD·API 대조 ([05-screens.md](05-screens.md) 7장 G1~G12)
 
 ## 1. 프로젝트 기획서
 
@@ -39,9 +39,9 @@
 
 | ID | 작업 | 산출물 | 상태 |
 | --- | --- | --- | --- |
-| 4-1 | 화면 흐름: 계정별 첫 화면, 화면 사이 이동, PC·폰 레이아웃 (01 6장 화면 10개) | `05-screens.md` | 대기 |
-| 4-2 | 화면별 설계: 영역, 입력 칸과 검증, 버튼, 쓰는 API(03 7장), 에러·빈 화면 표시 | `05-screens.md` | 대기 |
-| 4-3 | 핵심 화면 와이어프레임: 판매 기록(PC, 구매·환불·교환), 고객 상세, 오늘 할 일(폰) | `05-screens.md` | 대기 |
+| 4-1 | 화면 흐름: 계정별 화면·첫 화면·메뉴, 화면 사이 이동, PC·폰 레이아웃 (사용자 인터뷰) | [05-screens.md](05-screens.md) 1·2장, [screen-interview.md](screen-interview.md) | 완료 (11/04) |
+| 4-2 | 화면별 설계: 영역, 입력 칸과 검증, 버튼, 쓰는 API(03 7장), 에러·빈 화면 표시 | [05-screens.md](05-screens.md) 3장 | 완료 (11/04) |
+| 4-3 | 와이어프레임: 화면 전부를 피그마로 (사용자가 그림, 프레임 목록은 05 4장) | 피그마 (링크는 05 4장) | 진행 |
 
 ## 5. 논리 ERD
 
@@ -55,7 +55,7 @@
 
 | ID | 작업 | 산출물 | 상태 |
 | --- | --- | --- | --- |
-| 6-1 | 아키텍처 점검과 그림 (초안으로 두고 개발하면서 고침, 정할 것 A1~A10은 해당 작업 때) | [04-architecture.md](04-architecture.md), [architecture-review.md](architecture-review.md), [images/architecture.png](images/architecture.png) | 초안 (10/30) |
+| 6-1 | 아키텍처 점검과 그림 (초안으로 두고 개발하면서 고침, 정할 것 A1~A12는 해당 작업 때) | [04-architecture.md](04-architecture.md), [architecture-review.md](architecture-review.md), [images/architecture.png](images/architecture.png) | 초안 (10/30) |
 | 6-2 | **B0-5** 물리 ERD: `schema.sql`과 엔티티를 02에 맞추기 (24개 테이블, 새 칸, UNIQUE) | `schema.sql`, 엔티티 | 대기 |
 | 6-3 | **B0-4** 무료 배포 확인: 지금 뼈대를 무료 서비스에 올려 `/actuator/health`와 잠드는지 확인 | README 실행·배포 절 | 대기 |
 

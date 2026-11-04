@@ -8,6 +8,7 @@
 > 변경: 2026-10-23 등급 실적을 시즌 단위로 (01-requirements.md BR-03, ADR-020) — 고객 상세 `grade.ticketCount12m`·`netAmount12m`, `stats.qty12m`을 `seasonTicketCount`·`seasonNetAmount`·`seasonQty`로.
 > 변경: 2026-10-23 요구사항 점검 반영 (01-requirements.md 8장, ADR-021~027·029) — 역할(본사·매장·직원·KIOSK, 2장), `PATCH /me/password`·`POST /auth/logout-all`, 판매 `sellerStaffId`, 교환·정정·기록 취소·하루 마감 API(4.8~4.10), 본사 매장 목록·직원 관리 API(`/stores/{storeId}/...`, 4.11), 고객 검색은 이름만, 콜리스트 `scope`·`promoOnly`, 연락 `channel`, 알림함, 등급 `confirmedStatus`·`confirmedBasis`, 할인율 `PUT /grade-discounts`, 시즌 중 재계산 삭제, 이벤트 `kind`·`originSaleId`·`exchange`, 에러 코드 7개.
 > 변경: 2026-10-30 ERD 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-006·022·026·030) — `GET /sales/daily-summary`(본사 매장 목록의 판매 요약, `GET /stores`는 판매 데이터를 읽지 않음), 영수증 상세 라인 `returnedQty`, 구매이력 `keyword`, 반품·교환·정정·기록 취소의 동시 요청과 다른 영수증 줄, 교환 티켓 문구(금액만), 정정 본문에서 `sellerStaffId`·`memo`를 빼고 `staffId`, 남은 라인 없음 409, 다시 마감, 이벤트 `rootSaleId`·`recordedBy`와 `aggregate_id` = 처음 판매, 후속 연락·메모 처리 규칙.
+> 변경: 2026-11-04 화면설계 반영 ([05-screens.md](05-screens.md), 01-requirements.md 8장) — 직원 개인 계정도 연락 결과(`type=CALL`)를 남기고 내 할 일을 완료·건너뛰기(2장, 3.3), 직원 대리 등록의 담당 직원 `staffId`(3.2), 판매 사원은 화면이 저장할 때마다 비움(4.1), 판매 기록 화면이 마감 현황을 읽음(7장).
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -57,14 +58,14 @@
 | 공개 | (없음) | `/public/**`, `/auth/login`, `/auth/refresh` |
 | KIOSK | `KIOSK` | `/kiosk/registrations`, `GET /me`, `/public/**` 만 |
 | 매장 | `STORE` (매장 계정, 매장 노트북·매장폰) | 판매·반품·교환·그날 정정·기록 취소, 하루 마감, 고객 등록·조회·수정(가족 포함), 메모·연락 결과(직원 지정), 콜리스트·오늘 할 일(매장 전체), 상품 등록·조회, 등급 기준·후속 연락 설정 **조회** |
-| 직원 | `MANAGER`·`SENIOR`·`JUNIOR`·`STAFF` (개인 계정, 폰 웹앱) | 고객 조회, 내 할 일, 콜리스트(기본 내 담당), 메모(상담·기타), 알림함, 비밀번호 바꾸기. 판매·연락 결과 기록은 못 한다 |
+| 직원 | `MANAGER`·`SENIOR`·`JUNIOR`·`STAFF` (개인 계정, 폰 웹앱) | 고객 조회, 내 할 일(연락 결과로 완료·건너뛰기), 콜리스트(기본 내 담당), 메모(상담·기타·연락 결과, 작성자는 본인), 알림함, 비밀번호 바꾸기. 판매는 기록하지 못한다 |
 | 본사 | `HQ` (개인 계정) | 전 매장 조회(매장 지정), 매장 목록·상세, 직원·키오스크·매장 계정 관리(등록·비활성화·이관·승격·비밀번호), 마감된 판매 정정·기록 취소, 하루 마감 다시 열기, 등급 기준·할인율·후속 연락 설정, 정기 산정 실행, 상품 등록·조회. 판매는 기록하지 못한다 |
 
 - 아래 표의 "로그인"은 KIOSK를 뺀 모든 계정이다.
 - 요청마다 계정이 활성인지와 `tokens_valid_after`를 확인한다. 비활성 계정이면 `401 AUTH_ACCOUNT_DISABLED`, 기준 시각보다 먼저 발급된 토큰이면 `401 AUTH_TOKEN_INVALID` (ADR-025).
 - `/auth/refresh`는 새 Access와 새 Refresh를 함께 준다(14일 연장). 매장 계정·키오스크처럼 매일 쓰는 기기는 계속 로그인 상태다. 비활성 계정이면 `401 AUTH_ACCOUNT_DISABLED`.
 - 판매 매장은 요청으로 받지 않고 매장 계정의 소속 매장(`staff.store_id`)으로 정한다. 매장 계정이 아닌 계정이 `POST /sales`를 호출하면 `403 STORE_REQUIRED`.
-- 매장 계정으로 판매·연락 결과·메모를 남길 때는 직원 ID(`sellerStaffId`, `staffId`)를 함께 보낸다. 그 매장의 활성 직원(MANAGER~STAFF)이어야 한다. 직원 개인 계정이 메모를 쓰면 본인이 작성 직원이다.
+- 매장 계정으로 판매·연락 결과·메모를 남길 때는 직원 ID(`sellerStaffId`, `staffId`)를 함께 보낸다. 그 매장의 활성 직원(MANAGER~STAFF)이어야 한다. 직원 개인 계정이 메모·연락 결과를 남기거나 할 일을 완료·건너뛰면 본인이 작성 직원이고 `staffId`는 받지 않는다.
 - 본사 전용 매장 단위 API는 `/stores/{storeId}/...`다. 매장 계정이 같은 경로를 쓰면 자기 매장만 허용한다.
 
 ## 3. 엔드포인트 목록
@@ -88,7 +89,7 @@
 | GET | `/public/join-info?store=GN01&staff=S017` | QR 코드 확인. 매장명, 동의 문구, 사이즈 선택지 반환 | 공개 | REG-03 |
 | POST | `/public/registrations` | QR 등록. **IP당 분당 5회 제한** (프록시 뒤에서는 `X-Forwarded-For`로 IP 판별, NFR-04a) | 공개 | REG-01·03·05·06 |
 | POST | `/kiosk/registrations` | 매장 iPad 등록. 매장은 토큰에서 결정 | KIOSK | REG-01·02·05·06 |
-| POST | `/customers` | 직원 대리 등록 (매장 계정에서) | 매장 | REG-01·04·05 |
+| POST | `/customers` | 직원 대리 등록 (매장 계정에서). 담당 직원 `staffId`는 선택이고 그 매장의 활성 직원이어야 한다 (판매 기록 중이면 화면이 판매 사원을 미리 넣는다) | 매장 | REG-01·04·05 |
 
 - 공개·키오스크 등록은 신규든 기존 번호든 **항상 같은 응답**(`200 { "message": "등록이 완료되었습니다." }`)을 준다. 기존 번호면 아무것도 바꾸지 않는다 (REG-05).
 - QR의 매장 코드가 없는 코드면 `GET /public/join-info`와 `POST /public/registrations`가 `404 STORE_NOT_FOUND`.
@@ -118,14 +119,14 @@
 | PATCH | `/members/{memberId}` | 구성원 수정 | 매장 | CUS-05 |
 | DELETE | `/members/{memberId}` | 구성원 삭제. 과거 판매의 착용자 호칭은 남는다 | 매장 | CUS-05 |
 | GET | `/customers/{id}/notes` | 메모 목록 (최신순) | 로그인 | MEM-02 |
-| POST | `/customers/{id}/notes` | 메모 작성. 매장 계정은 `staffId`(작성 직원) 필수. 연락 결과(`type=CALL` + `callResult` + `channel`)는 매장 계정만 | 매장·직원 | MEM-01, CAL-02 |
+| POST | `/customers/{id}/notes` | 메모 작성. 매장 계정은 `staffId`(작성 직원) 필수. 연락 결과(`type=CALL` + `callResult` + `channel`)는 매장 계정과 직원(작성자는 본인) | 매장·직원 | MEM-01, CAL-02 |
 | PATCH | `/notes/{noteId}` | 메모 수정 (작성 직원 본인, 그 매장의 매장 계정, 본사는 전체) | 매장·직원·본사 | MEM-03 |
 | DELETE | `/notes/{noteId}` | 메모 삭제 (수정과 같은 규칙) | 매장·직원·본사 | MEM-03 |
 | GET | `/call-list` | 콜리스트. 아래 파라미터 참고 | 로그인 | CAL-01 |
 | GET | `/follow-ups/today` | 오늘 할 일: 만기일이 오늘이거나 지난 `OPEN` 할 일, 만기일 오래된 순. 직원은 내 할 일, 매장 계정은 매장 전체(매장 계정이 맡은 고객 포함), 본사는 `storeId` 지정 (4.7) | 로그인 | CAL-06 |
 | GET | `/customers/{id}/follow-ups` | 고객의 후속 연락 할 일 (상세 화면) | 로그인 | CAL-06 |
-| POST | `/follow-ups/{id}/complete` | 연락 결과를 기록하고 완료. 본문은 연락 메모와 같다(`staffId`, `callResult`, `channel`, `content`). `consult_note`(type=`CALL`)를 만들고 할 일에 연결한다 | 매장 | CAL-06, CAL-02 |
-| POST | `/follow-ups/{id}/skip` | 건너뛰기 | 매장 | CAL-06 |
+| POST | `/follow-ups/{id}/complete` | 연락 결과를 기록하고 완료. 본문은 연락 메모와 같다(`staffId`, `callResult`, `channel`, `content`). `consult_note`(type=`CALL`)를 만들고 할 일에 연결한다. 직원은 내 할 일만 되고(아니면 `403 ACCESS_DENIED`) `staffId`를 보내지 않는다 | 매장·직원 | CAL-06, CAL-02 |
+| POST | `/follow-ups/{id}/skip` | 건너뛰기. 직원은 내 할 일만 (아니면 `403 ACCESS_DENIED`) | 매장·직원 | CAL-06 |
 | GET | `/notifications` | 내 알림함 (안 읽은 것 먼저) | 직원 | CAL-09 |
 | POST | `/notifications/{id}/read` | 읽음 표시 | 직원 | CAL-09 |
 
@@ -235,7 +236,7 @@ Idempotency-Key: 6b0f6c1e-2f7a-4f3c-9a51-1d2c3e4f5a6b
 }
 ```
 
-- `sellerStaffId`는 판매 사원이고 필수다. 그 매장의 활성 직원(MANAGER~STAFF)이 아니면 `400 VALIDATION_FAILED`, 없는 ID면 `404 STAFF_NOT_FOUND`. 매장 계정 자신은 판매 사원이 될 수 없다. 화면은 직전에 고른 직원을 기본값으로 둔다.
+- `sellerStaffId`는 판매 사원이고 필수다. 그 매장의 활성 직원(MANAGER~STAFF)이 아니면 `400 VALIDATION_FAILED`, 없는 ID면 `404 STAFF_NOT_FOUND`. 매장 계정 자신은 판매 사원이 될 수 없다. 화면은 저장할 때마다 판매 사원 칸을 비우고, 목록 맨 위에 직전에 고른 직원을 둔다 (05-screens.md SCR-02).
 - 마감된 날(`store_day_close`가 있는 날)이면 `409 DAY_CLOSED` (BR-16).
 - `customerId`가 없으면 비회원 판매.
 - 각 라인은 **등록 상품**(`skuId`) 또는 **직접 입력**(`productName`, `itemType`, `size` 필수, `color`·`target` 선택) 중 하나다. 둘 다 있거나 둘 다 없으면 `400 VALIDATION_FAILED`. 없는 `skuId`면 `404 PRODUCT_NOT_FOUND`, 품목에 맞지 않는 사이즈면 `400 INVALID_SIZE`.
@@ -577,7 +578,7 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
 | --- | --- |
 | 고객 등록 폼 (QR) | `GET /public/join-info` (사이즈 선택지 포함), `POST /public/registrations` |
 | 고객 등록 폼 (iPad, KIOSK) | `GET /me`, `GET /public/join-info` (동의 문구, 사이즈 선택지 포함), `POST /kiosk/registrations` |
-| 판매 기록 (매장 계정, 노트북) | `GET /stores/{storeId}/staff`(판매 사원 고르기), `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자), `GET /products?keyword=`, `POST /sales`, `POST /customers`, `GET /public/sizes`. 환불·교환을 고르면 `GET /customers/{id}/purchases?keyword=`(회원의 구매 목록에서 상품 찾기), `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges` |
+| 판매 기록 (매장 계정, 노트북·매장폰) | `GET /stores/{storeId}/staff`(판매 사원 고르기), `GET /stores/{storeId}/day-closes?from=&to=`(화면을 열 때 오늘 마감 여부), `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자), `GET /products?keyword=`, `POST /sales`, `POST /customers`, `GET /public/sizes`. 환불·교환을 고르면 `GET /customers/{id}/purchases?keyword=`(회원의 구매 목록에서 상품 찾기), `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges` |
 | 판매 내역 · 반품 · 교환 · 정정 · 마감 (매장 계정) | `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges`, `PUT /sales/{id}`, `POST /sales/{id}/void`, `POST /day-closes`, `GET /stores/{storeId}/day-closes` |
 | 고객등록 (매장 계정) | `GET /public/sizes`, `POST /customers` |
 | 상품 관리 (매장 계정·본사) | `GET /products?keyword=`, `GET /products/{id}`, `POST /products`, `PATCH /products/{id}`, `GET /products/import-template`, `POST /products/import`, `GET /public/sizes` |
