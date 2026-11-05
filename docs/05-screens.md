@@ -243,7 +243,7 @@ flowchart LR
 - 남은 줄(반품되지 않은 수량)만 불러오고, 결제 금액은 원래 값 그대로 채운다(자동 계산 안 함).
 - [정정 저장] → 확인 창 "정정할까요? 원 판매는 기록 취소되고 새 영수증이 만들어집니다" → `PUT /sales/{id}` → 새 영수증 상세로 이동.
 
-**쓰는 API**: `GET /me`(매장 ID), `GET /stores/{storeId}/staff`, `GET /stores/{storeId}/day-closes?from=오늘&to=오늘`(마감 상태, S7), `GET /customers?name=`, `GET /customers/{id}`(할인율), `GET /customers/{id}/members`, `GET /products?keyword=`, `GET /public/sizes`, `POST /sales`, `POST /customers`. 환불·교환: `GET /customers/{id}/purchases?keyword=`, `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges`. 정정: `GET /sales/{id}`, `PUT /sales/{id}`.
+**쓰는 API**: `GET /me`(매장 ID), `GET /stores/{storeId}/staff`, `GET /sales/daily-summary?date=오늘`(오늘 판매 수·마감 상태, S7·V1), `GET /customers?name=`, `GET /customers/{id}`(할인율), `GET /customers/{id}/members`, `GET /products?keyword=`, `GET /public/sizes`, `POST /sales`, `POST /customers`. 환불·교환: `GET /customers/{id}/purchases?keyword=`, `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges`. 정정: `GET /sales/{id}`, `PUT /sales/{id}`.
 
 **에러·빈 화면**
 
@@ -363,7 +363,7 @@ flowchart LR
 - [오늘 판매 마감] → 확인 창 "오늘 판매를 마감할까요? 마감 뒤에는 본사만 다시 열 수 있습니다" → `POST /day-closes` → 위 상태가 `마감됨 · 18:42`로 바뀐다.
 - 본사가 다시 연 날은 다시 [오늘 판매 마감]이 보인다.
 
-**쓰는 API**: `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns`, `POST /sales/{id}/void`, `POST /day-closes`, `GET /stores/{storeId}/day-closes`, `GET /stores/{storeId}/staff`
+**쓰는 API**: `GET /sales/daily-summary?date=오늘`(위 마감 상태, V1), `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns`, `POST /sales/{id}/void`, `POST /day-closes`, `GET /stores/{storeId}/staff`
 
 ### SCR-05 상품 관리
 
@@ -596,24 +596,39 @@ flowchart LR
 | 판매 사원은 저장할 때마다 비우고 다시 고른다. 목록 맨 위에 직전 직원 | S6·S9 | 01 SAL-01, 03 4.1, dev-plan F1 |
 | 직원이 고친 결제 금액은 다시 계산하지 않는다 | S4 | 01 BR-10 |
 | 직원 대리 등록에서 담당 직원을 고른다 (판매 중이면 판매 사원) | C2 | 01 REG-04, 03 3.2 |
-| 판매 기록 화면이 열 때 마감 여부를 읽는다 | S7 | 03 7장 |
+| 판매 기록·판매 내역 화면이 열 때 오늘 판매 수·마감 여부를 읽는다 (매장 계정도 `GET /sales/daily-summary`) | S7, V1 (5-3) | 03 3.5·7장 |
 | 키오스크는 2분 동안 손대지 않으면 입력을 지운다 (**추천안대로 정함**) | W1 | 01 REG-02 |
 
-## 7. ERD · API와 맞춰 볼 것 (WBS 5-3으로 넘김)
+## 7. ERD · API와 맞춰 본 것 (WBS 5-3, 2026-11-05)
 
-화면을 그리다 보니 03(일부는 02)에 응답 모양이 없거나 예시가 어긋난 것들이다. 5-3에서 하나씩 확인하고 03(·02)과 erd-review.md에 반영한다.
+화면에 나오는 값을 하나씩 API(03) 응답과 ERD(02) 칸에 대 봤다. 자세한 대조표는 [erd-review.md](erd-review.md) 8장. ERD에 없는 값은 없었고, API에는 응답 모양이 없는 곳이 많아 03 4.12에 모았다.
 
-| # | 화면 | 필요한 것 | 지금 03 |
+**정한 것** (사용자가 추천대로 정함)
+
+| # | 정한 것 | 반영 |
+| --- | --- | --- |
+| V1 | 판매 기록·판매 내역 위의 '오늘 판매 12건 · 마감 전'은 `GET /sales/daily-summary`로 받는다. 매장 계정도 쓰고 자기 매장만 받는다 (S7의 마감 현황 API 대신) | 03 3.5·4.12·7장 |
+| V2 | 오늘 판매 수 = 그날 영수증 중 기록 취소를 뺀 수 (교환·정정 영수증 포함, 판매 내역의 그날 목록 수와 같음) | 03 4.12 |
+| V3 | 줄마다 환불된 금액 합계 `sale_line.returned_amount`를 둔다. 환불 예상 금액(BR-11의 마지막 수량), 정정 기본값(남은 결제 금액)에 쓴다 | 02 3.3·5장 #25, 03 4.2·4.12, `schema.sql`은 B0-5 |
+
+**찾은 것과 처리**
+
+| # | 화면 | 찾은 것 | 처리 |
 | --- | --- | --- | --- |
-| G1 | SCR-02 | 마감 현황 `GET /stores/{storeId}/day-closes?from=&to=`의 응답 모양 (날짜, 마감 여부, 마감 시각·계정, 다시 연 기록) | 7장 판매 기록 행에는 2026-11-04에 넣었고, 응답 모양이 없음 |
-| G2 | SCR-07 | 오늘 할 일 항목에 받는 사람 구분(`assignee`: 매장/직원)과 받는 직원 이름 | 4.7 예시에 없음 (본문은 `assignee`를 말함) |
-| G3 | SCR-04 | `POST /customers` 본문 전체 (등록 폼 칸 + 담당 직원 `staffId`) | 3.2에 `staffId` 한 줄만 있고 본문 예시 없음 |
-| G4 | SCR-07 | 알림 항목 모양 (종류 `FOLLOW_UP`·`NOTE`, 고객 ID·이름, 문구, 시각, 읽음) | 응답 모양 없음 (02 `staff_notification`에는 칸 있음) |
-| G5 | SCR-02 정정, SCR-03 | 영수증 상세 줄마다 환불된 금액 합계 (정정 기본값 = 남은 결제 금액) | `returnedQty`만 있음 |
-| G6 | SCR-09 | 정기 산정 실행 결과 (처리한 고객 수, 등급이 바뀐 수, 걸린 시간) | 응답 모양 없음 |
-| G7 | SCR-03 | 판매 내역 목록 항목 모양 (시각, 영수증 번호, 고객 이름, 판매 사원 이름, 수량, 금액, 상태, 종류, 원 영수증) | 목록 모양 없음 |
-| G8 | SCR-07 | 콜리스트 항목 모양 (검색 목록 + `marketingAllowed`, 구매 없는 고객의 가입일) | "`marketingAllowed`를 포함한다"만 있음 |
-| G9 | SCR-06, SCR-08 | 고객 할 일 목록(받는 사람 포함), 직원 목록(직급, 매니저 자리, 로그인 ID, 활성) 항목 모양 | 응답 모양 없음 |
-| G10 | SCR-02 | 03 4.1 예시의 여성 아우터 사이즈가 `M`인데, 02 3.2 허용값은 85~105다 | 예시 값을 `90`으로 |
-| G11 | SCR-06 | 03 4.4 예시의 `lastVisitAt`(08-28)가 4.1 예시의 같은 고객 판매(10-15)보다 이르다 | 예시 값을 맞추기 |
-| G12 | SCR-06·07 | 직원 개인 계정의 연락 결과·할 일 완료 (R1): 다른 사람 할 일이면 `403 ACCESS_DENIED`, `staffId`를 받지 않음 | 2026-11-04에 3.3에 넣음. 테스트 경우만 5-3·B4-1·B4-3에서 확인 |
+| G1 | SCR-08 | 마감 현황 응답 모양 | 03 4.12. 판매 기록 화면은 V1로 바꿈 |
+| G2 | SCR-07 | 오늘 할 일의 받는 사람(`assignee`)·받는 직원 이름 | 03 4.7 예시에 넣음 |
+| G3 | SCR-04 | 직원 대리 등록 본문 | 03 4.5: QR 본문에서 `storeCode`·`staffCode` 대신 `staffId` |
+| G4 | SCR-07 | 알림 항목 모양 | 03 4.12 |
+| G5 | SCR-02 정정·환불, SCR-03 | 줄마다 환불된 금액 | V3, 03 3.5·4.12 `returnedAmount` |
+| G6 | SCR-09 | 정기 산정 실행 결과 | 03 4.12 |
+| G7 | SCR-03 | 판매 내역 항목 모양, 고객 이름 | 03 4.12. 고객 이름은 sales가 customer `api`로 한 번에 받는다 |
+| G8 | SCR-07 | 콜리스트 항목 모양 | 03 4.12 (`createdAt`으로 "가입 후 N일") |
+| G9 | SCR-06·08 | 고객 할 일 목록, 계정 목록 모양 | 03 4.12 |
+| G10 | SCR-02 | 03 4.1 예시의 여성 아우터 사이즈 `M` | `90`으로 고침 |
+| G11 | SCR-06 | 03 4.3·4.4 예시의 마지막 방문일이 10/15 판매보다 이름 | 10/15로 고침 |
+| G12 | SCR-06·07 | 직원 개인 계정의 연락 결과·할 일 완료 | 2026-11-04에 03 3.3에 넣음. 테스트는 B4-1·B4-3 |
+| G13 | SCR-02·05 | 상품 검색 응답(SKU 포함) 모양 | 03 4.12 |
+| G14 | SCR-02 환불·교환, SCR-06 | 고객 구매이력 응답 모양(영수증 → 줄, 매장 이름) | 03 4.12 |
+| G15 | SCR-01·04·06 | 외국인 영문 이름 `nameEn`이 등록 본문·고객 상세에 없음. 상세에 `nationality`·`birthMd`도 없음 (02에는 칸이 있음) | 03 4.4·4.5 |
+| G16 | SCR-01·04·05 | 사이즈 목록, QR 첫 정보 응답 모양 | 03 4.12 |
+| G17 | SCR-06·07·09 | 메모의 고칠 수 있는지(`editable`), 알림 안 읽은 수(`unreadCount`), 등급 기준·등급 이력 응답 | 03 4.12. 알림 문구는 만들 때 고객 모듈이 정한다(common은 고객 모듈을 부르지 않음) |

@@ -9,6 +9,7 @@
 > 변경: 2026-10-23 요구사항 점검 반영 (01-requirements.md 8장, ADR-021~027·029) — 역할(본사·매장·직원·KIOSK, 2장), `PATCH /me/password`·`POST /auth/logout-all`, 판매 `sellerStaffId`, 교환·정정·기록 취소·하루 마감 API(4.8~4.10), 본사 매장 목록·직원 관리 API(`/stores/{storeId}/...`, 4.11), 고객 검색은 이름만, 콜리스트 `scope`·`promoOnly`, 연락 `channel`, 알림함, 등급 `confirmedStatus`·`confirmedBasis`, 할인율 `PUT /grade-discounts`, 시즌 중 재계산 삭제, 이벤트 `kind`·`originSaleId`·`exchange`, 에러 코드 7개.
 > 변경: 2026-10-30 ERD 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-006·022·026·030) — `GET /sales/daily-summary`(본사 매장 목록의 판매 요약, `GET /stores`는 판매 데이터를 읽지 않음), 영수증 상세 라인 `returnedQty`, 구매이력 `keyword`, 반품·교환·정정·기록 취소의 동시 요청과 다른 영수증 줄, 교환 티켓 문구(금액만), 정정 본문에서 `sellerStaffId`·`memo`를 빼고 `staffId`, 남은 라인 없음 409, 다시 마감, 이벤트 `rootSaleId`·`recordedBy`와 `aggregate_id` = 처음 판매, 후속 연락·메모 처리 규칙.
 > 변경: 2026-11-04 화면설계 반영 ([05-screens.md](05-screens.md), 01-requirements.md 8장) — 직원 개인 계정도 연락 결과(`type=CALL`)를 남기고 내 할 일을 완료·건너뛰기(2장, 3.3), 직원 대리 등록의 담당 직원 `staffId`(3.2), 판매 사원은 화면이 저장할 때마다 비움(4.1), 판매 기록 화면이 마감 현황을 읽음(7장).
+> 변경: 2026-11-05 화면 대조 반영 ([erd-review.md](erd-review.md) 8장, [05-screens.md](05-screens.md) 7장) — 화면이 쓰는 조회 응답 모양(4.12), `GET /sales/daily-summary`를 매장 계정도(자기 매장) 쓰고 `saleCount` = 기록 취소를 뺀 영수증 수, 라인별 환불된 금액 `returnedAmount`, 등록 본문·고객 상세의 `nameEn`·`nationality`·`birthMd`, 오늘 할 일의 받는 사람(`assignee`·`staffName`), 예시 값(아우터 사이즈, 마지막 방문일).
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -112,7 +113,7 @@
 | GET | `/customers?name=김하늘` | 고객명 검색(부분 일치). 목록에 뒷자리 4개 | 로그인 | CUS-01 |
 | GET | `/customers/{id}` | 상세 요약 + 프로필 + 등급(현재·실적 기준·임시/확정·근거) + 등급 할인율 | 로그인 | CUS-02·04, GRD-03 |
 | PATCH | `/customers/{id}` | 프로필, 담당 직원, 마케팅 수신 변경 | 매장·본사 | CUS-04 |
-| GET | `/customers/{id}/purchases?keyword=코트` | 구매이력 (영수증 단위, 최신순, 기록 취소 제외, 라인별 `returnedQty`). `keyword`가 있으면 상품명·품번으로 거른다(환불·교환할 상품 찾기, SAL-03). 경로는 고객 아래지만 **sales 모듈이 제공**한다 (판매 테이블 조회) | 로그인 | CUS-03, SAL-03 |
+| GET | `/customers/{id}/purchases?keyword=코트` | 구매이력 (영수증 단위, 최신순, 기록 취소 제외, 라인별 `returnedQty`·`returnedAmount`, 모양은 4.12). `keyword`가 있으면 상품명·품번으로 거른다(환불·교환할 상품 찾기, SAL-03). 경로는 고객 아래지만 **sales 모듈이 제공**한다 (판매 테이블 조회) | 로그인 | CUS-03, SAL-03 |
 | GET | `/customers/{id}/grade-history` | 등급 변경 이력 (사유, 시즌, 그때의 점수) | 로그인 | GRD-06 |
 | GET | `/customers/{id}/members` | 가족 구성원 목록 | 로그인 | CUS-05 |
 | POST | `/customers/{id}/members` | 구성원 추가 (호칭, 관계 필수. 성별·출생연도·사이즈 선택) | 매장 | CUS-05 |
@@ -170,8 +171,8 @@
 | --- | --- | --- | --- | --- |
 | POST | `/sales` | 판매 기록. **`Idempotency-Key` 헤더 필수**, `sellerStaffId`(판매 사원) 필수. 매장은 매장 계정의 소속 매장. 마감된 날이면 `409 DAY_CLOSED` | 매장 | SAL-01·02·04 |
 | GET | `/sales?from=2026-10-01&to=2026-10-15` | 판매 내역. 매장 계정은 자기 매장, 본사는 `storeId` 필수 | 매장·본사 | SAL-05 |
-| GET | `/sales/{id}` | 영수증 상세 (라인과 라인별 반품된 수량 `returnedQty`, 판매 사원, 정가·결제 금액, 반품·교환 내역(교환마다 새 판매와 추가 결제 금액), 원 판매·정정 판매 연결). 남은 수량은 화면이 `qty − returnedQty`로 계산한다 | 매장·본사 | SAL-05 |
-| GET | `/sales/daily-summary?date=2026-10-30` | 매장별 그날 판매 수와 마감 여부 `[{ "storeId": 1, "saleCount": 12, "closed": true }]`. `storeId`로 한 매장만 받을 수 있다. 본사 매장 목록·상세가 `GET /stores`와 합쳐 보여준다 (3.7) | 본사 | ADM-03 |
+| GET | `/sales/{id}` | 영수증 상세 (라인과 라인별 반품된 수량 `returnedQty`·환불된 금액 `returnedAmount`, 판매 사원, 정가·결제 금액, 반품·교환 내역(교환마다 새 판매와 추가 결제 금액), 원 판매·정정 판매 연결). 남은 수량은 화면이 `qty − returnedQty`로, 남은 결제 금액은 `lineAmount − returnedAmount`로 계산한다 (모양은 4.12) | 매장·본사 | SAL-05 |
+| GET | `/sales/daily-summary?date=2026-10-30` | 매장별 그날 판매 수와 마감 여부 `[{ "storeId": 1, "saleCount": 12, "closed": true }]`. `storeId`로 한 매장만 받을 수 있다. 본사 매장 목록·상세가 `GET /stores`와 합쳐 보여주고, 매장 계정은 판매 기록·판매 내역 위의 '오늘 판매 12건 · 마감 전'에 쓴다(자기 매장만). `saleCount`는 기록 취소를 뺀 영수증 수다 (4.12) | 매장·본사 | ADM-03, SAL-01·08 |
 | POST | `/sales/{id}/returns` | 반품 (라인별 수량). **`Idempotency-Key` 필수**. 마감된 날이면 `409 DAY_CLOSED` | 매장 | SAL-03 |
 | POST | `/sales/{id}/exchanges` | 교환: 반품할 라인 + 새 상품 (4.8). **`Idempotency-Key` 필수** | 매장 | SAL-06 |
 | PUT | `/sales/{id}` | 정정: 기록 취소 + 원래 시각으로 다시 기록 (4.9). **`Idempotency-Key` 필수**. 매장 계정은 판매한 날·마감 전만, 그 뒤는 본사 | 매장·본사 | SAL-07 |
@@ -261,7 +262,7 @@ Idempotency-Key: 6b0f6c1e-2f7a-4f3c-9a51-1d2c3e4f5a6b
   "appliedGrade": "B",
   "lines": [
     { "lineId": 1, "skuId": 5501, "productCode": "D2110", "productName": "울 블렌드 롱코트", "itemType": "OUTER",
-      "color": "차콜", "size": "M", "listPrice": 798000, "qty": 1, "lineAmount": 774060 },
+      "color": "차콜", "size": "90", "listPrice": 798000, "qty": 1, "lineAmount": 774060 },
     { "lineId": 2, "skuId": null, "productCode": null, "productName": "캐시미어 머플러", "itemType": "ACC",
       "color": "오트밀", "size": "FREE", "listPrice": null, "qty": 1, "lineAmount": 217800,
       "wearerMemberId": 31, "wearerLabel": "남편" }
@@ -295,7 +296,7 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 ```
 
 - **중복 요청 방지**는 판매(4.1)와 같다. 키는 화면이 반품 창을 열 때 만든 UUID이고, `sale_return.idempotency_key`(UNIQUE)와 `sale_return.request_hash`에 저장한다. 같은 키로 다시 오면 저장된 반품으로 같은 응답을 `200`으로 주고, 해시가 다르면 `409 IDEMPOTENCY_KEY_REUSED` (ADR-006). 이것이 없으면 "1개 반품"을 두 번 눌렀을 때 2개가 반품된다.
-- 환불 금액 = 그 라인의 결제 금액 ÷ 판매 수량 × 반품 수량 (원 미만 버림). 그 라인의 마지막 남은 수량을 반품하면 남은 결제 금액 전부 (BR-11).
+- 환불 금액 = 그 라인의 결제 금액 ÷ 판매 수량 × 반품 수량 (원 미만 버림). 그 라인의 마지막 남은 수량을 반품하면 남은 결제 금액 전부(`line_amount − returned_amount`) (BR-11). 반품하면 같은 잠금 안에서 `sale_line.returned_qty`와 `returned_amount`를 함께 늘린다.
 - 남은 수량보다 많이 반품하면 `409 RETURN_QTY_EXCEEDED`. 마감된 날이면 `409 DAY_CLOSED`, 기록 취소된 판매면 `409 SALE_ALREADY_VOIDED`.
 - **다른 키로 동시에 반품**(매장 노트북과 매장폰): 서버는 판매 행을 잠그고(`SELECT … FOR UPDATE`) 남은 수량을 확인하므로, 뒤 요청은 앞 요청이 끝난 뒤의 남은 수량을 보고 `409 RETURN_QTY_EXCEEDED`가 된다. 교환·정정·기록 취소도 같다 (ADR-030).
 - `lineId`가 이 판매의 라인이 아니면(다른 영수증의 줄) `400 VALIDATION_FAILED`.
@@ -308,7 +309,7 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 {
   "content": [
     { "id": 1024, "name": "김하늘", "phoneMasked": "****-4821", "grade": "B",
-      "lastVisitAt": "2026-08-28T15:10:00+09:00", "staffName": "이지은" },
+      "lastVisitAt": "2026-10-15T14:03:00+09:00", "staffName": "이지은" },
     { "id": 2310, "name": "김하늘", "phoneMasked": "****-0937", "grade": "NORMAL",
       "lastVisitAt": "2025-10-02T11:40:00+09:00", "staffName": "박도윤" }
   ],
@@ -322,6 +323,8 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 {
   "id": 1024,
   "name": "김하늘",
+  "nameEn": null,
+  "nationality": "DOMESTIC",
   "phone": "010-2943-4821",
   "createdAt": "2025-12-06T13:05:00+09:00",
   "homeStore": { "id": 1, "name": "강남점" },
@@ -334,9 +337,9 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
     "totalScore": 70, "discountRate": 3, "policyVersion": 2,
     "confirmedBasis": { "season": "25/26", "ticketCount": 2, "netAmount": 2500000, "totalScore": 40 }
   },
-  "stats": { "firstVisitAt": "2025-12-06T13:20:00+09:00", "lastVisitAt": "2026-08-28T15:10:00+09:00",
+  "stats": { "firstVisitAt": "2025-12-06T13:20:00+09:00", "lastVisitAt": "2026-10-15T14:03:00+09:00",
              "seasonQty": 5, "lifetimeAmount": 9200000 },
-  "profile": { "gender": "F", "birthYear": 1991, "regionSido": "서울", "regionGu": "강남구",
+  "profile": { "gender": "F", "birthYear": 1991, "birthMd": "0314", "regionSido": "서울", "regionGu": "강남구",
                "preferredItemTypes": ["OUTER", "TOP"],
                "sizes": { "top": "M", "outer": "90", "bottom": "26", "shoes": "240" },
                "contactChannel": "KAKAO" },
@@ -370,6 +373,8 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 - `privacy`, `age14`가 `true`가 아니면 `400`.
 - 사이즈가 허용값이 아니면 `400` + `fieldErrors`.
 - 값 목록: `nationality` = `DOMESTIC`, `FOREIGN` · `gender` = `F`, `M` · `contactChannel` = `CALL`, `SMS`, `KAKAO`. `gender`와 `contactChannel`은 선택 항목이라 비워도 된다.
+- 외국인(`FOREIGN`)이면 영문 이름 `nameEn`이 필수이고 `name`(한글 이름)은 선택이다. `name`을 비우면 서버가 `nameEn`을 `name`에도 넣는다 (REG-06). 내국인은 `nameEn`을 보내지 않는다.
+- 같은 본문을 세 곳이 쓴다: QR(`POST /public/registrations`, 위 그대로), 키오스크(`POST /kiosk/registrations`, `storeCode`·`staffCode` 없이 토큰의 매장), 직원 대리 등록(`POST /customers`, `storeCode`·`staffCode` 대신 담당 직원 `staffId` 선택).
 - 같은 IP에서 1분에 5번을 넘으면 `429 TOO_MANY_REQUESTS`.
 
 ### 4.6 상품 엑셀 올리기 `POST /products/import`
@@ -409,17 +414,19 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
   "content": [
     { "id": 501, "customerId": 1024, "customerName": "김하늘", "phoneMasked": "****-4821", "grade": "B",
       "stage": "착용감 확인", "promotional": false, "dueDate": "2026-10-29", "overdueDays": 0,
-      "saleId": 88231, "soldAt": "2026-10-15T14:03:00+09:00", "marketingAllowed": true },
+      "saleId": 88231, "soldAt": "2026-10-15T14:03:00+09:00", "marketingAllowed": true,
+      "assignee": "STAFF", "staffId": 17, "staffName": "이지은" },
     { "id": 377, "customerId": 2310, "customerName": "박서연", "phoneMasked": "****-0937", "grade": "C",
       "stage": "신상·재방문 안내", "promotional": true, "dueDate": "2026-10-26", "overdueDays": 3,
-      "saleId": 80112, "soldAt": "2026-08-26T16:40:00+09:00", "marketingAllowed": false }
+      "saleId": 80112, "soldAt": "2026-08-26T16:40:00+09:00", "marketingAllowed": false,
+      "assignee": "STAFF", "staffId": 23, "staffName": "박도윤" }
   ],
   "page": 0, "size": 20, "totalElements": 2, "totalPages": 1
 }
 ```
 
 - 만기일이 오래된 순이라 밀린 할 일(`overdueDays` > 0)이 먼저 나온다.
-- 직원 개인은 내 할 일, 매장 계정은 매장 전체 할 일을 받는다. 매장 계정이 맡은 고객의 할 일은 `assignee`가 `STORE`라 화면이 "매장 할 일"로 묶어 보여준다. 본사는 `storeId`를 지정한다.
+- 직원 개인은 내 할 일, 매장 계정은 매장 전체 할 일을 받는다. 매장 계정이 맡은 고객의 할 일은 `assignee`가 `STORE`(받는 계정이 매장 계정, `staffName`은 매장 계정 이름)라 화면이 "매장 할 일"로 묶어 보여준다. 나머지는 `STAFF`이고 `staffName`이 받는 직원이다. 본사는 `storeId`를 지정한다.
 - `promotional`이 `true`인데 `marketingAllowed`가 `false`면 화면은 "홍보 연락 불가 · 안부 연락만"을 보여준다 (BR-08, BR-14).
 - 이미 완료·건너뛰기·취소된 할 일에 `complete`나 `skip`을 보내면 `409 FOLLOW_UP_ALREADY_CLOSED`.
 
@@ -474,6 +481,179 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 - `newStorePassword`는 그 매장 계정의 새 비밀번호다 (필수, AUTH-04 규칙). 바꾸면 매장 계정의 기존 로그인이 끊긴다.
 - 비활성화, 이관, 매장 계정 비밀번호 변경은 한 트랜잭션이다. common 모듈이 같은 트랜잭션에서 `StaffDeactivated` Spring 이벤트를 발행하고 고객 모듈이 받아 이관한다 (ADR-024).
 - 응답 `200`: `{ "movedCustomers": 312, "movedFollowUps": 18 }`. 비활성화한 계정은 다음 요청부터 바로 막힌다 (ADR-025).
+
+### 4.12 화면이 쓰는 조회 응답 (2026-11-05)
+
+화면설계서 대조(05 7장, erd-review.md 8장)에서 모양이 없던 응답이다. 목록은 1장의 목록 응답(`content`, `page`, …)으로 감싸고 아래는 항목 하나만 보인다. 다른 모듈의 이름(고객 이름, 직원 이름, 매장 이름)은 그 모듈의 `api`에 ID 목록을 한 번에 넘겨 받는다. 목록 20줄마다 하나씩 묻지 않는다 (ADR-012, 아키텍처 점검 A9).
+
+**오늘 판매 요약** `GET /sales/daily-summary?date=2026-10-30`
+
+```json
+[ { "storeId": 1, "date": "2026-10-30", "saleCount": 12, "closed": false, "closedAt": null } ]
+```
+
+- 매장 계정은 자기 매장 1개만 받는다 (`storeId`를 보내도 자기 매장). 본사는 전 매장이고 `storeId`로 한 매장만 받을 수 있다.
+- `saleCount`는 그날 기록한 영수증 중 기록 취소(`VOIDED`)를 뺀 수다. 교환·정정으로 생긴 영수증도 세므로 판매 내역의 그날 목록 수와 같다.
+- `closed`는 마감 행이 있고 다시 열지 않은 상태다. 지난 날은 날짜로 잠기므로 `closed`와 관계없이 매장 계정이 기록할 수 없다 (4.10).
+
+**판매 내역 항목** `GET /sales?from=&to=`
+
+```json
+{ "id": 88231, "receiptNo": "GN01-20261015-0012", "soldAt": "2026-10-15T14:03:00+09:00",
+  "kind": "NORMAL", "status": "PARTIAL_RETURNED", "customerId": 1024, "customerName": "김하늘",
+  "sellerStaffId": 17, "sellerName": "이지은", "totalQty": 2, "totalAmount": 991860,
+  "originSaleId": null, "originReceiptNo": null }
+```
+
+- 최신순. 비회원이면 `customerId`·`customerName`이 `null`이다. 교환·정정 판매는 `originReceiptNo`에 원 영수증 번호가 있다.
+
+**영수증 상세** `GET /sales/{id}`
+
+```json
+{ "id": 88231, "receiptNo": "GN01-20261015-0012", "soldAt": "2026-10-15T14:03:00+09:00",
+  "store": { "id": 1, "name": "강남점" }, "kind": "NORMAL", "status": "PARTIAL_RETURNED",
+  "customerId": 1024, "customerName": "김하늘", "sellerStaffId": 17, "sellerName": "이지은", "appliedGrade": "B",
+  "lines": [
+    { "lineId": 2, "skuId": null, "productCode": null, "productName": "캐시미어 머플러", "itemType": "ACC",
+      "color": "오트밀", "size": "FREE", "listPrice": null, "qty": 1, "lineAmount": 217800,
+      "returnedQty": 1, "returnedAmount": 217800, "wearerLabel": "남편" } ],
+  "returns": [
+    { "returnId": 5021, "kind": "RETURN", "returnedAt": "2026-10-16T11:20:00+09:00", "staffName": "이지은",
+      "amount": 217800, "newSaleId": null, "newReceiptNo": null } ],
+  "originSaleId": null, "originReceiptNo": null, "totalQty": 2, "totalAmount": 991860 }
+```
+
+- `returns`에는 반품·교환·기록 취소가 모두 들어간다(`kind`). 교환이면 `newSaleId`가 새 판매, 정정으로 기록 취소된 판매면 `kind=VOID`이고 `newSaleId`가 정정 판매다.
+
+**고객 구매이력 항목** `GET /customers/{id}/purchases?keyword=코트`
+
+```json
+{ "saleId": 88231, "receiptNo": "GN01-20261015-0012", "soldAt": "2026-10-15T14:03:00+09:00",
+  "storeName": "강남점", "kind": "NORMAL", "status": "PARTIAL_RETURNED", "totalAmount": 991860,
+  "lines": [
+    { "lineId": 1, "productCode": "D2110", "productName": "울 블렌드 롱코트", "color": "차콜", "size": "90",
+      "qty": 1, "lineAmount": 774060, "returnedQty": 0, "returnedAmount": 0, "wearerLabel": null } ] }
+```
+
+- 영수증 단위, 최신순, 기록 취소된 영수증은 뺀다. `keyword`가 있으면 상품명·품번에 그 말이 든 줄만 남기고, 남은 줄이 없는 영수증은 뺀다 (환불·교환 모드, SAL-03).
+
+**상품 검색 항목** `GET /products?keyword=코트`
+
+```json
+{ "id": 301, "productCode": "D2110", "name": "울 블렌드 롱코트", "itemType": "OUTER", "target": "WOMEN",
+  "listPrice": 798000,
+  "skus": [ { "skuId": 5501, "color": "차콜", "size": "90" }, { "skuId": 5502, "color": "차콜", "size": "95" } ] }
+```
+
+**사이즈 목록** `GET /public/sizes`
+
+```json
+[ { "itemType": "OUTER", "target": "WOMEN", "sizes": ["85", "90", "95", "100", "105"] },
+  { "itemType": "OUTER", "target": "MEN", "sizes": ["95", "100", "105", "110", "115"] },
+  { "itemType": "TOP", "target": null, "sizes": ["XS", "S", "M", "L", "XL", "XXL"] },
+  { "itemType": "ACC", "target": null, "sizes": ["FREE"] } ]
+```
+
+- 값은 02 3.2와 같고 위는 일부만 보였다. `target`이 `null`이면 대상과 관계없는 목록이다. 아동 의류는 `target: "KIDS"`(4·6·8·10). 공용(`UNISEX`) 아우터·하의는 남성 목록을 쓴다. 여성 아우터의 `90(55)` 같은 호수 표시는 화면이 붙인다.
+
+**QR 첫 정보** `GET /public/join-info?store=GN01&staff=S017`
+
+```json
+{ "store": { "code": "GN01", "name": "강남점" },
+  "consents": { "privacy": "(개인정보 수집·이용 동의 문구)", "age14": "(만 14세 이상 확인 문구)", "marketing": "(마케팅 수신 동의 문구)" },
+  "sizes": [ "GET /public/sizes와 같은 목록" ] }
+```
+
+- 직원 코드가 맞는지는 알려 주지 않는다. 틀려도 등록은 받고 담당 직원만 비운다 (REG-03).
+
+**고객 할 일 항목** `GET /customers/{id}/follow-ups`
+
+```json
+{ "id": 501, "stage": "착용감 확인", "promotional": false, "saleId": 88231, "soldAt": "2026-10-15T14:03:00+09:00",
+  "dueDate": "2026-10-29", "status": "OPEN", "assignee": "STAFF", "staffId": 17, "staffName": "이지은", "closedAt": null }
+```
+
+- `OPEN`을 먼저, 그 안에서 만기일 순. 기준 판매 시각(`soldAt`)은 고객 모듈의 `customer_purchase`에서 읽는다 (판매 테이블을 읽지 않음, ADR-003).
+
+**콜리스트 항목** `GET /call-list`
+
+```json
+{ "id": 1024, "name": "김하늘", "phoneMasked": "****-4821", "grade": "B",
+  "lastVisitAt": "2026-10-15T14:03:00+09:00", "createdAt": "2025-12-06T13:05:00+09:00",
+  "staffName": "이지은", "marketingAllowed": true }
+```
+
+- 구매가 없으면 `lastVisitAt`이 `null`이고, 화면은 `createdAt`(가입일)으로 "가입 후 40일"을 보여준다 (BR-09).
+
+**메모 항목** `GET /customers/{id}/notes`
+
+```json
+{ "id": 7001, "type": "CALL", "content": "코트 착용감 만족. 소매 길이 수선 문의.",
+  "callResult": "COMPLETED", "channel": "CALL", "staffId": 17, "staffName": "이지은",
+  "saleId": null, "followUpId": 501, "createdAt": "2026-10-29T15:20:00+09:00", "updatedAt": null, "editable": true }
+```
+
+- `editable`은 지금 로그인한 계정이 이 메모를 고치고 지울 수 있는지다 (MEM-03). 화면은 이 값으로 [수정] [삭제]를 보인다.
+- `followUpId`는 이 연락으로 완료한 할 일이다 (`follow_up_task.note_id`).
+
+**알림함** `GET /notifications`
+
+```json
+{ "unreadCount": 2,
+  "content": [
+    { "id": 9001, "type": "FOLLOW_UP", "customerId": 1024, "refId": 501,
+      "message": "김하늘 · 구매 2주 · 착용감 확인", "createdAt": "2026-10-29T00:00:10+09:00", "read": false } ],
+  "page": 0, "size": 20, "totalElements": 2, "totalPages": 1 }
+```
+
+- 안 읽은 것 먼저, 그 안에서 최신순. `unreadCount`는 배지 숫자다.
+- 문구(`message`)는 알림을 만들 때 고객 모듈이 정해 넘긴다(고객 이름 포함). 알림함은 common 모듈에 있고 common은 고객 모듈을 부르지 않으므로(ADR-024), 읽을 때 이름을 붙이지 않는다. 고객 정보 삭제(CUS-06, 다음)를 만들 때 그 고객의 알림도 지운다.
+
+**계정 목록 항목** `GET /stores/{storeId}/staff`
+
+```json
+{ "id": 17, "name": "이지은", "role": "SENIOR", "managerSlot": null, "loginId": "gn01-jieun", "staffCode": "S017", "active": true }
+```
+
+- 본사는 매장 계정·직원·키오스크를 모두 받는다. 매장 계정이 부르면 활성 직원(MANAGER~STAFF)의 `id`·`name`·`role`만 받는다 (직원 고르기).
+
+**마감 현황 항목** `GET /stores/{storeId}/day-closes?from=&to=`
+
+```json
+{ "date": "2026-10-30", "closedAt": "2026-10-30T21:05:00+09:00", "closedByName": "강남점",
+  "reopenedAt": null, "reopenedByName": null }
+```
+
+- 마감 행이 있는 날만 준다. 행이 없는 지난 날은 화면이 "자정에 잠김"으로 보여준다.
+
+**등급 기준** `GET /grade-policy`
+
+```json
+{ "version": 2, "appliesFrom": "2026-06-01", "periodMonths": 12,
+  "amountRules": [ { "minValue": 0, "score": 0 }, { "minValue": 1000000, "score": 10 } ],
+  "ticketRules": [ { "minValue": 0, "score": 0 }, { "minValue": 1, "score": 10 } ],
+  "gradeCuts": [ { "grade": "NORMAL", "minScore": 0 }, { "grade": "D", "minScore": 20 } ],
+  "discounts": [ { "grade": "A", "rate": 5 }, { "grade": "B", "rate": 3 } ],
+  "next": { "version": 3, "appliesFrom": "2027-06-01" } }
+```
+
+- 구간은 일부만 보였다(전체 값은 01 BR-04). 예약된 다음 기준이 없으면 `next`가 `null`이다.
+
+**등급 이력 항목** `GET /customers/{id}/grade-history`
+
+```json
+{ "id": 77, "fromGrade": "C", "toGrade": "B", "reason": "PROMOTION", "season": "26/27",
+  "ticketCount": 3, "netAmount": 3420000, "totalScore": 70, "policyVersion": 2, "createdAt": "2026-10-15T14:03:02+09:00" }
+```
+
+**정기 산정 실행 결과** `POST /grade-policy/periodic-runs`
+
+```json
+{ "season": "25/26", "nextSeason": "26/27", "policyVersion": 2,
+  "customerCount": 5000, "changedCount": 412, "historyCreated": 5000, "elapsedMs": 8400 }
+```
+
+- 다시 실행해 결과가 같으면 `historyCreated`가 0이다 (GRD-06). `elapsedMs`로 NFR-02a(30초)를 잰다.
 
 ## 5. 에러 코드 목록
 
@@ -578,8 +758,8 @@ HTTP API는 아니지만 판매 모듈과 고객 모듈 사이의 **계약**이�
 | --- | --- |
 | 고객 등록 폼 (QR) | `GET /public/join-info` (사이즈 선택지 포함), `POST /public/registrations` |
 | 고객 등록 폼 (iPad, KIOSK) | `GET /me`, `GET /public/join-info` (동의 문구, 사이즈 선택지 포함), `POST /kiosk/registrations` |
-| 판매 기록 (매장 계정, 노트북·매장폰) | `GET /stores/{storeId}/staff`(판매 사원 고르기), `GET /stores/{storeId}/day-closes?from=&to=`(화면을 열 때 오늘 마감 여부), `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자), `GET /products?keyword=`, `POST /sales`, `POST /customers`, `GET /public/sizes`. 환불·교환을 고르면 `GET /customers/{id}/purchases?keyword=`(회원의 구매 목록에서 상품 찾기), `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges` |
-| 판매 내역 · 반품 · 교환 · 정정 · 마감 (매장 계정) | `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges`, `PUT /sales/{id}`, `POST /sales/{id}/void`, `POST /day-closes`, `GET /stores/{storeId}/day-closes` |
+| 판매 기록 (매장 계정, 노트북·매장폰) | `GET /stores/{storeId}/staff`(판매 사원 고르기), `GET /sales/daily-summary?date=오늘`(화면을 열 때 오늘 판매 수·마감 여부), `GET /customers?name=`, `GET /customers/{id}`, `GET /customers/{id}/members`(착용자), `GET /products?keyword=`, `POST /sales`, `POST /customers`, `GET /public/sizes`. 환불·교환을 고르면 `GET /customers/{id}/purchases?keyword=`(회원의 구매 목록에서 상품 찾기), `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges` |
+| 판매 내역 · 반품 · 교환 · 정정 · 마감 (매장 계정) | `GET /sales/daily-summary?date=오늘`, `GET /sales`, `GET /sales/{id}`, `POST /sales/{id}/returns`, `POST /sales/{id}/exchanges`, `PUT /sales/{id}`, `POST /sales/{id}/void`, `POST /day-closes`, `GET /stores/{storeId}/day-closes` |
 | 고객등록 (매장 계정) | `GET /public/sizes`, `POST /customers` |
 | 상품 관리 (매장 계정·본사) | `GET /products?keyword=`, `GET /products/{id}`, `POST /products`, `PATCH /products/{id}`, `GET /products/import-template`, `POST /products/import`, `GET /public/sizes` |
 | 고객 검색 · 상세 (모두) | `GET /customers`, `GET /customers/{id}`, `PATCH /customers/{id}`, `GET /customers/{id}/purchases`, `GET /customers/{id}/grade-history`, 구성원 API, 메모 API, `GET /public/sizes` |

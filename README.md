@@ -25,7 +25,7 @@
 | - | [docs/dev-plan.md](docs/dev-plan.md) | 개발 계획 (백엔드·프론트엔드 PR 단위 작업, 완료 기준, 테스트, 정할 기술 결정) | 초안 |
 | - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
 | - | [docs/architecture-review.md](docs/architecture-review.md) | 시스템 아키텍처 점검 (통과한 것, 개발하면서 정할 것 A1~A12, 요구사항 대조) | 초안 |
-| - | [docs/erd-review.md](docs/erd-review.md) | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정) | 완료 (2026-10-30) |
+| - | [docs/erd-review.md](docs/erd-review.md) | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정, 화면설계서와 대조) | 완료 (2026-11-05) |
 | - | [docs/screen-interview.md](docs/screen-interview.md) | 화면설계 인터뷰 기록 (질문과 답, 추천안대로 정한 것 W1~W14) | 완료 (2026-11-04) |
 | - | [docs/worklog.md](docs/worklog.md) | 작업 시간 기록 (날짜, 한 일, 걸린 시간). 일정 점검의 근거 | 계속 추가 |
 | - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 시장 규모, 확인 못 한 가설) | 참고 |

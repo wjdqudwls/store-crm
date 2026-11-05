@@ -26,7 +26,7 @@
 | A6 | 낮음 | NFR-11은 "`docker compose up` 한 번으로 실행"인데 지금 compose는 DB만 띄운다 | B0-4의 Dockerfile을 compose에 `app`으로 넣는다. 리뷰어는 한 번에, 개발은 지금처럼 `bootRun` | B0-4 | |
 | A7 | 낮음 | 테스트 DB가 두 갈래다. 문서는 Testcontainers, CI는 GitHub의 MariaDB 서비스 | Testcontainers로 바꾸면서 CI의 DB 서비스를 지운다. 그 뒤 `./gradlew test`는 Docker만 있으면 된다 | B0-6 | |
 | A8 | 낮음 | 04에 ADR-032의 자리가 없다: 로그인 계정 자리(`common.security`, `local` 전용 임시 구현), 화면 가짜 데이터(`frontend/src/mocks`) | 04 4장·7장·8장에 적는다 | B0-6, F0 | |
-| A9 | 낮음 | 고객 목록 20명마다 직원 이름을 common에 하나씩 물으면 느려진다(N+1) | common이 "ID 목록 → 이름"을 한 번에 주는 조회를 둔다 (NFR-01) | B1-5 | |
+| A9 | 낮음 | 고객 목록 20명마다 직원 이름을 common에 하나씩 물으면 느려진다(N+1). 판매 내역·영수증의 고객 이름(sales → customer), 판매 사원·매장 이름(sales → common)도 같다 (2026-11-05 화면 대조) | 각 모듈 `api`가 "ID 목록 → 이름"을 한 번에 주는 조회를 둔다 (NFR-01, 03 4.12) | B1-5, B2-2 | |
 | A10 | 낮음 | CI는 백엔드만 있고, 규칙 문구도 "`backend-ci` 통과"뿐이다. main 브랜치 보호는 꺼져 있다(확인함) | F0에서 frontend-ci를 추가하고, CLAUDE.md 문구는 "그 PR이 바꾼 쪽의 CI"로 | F0 | |
 | A11 | 낮음 | (요구사항 대조) BR-06 "원인을 고친 뒤 `PENDING`으로 되돌려 다시 처리한다(MVP는 수동)"의 방법이 04에 없다 | `FAILED`는 이벤트 ID와 원인을 로그에 남기고, 원인을 고친 뒤 DB에서 직접 `PENDING`·`attempts = 0`으로 되돌린다(화면·API 없음). 04 6장에 운영 절차로 적는다 | B2-4 | |
 | A12 | 낮음 | (요구사항 대조) REG-07(SMS 본인 인증, 다음)은 "발송 부분만 갈아끼울 수 있게 설계해 둔다"인데 아키텍처에 자리가 없다 | 고객용 등록 흐름에 "본인 확인" 단계 인터페이스만 두고 MVP 구현은 "확인 없음"으로 한다(ADR-029의 알림 자리와 같은 방식). 문자 발송은 만들지 않는다 | B1-4 | |

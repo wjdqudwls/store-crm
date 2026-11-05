@@ -4,6 +4,7 @@
 > 범위: 개념·논리(테이블, 관계, 키, 모듈, 일부러 중복한 이유). 타입·길이·인덱스 같은 물리 항목은 개발하면서 `schema.sql`에서 다듬는다.
 > 방법: ① 추적표(요구사항 → 테이블.컬럼) ② 시나리오 따라가기 ③ 규칙 체크(경계·유일·중복). 찾은 것은 5장에 번호로 모았다.
 > 재검증: 2026-10-30 정한 결정을 넣은 상태로 요구사항 ID를 처음부터 다시 대 보고 시나리오를 더 돌렸다 (7장). 새로 찾은 것은 #15, 밖-7~10이다. 사용자가 "요구사항 보고 확실하게 검증하고 넘어가자"고 맡겨, 남은 항목은 추천안대로 정했다 (6장).
+> 화면 대조: 2026-11-05 화면설계서([05-screens.md](05-screens.md))의 값을 API·ERD에 대 봤다 (8장, WBS 5-3). ERD에는 `sale_line.returned_amount` 하나를 더했다.
 
 ## 1. 추적표
 
@@ -232,3 +233,45 @@ ERD 점검 이유를 설명하며 "'매장·날짜마다 마감 1행'은 UNIQUE 
 - 매장이 "오늘 판매 마감"을 누르는 순간 같이 저장 중이던 판매는 몇 ms 차이로 마감 뒤에 들어갈 수 있다. 같은 날 판매라 피해가 없어 막지 않는다.
 - 같은 구매 건 ID가 정정으로 두 고객(A, B)에 걸칠 수 있다. 티켓·금액은 고객별로 세므로 문제없다.
 - 상품에서 사이즈·색상을 빼 SKU 행이 지워지면 옛 판매 라인의 `sku_id`는 없는 SKU를 가리킨다. 판매 라인은 스냅샷이라 화면에 영향이 없다.
+
+## 8. 화면설계서와 대조 (WBS 5-3, 2026-11-05)
+
+[05-screens.md](05-screens.md)의 화면마다 보여 주는 값을 API(03) 응답과 ERD(02) 칸에 대 봤다. 기준은 "화면에 나오는 값 → 그 값을 주는 API 필드 → 그 값을 만드는 ERD 칸"이다.
+
+### 화면 → API → ERD
+
+| 화면 | 화면에 나오는 값 | API | ERD | 결과 |
+| --- | --- | --- | --- | --- |
+| SCR-02 판매 기록 | 오늘 판매 수·마감 여부 | `GET /sales/daily-summary` (매장 계정도) | `sale.status`, `store_day_close` | V1·V2 |
+| | 판매 사원 목록 | `GET /stores/{storeId}/staff` | `staff` | 모양 없음 → 4.12 |
+| | 고객 찾기 목록·할인율 | 4.3, 4.4 `grade.discountRate` | `customer`, `customer_summary`, `grade_discount` | ✓ |
+| | 상품 → 색상 → 사이즈 | `GET /products` | `product`, `product_sku` | 모양 없음(G13) → 4.12 |
+| | 환불 구매 목록(영수증별, 남은 수량, 환불 예상 금액) | `GET /customers/{id}/purchases` | `sale`, `sale_line.returned_qty`, 환불된 금액은 없음 | 모양 없음(G14), 금액 칸 V3 |
+| | 교환 차액 | 4.8 `extraPaid` | `sale_return.amount`, 새 `sale` | ✓ |
+| | 정정 기본값(남은 줄·남은 금액) | `GET /sales/{id}` | `sale_line.returned_qty`, V3 | G5 → V3 |
+| SCR-04·01 등록 | 외국인 영문 이름 | 4.5 본문에 없음 | `customer.name_en` | G15 → 4.5 |
+| | 담당 직원 | `POST /customers` `staffId` | `customer.staff_id` | ✓ (11/04) |
+| | 사이즈 선택지, 동의 문구 | `GET /public/sizes`, `/public/join-info` | 코드 enum (02 3.2) | 모양 없음(G16) → 4.12 |
+| SCR-03 판매 내역 | 고객 이름, 판매 사원 이름 | `GET /sales` | `sale.customer_id`·`staff_id` (이름은 다른 모듈) | G7: 각 모듈 `api`로 한 번에 (A9) |
+| | 반품·교환·기록 취소 내역, 새 영수증 | `GET /sales/{id}` | `sale_return`(`kind`, `new_sale_id`) | 모양 → 4.12 |
+| SCR-06 고객 상세 | 등급 근거 두 칸 | 4.4 `grade`, `confirmedBasis` | `customer_summary`, `grade_history` | ✓ |
+| | 내/외국인, 영문 이름, 생일 | 4.4에 없음 | `customer.nationality`·`name_en`·`birth_md` | G15 → 4.4 |
+| | 구매이력의 매장 이름 | purchases | `sale.store_id` (이름은 common) | 4.12 |
+| | 메모 [수정] 보이기 | notes | `consult_note.staff_id` → 작성 직원의 매장 | `editable` (G17) |
+| | 할 일의 기준 구매일·받는 사람 | `GET /customers/{id}/follow-ups` | `follow_up_task`, `customer_purchase.sold_at`, 받는 계정의 `role` | 모양 → 4.12 |
+| SCR-07 | 오늘 할 일 '매장 할 일' 묶음, 받는 직원 | 4.7 | `follow_up_task.staff_id` → `staff.role` | G2 → 4.7 |
+| | 콜리스트 "가입 후 N일" | `GET /call-list` | `customer.created_at` | G8 → 4.12 |
+| | 알림 배지·문구 | `GET /notifications` | `staff_notification` | G4·G17 → 4.12 |
+| SCR-08 본사 | 매장별 오늘 판매 수·마감 | 3.7 + daily-summary | ✓ | ✓ |
+| | 마감 현황(마감·다시 연 기록) | day-closes | `store_day_close` | G1 → 4.12 |
+| SCR-09 설정 | 기준 표, 다음 기준, 할인율 | `GET /grade-policy` | `grade_policy`, `grade_rule`, `grade_discount` | 모양 → 4.12 |
+| | 정기 산정 결과 | periodic-runs | `grade_history` | G6 → 4.12 |
+
+### 찾은 것
+
+- **ERD에 없는 값은 없었다.** 하나만 더했다: 줄마다 환불된 금액 `sale_line.returned_amount` (V3, 02 5장 #25). 없으면 영수증 상세·구매이력·정정마다 반품 줄을 합쳐야 하고, BR-11의 "마지막 수량은 남은 금액 전부"도 반품 때마다 합산한다.
+- **API는 응답 모양이 빈 곳이 많았다** (G1~G9, G13~G17). 03 4.12에 화면이 쓰는 조회 응답을 모았다. 03 예시 값 2개(G10 아우터 사이즈, G11 마지막 방문일)를 고쳤다.
+- **모듈 경계**: 판매 내역·영수증의 고객 이름은 sales가 customer `api`로, 판매 사원·매장 이름은 common `api`로 받는다. 목록마다 ID를 한 번에 넘긴다 (아키텍처 점검 A9를 넓힘).
+- **알림 문구**: 알림함(common)은 고객 모듈을 부르지 않으므로(ADR-024) 고객 이름은 알림을 만들 때 문구에 넣는다. 고객 정보 삭제(CUS-06, 다음)를 만들 때 알림도 지운다.
+- **매장 계정의 판매 요약**: `GET /sales/daily-summary`를 매장 계정도 쓴다(자기 매장). 마감 현황 API는 판매 수를 주지 않아서다 (V1). 판매 수는 기록 취소를 뺀 영수증 수 (V2).
+

@@ -10,6 +10,7 @@
 > 변경: 2026-10-23 등급 실적을 시즌 단위로 (01-requirements.md BR-03·05, ADR-020) — `customer_summary`의 `ticket_count_12m`·`qty_12m`·`net_amount_12m`을 `season_ticket_count`·`season_qty`·`season_net_amount`로, 매일 실적 갱신 삭제. `schema.sql`과 엔티티는 B3-3 작업 때 바꾼다.
 > 변경: 2026-10-23 요구사항 점검 반영 (01-requirements.md 8장, ADR-021~027·029) — `staff.role` 값(HQ·STORE·MANAGER·SENIOR·JUNIOR·STAFF·KIOSK)·`manager_slot`·`tokens_valid_after`, `staff_notification`·`store_day_close`·`grade_discount` 추가(테이블 24개), `sale`의 `kind`·`origin_sale_id`·`recorded_by`·상태 `VOIDED`, `sale_return`의 `kind`·`recorded_by`, `customer_purchase`의 `purchase_group_id`·`counted_at`, `grade_policy.applies_from`(`active` 삭제), `grade_rule.discount_rate` 삭제, `grade_history`의 시즌·점수 칸, `consult_note`의 `channel`·`recorded_by`, 고객 인덱스 `(name, phone_last4)` 삭제. `schema.sql`과 엔티티는 해당 작업(dev-plan) 때 바꾼다.
 > 변경: 2026-10-30 ERD 개념·논리 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-022·026·030·031) — `sale.root_sale_id`(처음 판매)·`created_at`, `sale_return.new_sale_id`, `customer_purchase.voided_qty`, 구매 건 = 처음 판매(교환·정정은 티켓 없이 금액만), `UNIQUE(store_id, manager_slot)`, 반품·교환·정정·기록 취소 때 판매 행 잠금, 하루 마감 잠김·다시 마감 규칙, 요약 행은 고객 등록 때, 정기 산정 이력은 고객마다, 후속 연락 단계는 끄기만, 그림의 빠진 관계. 이 문서는 개념·논리이고, 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이다 (ADR-031).
+> 변경: 2026-11-05 화면 대조 반영 ([erd-review.md](erd-review.md) 8장, 05-screens.md 7장) — `sale_line.returned_amount`(줄마다 환불된 금액 합계) 추가 (5장 #25). `schema.sql`은 B0-5에서 맞춘다.
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -148,6 +149,7 @@ erDiagram
         INT qty
         BIGINT line_amount "실제 결제 금액"
         INT returned_qty
+        BIGINT returned_amount "환불된 금액 합계"
         BIGINT wearer_member_id "착용자, 선택"
         VARCHAR wearer_label "착용자 호칭 스냅샷"
     }
@@ -399,7 +401,7 @@ erDiagram
 - `store_day_close`: 매장 계정이 "오늘 판매 마감"을 누르면 1행 생긴다. 그날 판매는 **날짜가 지났거나, 마감 행이 있고 `reopened_at`이 NULL이면** 잠긴다. 본사가 다시 열면 `reopened_*`를 채운다. 다시 연 날을 다시 마감하면 같은 행의 `closed_*`를 새로 쓰고 `reopened_*`를 비운다(이전 마감·다시 열기 기록은 로그에 남긴다).
 - `sale_line`은 상품 정보를 **판매 시점 값으로 복사**(스냅샷)해 둔다. 나중에 상품명이나 카테고리가 바뀌어도 과거 영수증은 그대로여야 하기 때문이다.
 - 상품을 등록하지 않은 매장은 직원이 상품명·품목·사이즈를 직접 입력한다. 이때 `sku_id`와 `list_price`는 NULL이고, 같은 스냅샷 칸에 입력값이 남는다 (PRD-01, SAL-01).
-- 반품·교환·기록 취소는 원 판매를 고치지 않고 `sale_return`으로 따로 남긴다. `sale_line.returned_qty`와 `sale.status`는 조회 편의를 위한 값이다.
+- 반품·교환·기록 취소는 원 판매를 고치지 않고 `sale_return`으로 따로 남긴다. `sale_line.returned_qty`·`returned_amount`와 `sale.status`는 조회 편의를 위한 값이다. `returned_amount`는 그 줄의 `sale_return_line.amount` 합계이고, 마지막 남은 수량의 환불 금액(`line_amount − returned_amount`, BR-11)과 화면의 남은 결제 금액에 쓴다. 반품할 때 판매 행 잠금 안에서 `returned_qty`와 함께 늘린다 (ADR-030).
 - **남은 수량 지키기**: 반품·교환·정정·기록 취소는 바꿀 판매 행을 먼저 잠그고(`SELECT … FOR UPDATE`) 남은 수량을 확인한다. 매장 노트북과 매장폰에서 다른 요청 키로 같은 상품을 동시에 반품해도 뒤 요청은 앞 요청이 끝난 뒤의 남은 수량을 보고 `409 RETURN_QTY_EXCEEDED`가 된다. UNIQUE로는 "반품 합계 ≤ 판매 수량"을 막을 수 없기 때문이다. 잠그는 순서는 항상 판매 행 → 영수증 번호 행이다 (ADR-030).
 - **금액은 실제 결제 금액을 라인 단위로 저장한다** (BR-10, ADR-014). 쿠폰은 쓰지 않는다.
   - `line_amount` = 직원이 확인한 실제 결제 금액. 등록 상품이면 화면이 정가와 고객 등급 할인율로 기본값을 채우고, 직원이 고칠 수 있다. 서버는 받은 값을 그대로 기록한다.
@@ -509,6 +511,7 @@ erDiagram
 | 22 | 기록 취소 수량을 따로(`customer_purchase.voided_qty`) | 반품(있었던 일)과 기록 취소(없던 일)를 구별해 방문일·"이 매장 고객"을 바르게 센다. 일부 반품 뒤 나머지를 기록 취소해도 담긴다 (ADR-026) | 행 삭제: 이력이 사라진다. 취소 시각 칸: 일부 반품 뒤 기록 취소를 담지 못한다 |
 | 23 | 남은 수량은 판매 행 잠금으로 지킴 | UNIQUE로 못 막는 "반품 합계 ≤ 판매 수량"을 칸 추가 없이 지킨다. 영수증 번호 채번과 같은 방식이다 (ADR-030) | 낙관적 잠금(`version` 칸): 충돌하면 다시 읽고 판단하는 코드가 더 든다. 조건부 UPDATE: 여러 라인과 판매 상태를 함께 바꾸면 조건이 복잡해진다 |
 | 24 | 매니저 자리는 `UNIQUE(store_id, manager_slot)` | 동시에 등록해도 DB가 자리 수를 막는다 | 코드에서만 확인: 동시 요청이면 둘 다 들어간다 |
+| 25 | 줄마다 환불된 금액 합계(`sale_line.returned_amount`) | 마지막 수량 환불(BR-11)과 화면의 남은 결제 금액을 반품 줄 합산 없이 구한다. `returned_qty`와 같은 잠금 안에서 함께 바꿔 둘이 어긋나지 않는다 (2026-11-05) | 매번 `sale_return_line` 합산: 영수증 상세·구매이력·정정마다 집계가 붙는다 |
 
 ## 6. 확인 필요
 
