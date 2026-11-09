@@ -70,6 +70,10 @@ public class SaleLine {
     @Column(nullable = false)
     private int returnedQty;
 
+    /** 이 줄의 sale_return_line.amount 합계. 마지막 남은 수량의 환불액 계산에 쓴다 (BR-11, ADR-030). */
+    @Column(nullable = false)
+    private long returnedAmount;
+
     @Column
     private Long wearerMemberId;
 

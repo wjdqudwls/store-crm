@@ -27,14 +27,15 @@ public class CustomerSummary {
     @Id
     private Long customerId;
 
-    @Column(name = "ticket_count_12m", nullable = false)
-    private int ticketCount12m;
+    /** 이번 시즌(6월 1일 0시부터) 누적. */
+    @Column(nullable = false)
+    private int seasonTicketCount;
 
-    @Column(name = "qty_12m", nullable = false)
-    private int qty12m;
+    @Column(nullable = false)
+    private int seasonQty;
 
-    @Column(name = "net_amount_12m", nullable = false)
-    private long netAmount12m;
+    @Column(nullable = false)
+    private long seasonNetAmount;
 
     @Column(nullable = false)
     private long lifetimeAmount;

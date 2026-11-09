@@ -17,7 +17,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 등급 기준의 구간 한 줄. AMOUNT·TICKET은 점수, GRADE는 등급 컷과 할인율. */
+/** 등급 기준의 구간 한 줄. AMOUNT·TICKET은 점수, GRADE는 등급 컷. 할인율은 GradeDiscount에 따로 둔다 (ADR-027). */
 @Entity
 @Table(name = "grade_rule")
 @Getter
@@ -45,7 +45,4 @@ public class GradeRule {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private GradeCode gradeCode;
-
-    @Column
-    private Integer discountRate;
 }
