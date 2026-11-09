@@ -48,6 +48,14 @@ public class CustomerPurchase {
     @Column(nullable = false)
     private LocalDateTime soldAt;
 
+    /** 구매 건 = 처음 판매 ID (이벤트의 rootSaleId, ADR-022). */
+    @Column(nullable = false)
+    private Long purchaseGroupId;
+
+    /** 실적에 넣는 시각 = 처음 판매 시각. */
+    @Column(nullable = false)
+    private LocalDateTime countedAt;
+
     @Enumerated(EnumType.STRING)
     /** 모르면 null (직접 입력 판매). */
     @Column(length = 20)
@@ -63,8 +71,13 @@ public class CustomerPurchase {
     @Column(nullable = false)
     private long amount;
 
+    /** 나간 수량 (반품·교환·기록 취소). */
     @Column(nullable = false)
     private int returnedQty;
+
+    /** returnedQty 중 기록 취소분 (BR-16). */
+    @Column(nullable = false)
+    private int voidedQty;
 
     @Column(nullable = false)
     private long returnedAmount;

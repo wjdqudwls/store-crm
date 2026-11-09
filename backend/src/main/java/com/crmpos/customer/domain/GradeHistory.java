@@ -19,7 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 등급 변경 이력 (GRD-06). */
+/** 등급 이력 (GRD-06). 등급이 바뀔 때, 그리고 정기 산정·임시 재계산 때는 등급이 그대로여도 고객마다 1행 (ADR-021). */
 @Entity
 @Table(name = "grade_history")
 @Getter
@@ -45,6 +45,20 @@ public class GradeHistory {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private GradeChangeReason reason;
+
+    /** 점수를 계산한 시즌 (예: 25/26). */
+    @Column(nullable = false, length = 10)
+    private String season;
+
+    /** 아래 세 값은 그때의 실적. "왜 이 등급인지"를 보여준다 (GRD-03). */
+    @Column(nullable = false)
+    private int ticketCount;
+
+    @Column(nullable = false)
+    private long netAmount;
+
+    @Column(nullable = false)
+    private int totalScore;
 
     @Column(nullable = false)
     private int policyVersion;

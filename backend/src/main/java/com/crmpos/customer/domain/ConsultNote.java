@@ -33,7 +33,7 @@ public class ConsultNote {
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
 
-    /** 작성자. common 모듈의 ID (ADR-003). */
+    /** 작성 직원. 매장 계정에서 쓰면 고른 직원. common 모듈의 ID (ADR-003). */
     @Column(nullable = false)
     private Long staffId;
 
@@ -44,6 +44,15 @@ public class ConsultNote {
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private CallResult callResult;
+
+    /** 연락(CALL)일 때 채널. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ContactChannel channel;
+
+    /** 기록한 계정. */
+    @Column(nullable = false)
+    private Long recordedBy;
 
     @Column(nullable = false, length = 1000)
     private String content;

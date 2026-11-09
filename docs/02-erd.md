@@ -11,6 +11,7 @@
 > 변경: 2026-10-23 요구사항 점검 반영 (01-requirements.md 8장, ADR-021~027·029) — `staff.role` 값(HQ·STORE·MANAGER·SENIOR·JUNIOR·STAFF·KIOSK)·`manager_slot`·`tokens_valid_after`, `staff_notification`·`store_day_close`·`grade_discount` 추가(테이블 24개), `sale`의 `kind`·`origin_sale_id`·`recorded_by`·상태 `VOIDED`, `sale_return`의 `kind`·`recorded_by`, `customer_purchase`의 `purchase_group_id`·`counted_at`, `grade_policy.applies_from`(`active` 삭제), `grade_rule.discount_rate` 삭제, `grade_history`의 시즌·점수 칸, `consult_note`의 `channel`·`recorded_by`, 고객 인덱스 `(name, phone_last4)` 삭제. `schema.sql`과 엔티티는 해당 작업(dev-plan) 때 바꾼다.
 > 변경: 2026-10-30 ERD 개념·논리 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-022·026·030·031) — `sale.root_sale_id`(처음 판매)·`created_at`, `sale_return.new_sale_id`, `customer_purchase.voided_qty`, 구매 건 = 처음 판매(교환·정정은 티켓 없이 금액만), `UNIQUE(store_id, manager_slot)`, 반품·교환·정정·기록 취소 때 판매 행 잠금, 하루 마감 잠김·다시 마감 규칙, 요약 행은 고객 등록 때, 정기 산정 이력은 고객마다, 후속 연락 단계는 끄기만, 그림의 빠진 관계. 이 문서는 개념·논리이고, 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이다 (ADR-031).
 > 변경: 2026-11-05 화면 대조 반영 ([erd-review.md](erd-review.md) 8장, 05-screens.md 7장) — `sale_line.returned_amount`(줄마다 환불된 금액 합계) 추가 (5장 #25). `schema.sql`은 B0-5에서 맞춘다.
+> 변경: 2026-11-09 B0-5에서 `schema.sql`과 엔티티를 이 문서의 테이블 24개에 맞췄다. 3.3에 남아 있던 등급 할인율 칸 이름을 `grade_discount.rate`로 고침 (2026-10-23에 `grade_rule`에서 옮긴 것, ADR-027).
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -406,7 +407,7 @@ erDiagram
 - **금액은 실제 결제 금액을 라인 단위로 저장한다** (BR-10, ADR-014). 쿠폰은 쓰지 않는다.
   - `line_amount` = 직원이 확인한 실제 결제 금액. 등록 상품이면 화면이 정가와 고객 등급 할인율로 기본값을 채우고, 직원이 고칠 수 있다. 서버는 받은 값을 그대로 기록한다.
   - 등록 상품 라인은 `list_price`(정가)를 함께 남겨 영수증 상세에서 정가와 결제 금액을 비교한다. 할인 금액은 저장하지 않는다.
-  - 등급 할인율(`grade_rule.discount_rate`)은 화면에 보여주는 안내 값이고, 판매 라인에 저장하지 않는다.
+  - 등급 할인율(`grade_discount.rate`)은 화면에 보여주는 안내 값이고, 판매 라인에 저장하지 않는다.
   - 부분 반품 환불액은 그 라인의 결제 금액에서 바로 계산된다 (BR-11).
   - `sale.applied_grade`에 판매 당시 등급을 남긴다. 이번 판매로 승급해도 기본값은 판매 전 등급 기준이다.
 - **착용자**: `sale_line.wearer_member_id`는 고객 모듈의 가족 구성원 ID를 들고만 있다(FK 없음). 호칭은 `wearer_label`에 복사해 둔다. 구성원을 지우거나 호칭을 바꿔도 과거 영수증은 그대로다. 고르지 않으면 둘 다 NULL (ADR-009).

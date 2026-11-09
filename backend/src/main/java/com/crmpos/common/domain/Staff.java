@@ -11,6 +11,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import java.time.LocalDateTime;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -38,6 +41,11 @@ public class Staff {
     @Column(nullable = false, length = 20)
     private StaffRole role;
 
+    /** 활성 MANAGER만 MAIN·TEMP, 그 밖에는 null (BR-15). */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ManagerSlot managerSlot;
+
     /** 본사 계정은 null. 같은 common 모듈이라 연관관계로 둔다. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id")
@@ -48,4 +56,8 @@ public class Staff {
 
     @Column(nullable = false)
     private boolean active;
+
+    /** 이 시각보다 먼저 발급된 토큰은 거절한다 (ADR-025). */
+    @Column(nullable = false)
+    private LocalDateTime tokensValidAfter;
 }
