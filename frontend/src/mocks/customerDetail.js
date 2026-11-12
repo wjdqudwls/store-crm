@@ -1,0 +1,450 @@
+/**
+ * 고객 상세 화면용 가짜 데이터 (03 4.4·4.12 모양). 이름·번호·주소는 모두 가상이다 (NFR-07).
+ * 고객 목록의 기본 정보는 data.js의 customers에 있고, 여기는 상세에만 쓰는 값이다.
+ */
+
+const grade = (current, computed, confirmed, season, basis, discountRate) => ({
+  current,
+  computed,
+  confirmed,
+  confirmedStatus: 'CONFIRMED',
+  season: '26/27',
+  ...season,
+  discountRate,
+  policyVersion: 2,
+  confirmedBasis: { season: '25/26', ...basis },
+})
+
+/** id → 상세 (GET /customers/{id}) */
+export const customerDetails = {
+  1024: {
+    nameEn: null,
+    nationality: 'DOMESTIC',
+    createdAt: '2025-12-06T13:05:00+09:00',
+    homeStore: { id: 1, name: '강남점' },
+    staff: { id: 17, name: '이지은' },
+    grade: grade(
+      'B',
+      'B',
+      'C',
+      {
+        seasonTicketCount: 3,
+        ticketScore: 30,
+        seasonNetAmount: 3420000,
+        amountScore: 40,
+        totalScore: 70,
+      },
+      { ticketCount: 2, netAmount: 2500000, totalScore: 40 },
+      3,
+    ),
+    stats: {
+      firstVisitAt: '2025-12-06T13:20:00+09:00',
+      lastVisitAt: '2026-10-15T14:03:00+09:00',
+      seasonQty: 5,
+      lifetimeAmount: 5920000,
+    },
+    profile: {
+      gender: 'F',
+      birthYear: 1991,
+      birthMd: '0314',
+      regionSido: '서울',
+      regionGu: '강남구',
+      preferredItemTypes: ['OUTER', 'TOP'],
+      sizes: { top: 'M', outer: '90', bottom: '26', shoes: '240' },
+      contactChannel: 'KAKAO',
+    },
+    addressDetail: '테헤란로 000, 가상아파트 101동 1001호',
+    marketing: { sms: true, kakao: true },
+  },
+  2310: {
+    createdAt: '2025-10-02T11:30:00+09:00',
+    staff: { id: 24, name: '박도윤' },
+    grade: grade(
+      'NORMAL',
+      'NORMAL',
+      'NORMAL',
+      {
+        seasonTicketCount: 0,
+        ticketScore: 0,
+        seasonNetAmount: 0,
+        amountScore: 0,
+        totalScore: 0,
+      },
+      { ticketCount: 1, netAmount: 189000, totalScore: 10 },
+      0,
+    ),
+    stats: {
+      firstVisitAt: '2025-10-02T11:40:00+09:00',
+      lastVisitAt: '2025-10-02T11:40:00+09:00',
+      seasonQty: 0,
+      lifetimeAmount: 189000,
+    },
+    profile: { gender: null, preferredItemTypes: [], sizes: {}, contactChannel: null },
+    marketing: { sms: false, kakao: false },
+  },
+  1187: {
+    createdAt: '2024-03-11T15:00:00+09:00',
+    staff: { id: 11, name: '박서연' },
+    grade: grade(
+      'A',
+      'A',
+      'A',
+      {
+        seasonTicketCount: 6,
+        ticketScore: 50,
+        seasonNetAmount: 8840000,
+        amountScore: 50,
+        totalScore: 100,
+      },
+      { ticketCount: 7, netAmount: 9900000, totalScore: 100 },
+      5,
+    ),
+    stats: {
+      firstVisitAt: '2024-03-11T15:10:00+09:00',
+      lastVisitAt: '2026-11-08T16:20:00+09:00',
+      seasonQty: 11,
+      lifetimeAmount: 24310000,
+    },
+    profile: {
+      gender: 'M',
+      birthYear: 1983,
+      birthMd: '0920',
+      regionSido: '서울',
+      regionGu: '서초구',
+      preferredItemTypes: ['OUTER', 'SHOES'],
+      sizes: { top: 'L', outer: '105', bottom: '32', shoes: '270' },
+      contactChannel: 'CALL',
+    },
+    addressDetail: null,
+    marketing: { sms: true, kakao: false },
+  },
+  1502: {
+    createdAt: '2025-04-19T12:00:00+09:00',
+    staff: { id: 21, name: '정민호' },
+    grade: grade(
+      'C',
+      'D',
+      'C',
+      {
+        seasonTicketCount: 1,
+        ticketScore: 10,
+        seasonNetAmount: 820000,
+        amountScore: 10,
+        totalScore: 20,
+      },
+      { ticketCount: 2, netAmount: 2100000, totalScore: 40 },
+      2,
+    ),
+    stats: {
+      firstVisitAt: '2025-04-19T12:10:00+09:00',
+      lastVisitAt: '2026-09-21T13:10:00+09:00',
+      seasonQty: 2,
+      lifetimeAmount: 2920000,
+    },
+    profile: {
+      gender: 'F',
+      birthYear: 1987,
+      preferredItemTypes: ['TOP'],
+      sizes: { top: 'S', shoes: '235' },
+      contactChannel: 'SMS',
+    },
+    marketing: { sms: true, kakao: true },
+  },
+  1733: {
+    createdAt: '2026-01-20T17:30:00+09:00',
+    staff: { id: 26, name: '한예린' },
+    grade: grade(
+      'D',
+      'D',
+      'NORMAL',
+      {
+        seasonTicketCount: 1,
+        ticketScore: 10,
+        seasonNetAmount: 459000,
+        amountScore: 10,
+        totalScore: 20,
+      },
+      { ticketCount: 1, netAmount: 312000, totalScore: 10 },
+      1,
+    ),
+    stats: {
+      firstVisitAt: '2026-01-20T17:40:00+09:00',
+      lastVisitAt: '2026-06-03T18:45:00+09:00',
+      seasonQty: 1,
+      lifetimeAmount: 771000,
+    },
+    profile: { gender: 'F', preferredItemTypes: [], sizes: {}, contactChannel: null },
+    marketing: { sms: false, kakao: true },
+  },
+}
+
+const line = (lineId, productCode, productName, color, size, qty, lineAmount, more = {}) => ({
+  lineId,
+  productCode,
+  productName,
+  color,
+  size,
+  qty,
+  lineAmount,
+  returnedQty: 0,
+  returnedAmount: 0,
+  wearerLabel: null,
+  ...more,
+})
+
+/** GET /customers/{id}/purchases 항목 (영수증 단위, 최신순) */
+export const purchases = {
+  1024: [
+    {
+      saleId: 88231,
+      receiptNo: 'GN01-20261015-0012',
+      soldAt: '2026-10-15T14:03:00+09:00',
+      storeName: '강남점',
+      kind: 'NORMAL',
+      status: 'PARTIAL_RETURNED',
+      totalAmount: 991860,
+      lines: [
+        line(1, 'D2110', '울 블렌드 롱코트', '차콜', '90', 1, 774060),
+        line(2, null, '캐시미어 머플러', '오트밀', 'FREE', 1, 217800, {
+          returnedQty: 1,
+          returnedAmount: 217800,
+          wearerLabel: '남편',
+        }),
+      ],
+    },
+    {
+      saleId: 86120,
+      receiptNo: 'GN01-20260712-0004',
+      soldAt: '2026-07-12T16:40:00+09:00',
+      storeName: '강남점',
+      kind: 'NORMAL',
+      status: 'COMPLETED',
+      totalAmount: 1428000,
+      lines: [
+        line(1, 'D3305', '린넨 셔츠 원피스', '아이보리', 'M', 1, 279000),
+        line(2, 'K1102', '아동 데님 점퍼', '인디고', '8', 1, 149000, { wearerLabel: '딸' }),
+        line(3, 'D2204', '라이트 트렌치코트', '베이지', '90', 1, 1000000),
+      ],
+    },
+    {
+      saleId: 84077,
+      receiptNo: 'SC02-20260405-0021',
+      soldAt: '2026-04-05T12:15:00+09:00',
+      storeName: '서초점',
+      kind: 'NORMAL',
+      status: 'COMPLETED',
+      totalAmount: 1000140,
+      lines: [
+        line(1, 'D4120', '울 와이드 팬츠', '블랙', '26', 2, 556140),
+        line(2, 'S0710', '레더 로퍼', '브라운', '240', 1, 444000),
+      ],
+    },
+  ],
+  1187: [
+    {
+      saleId: 88402,
+      receiptNo: 'GN01-20261108-0009',
+      soldAt: '2026-11-08T16:20:00+09:00',
+      storeName: '강남점',
+      kind: 'NORMAL',
+      status: 'COMPLETED',
+      totalAmount: 1515250,
+      lines: [line(1, 'M2010', '캐시미어 더블 코트', '네이비', '105', 1, 1515250)],
+    },
+  ],
+  1502: [
+    {
+      saleId: 87700,
+      receiptNo: 'GN01-20260921-0003',
+      soldAt: '2026-09-21T13:10:00+09:00',
+      storeName: '강남점',
+      kind: 'NORMAL',
+      status: 'COMPLETED',
+      totalAmount: 820000,
+      lines: [line(1, 'D5501', '실크 블라우스', '블랙', 'S', 2, 820000)],
+    },
+  ],
+}
+
+/** GET /customers/{id}/grade-history (최신순) */
+export const gradeHistory = {
+  1024: [
+    {
+      id: 77,
+      fromGrade: 'C',
+      toGrade: 'B',
+      reason: 'PROMOTION',
+      season: '26/27',
+      ticketCount: 3,
+      netAmount: 3420000,
+      totalScore: 70,
+      policyVersion: 2,
+      createdAt: '2026-10-15T14:03:02+09:00',
+    },
+    {
+      id: 52,
+      fromGrade: 'C',
+      toGrade: 'C',
+      reason: 'PERIODIC',
+      season: '25/26',
+      ticketCount: 2,
+      netAmount: 2500000,
+      totalScore: 40,
+      policyVersion: 2,
+      createdAt: '2026-06-01T00:10:00+09:00',
+    },
+    {
+      id: 31,
+      fromGrade: 'NORMAL',
+      toGrade: 'C',
+      reason: 'PROMOTION',
+      season: '25/26',
+      ticketCount: 2,
+      netAmount: 2500000,
+      totalScore: 40,
+      policyVersion: 1,
+      createdAt: '2026-04-05T12:15:03+09:00',
+    },
+  ],
+  1502: [
+    {
+      id: 49,
+      fromGrade: 'C',
+      toGrade: 'C',
+      reason: 'PERIODIC',
+      season: '25/26',
+      ticketCount: 2,
+      netAmount: 2100000,
+      totalScore: 40,
+      policyVersion: 2,
+      createdAt: '2026-06-01T00:10:00+09:00',
+    },
+  ],
+}
+
+/** GET /customers/{id}/notes (최신순) */
+export const notes = {
+  1024: [
+    {
+      id: 7001,
+      type: 'CALL',
+      content: '코트 착용감 만족. 소매 길이 수선 문의 → 다음 방문 때 수선 접수.',
+      callResult: 'COMPLETED',
+      channel: 'CALL',
+      staffId: 17,
+      staffName: '이지은',
+      saleId: null,
+      followUpId: 500,
+      createdAt: '2026-10-29T15:20:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
+    {
+      id: 6950,
+      type: 'PURCHASE',
+      content: '딸 겨울 점퍼도 보고 감. 아동 8 사이즈 입고되면 연락 원함.',
+      callResult: null,
+      channel: null,
+      staffId: 17,
+      staffName: '이지은',
+      saleId: 88231,
+      followUpId: null,
+      createdAt: '2026-10-15T14:05:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
+    {
+      id: 6402,
+      type: 'CONSULT',
+      content: '어깨가 좁은 편. 아우터는 90이 맞고 소매는 줄여야 함.',
+      callResult: null,
+      channel: null,
+      staffId: 11,
+      staffName: '박서연',
+      saleId: null,
+      followUpId: null,
+      createdAt: '2026-07-12T16:30:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
+  ],
+}
+
+/** GET /customers/{id}/follow-ups (OPEN 먼저, 만기일 순) */
+export const followUps = {
+  1024: [
+    {
+      id: 502,
+      stage: '신상·재방문 안내',
+      promotional: true,
+      saleId: 88231,
+      soldAt: '2026-10-15T14:03:00+09:00',
+      dueDate: '2026-12-15',
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: null,
+    },
+    {
+      id: 500,
+      stage: '착용감 확인',
+      promotional: false,
+      saleId: 88231,
+      soldAt: '2026-10-15T14:03:00+09:00',
+      dueDate: '2026-10-29',
+      status: 'DONE',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: '2026-10-29T15:20:00+09:00',
+    },
+  ],
+  1502: [
+    {
+      id: 471,
+      stage: '착용감 확인',
+      promotional: false,
+      saleId: 87700,
+      soldAt: '2026-09-21T13:10:00+09:00',
+      dueDate: '2026-10-05',
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 21,
+      staffName: '정민호',
+      closedAt: null,
+    },
+  ],
+}
+
+/** GET /customers/{id}/members */
+export const members = {
+  1024: [
+    {
+      id: 31,
+      nickname: '남편',
+      relation: 'SPOUSE',
+      gender: 'M',
+      birthYear: 1989,
+      sizes: { top: 'L', outer: '105', bottom: '32', shoes: '270' },
+    },
+    {
+      id: 32,
+      nickname: '딸',
+      relation: 'CHILD',
+      gender: 'F',
+      birthYear: 2019,
+      sizes: { top: '8', outer: '8', bottom: '8', shoes: null },
+    },
+  ],
+  1502: [
+    {
+      id: 40,
+      nickname: '아들',
+      relation: 'CHILD',
+      gender: 'M',
+      birthYear: 2016,
+      sizes: { top: '10', outer: '10' },
+    },
+  ],
+}

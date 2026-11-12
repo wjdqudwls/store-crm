@@ -1,6 +1,6 @@
 <script setup>
 import { nextTick, ref } from 'vue'
-import { searchCustomers } from '@/api/sales'
+import { searchCustomers } from '@/api/customers'
 import GradeBadge from './GradeBadge.vue'
 
 /**

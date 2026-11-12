@@ -6,7 +6,7 @@ import CustomerForm from '@/components/CustomerForm.vue'
 
 /**
  * 고객 등록 화면 `/customers/new` (05 SCR-04, 매장 계정).
- * 등록 뒤에는 고객 상세로 간다. 고객 상세(F2)를 만들기 전에는 고객 화면으로 간다.
+ * 등록 뒤에는 고객 상세로 간다. 같은 번호가 있으면 기존 고객 상세로 (REG-05).
  */
 const router = useRouter()
 const formKey = ref(0)
@@ -16,11 +16,11 @@ function onCreated(res) {
     message: `${res.name}님을 고객으로 등록했습니다 · ${res.phoneMasked}`,
     duration: 4000,
   })
-  router.push('/customers')
+  router.push(`/customers/${res.id}`)
 }
 
-function onExisting() {
-  router.push('/customers')
+function onExisting(customerId) {
+  router.push(`/customers/${customerId}`)
 }
 </script>
 
