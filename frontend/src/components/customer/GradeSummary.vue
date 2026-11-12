@@ -8,9 +8,8 @@ import {
   daysAgoLabel,
   gradeNotes,
   gradeReasonLabels,
-  manwon,
 } from '@/features/customer/customerDetail'
-import { gradeLabel } from '@/utils/format'
+import { formatWon, gradeLabel } from '@/utils/format'
 
 /**
  * 요약: 등급 근거와 방문 (05 SCR-06 D3, GRD-03·05·06).
@@ -47,7 +46,7 @@ async function toggleHistory() {
       <dl class="gsum__score">
         <dt>티켓 {{ g.seasonTicketCount }}건</dt>
         <dd>{{ g.ticketScore }}점</dd>
-        <dt>금액 {{ manwon(g.seasonNetAmount) }}</dt>
+        <dt>금액 {{ formatWon(g.seasonNetAmount) }}</dt>
         <dd>{{ g.amountScore }}점</dd>
         <dt class="gsum__total">합계 {{ g.totalScore }}점</dt>
         <dd class="gsum__total">실적 기준 <GradeBadge :grade="g.computed" /></dd>
@@ -61,7 +60,7 @@ async function toggleHistory() {
       </h3>
       <p class="gsum__confirmed">
         <GradeBadge :grade="g.confirmed" :provisional="provisional" />
-        티켓 {{ g.confirmedBasis.ticketCount }}건 · {{ manwon(g.confirmedBasis.netAmount) }} ·
+        티켓 {{ g.confirmedBasis.ticketCount }}건 · {{ formatWon(g.confirmedBasis.netAmount) }} ·
         {{ g.confirmedBasis.totalScore }}점
       </p>
     </div>
@@ -112,7 +111,7 @@ async function toggleHistory() {
       <dt>이번 시즌</dt>
       <dd>{{ s.seasonQty }}개</dd>
       <dt>누적</dt>
-      <dd>{{ manwon(s.lifetimeAmount) }}</dd>
+      <dd>{{ formatWon(s.lifetimeAmount) }}</dd>
     </dl>
   </section>
 </template>

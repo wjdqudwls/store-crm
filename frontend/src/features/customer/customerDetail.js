@@ -35,12 +35,6 @@ export function dateLabel(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** 요약 칸의 큰 금액: 만원 아래는 버린다 (`342만원`) */
-export function manwon(n) {
-  if (n < 10000) return `${n.toLocaleString('ko-KR')}원`
-  return `${Math.floor(n / 10000).toLocaleString('ko-KR')}만원`
-}
-
 /** 홍보 연락 가능: 문자·카톡 중 하나라도 동의 (BR-08) */
 export function marketingAllowed(marketing) {
   return Boolean(marketing?.sms || marketing?.kakao)

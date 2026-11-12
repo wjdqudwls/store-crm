@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   daysAgoLabel,
-  manwon,
   marketingAllowed,
   firstTab,
   gradeNotes,
@@ -31,16 +30,6 @@ describe('dateTimeLabel (05 1.4 날짜·시각)', () => {
   })
   it('should_use_full_form_in_detail', () => {
     expect(dateTimeLabel('2026-10-15T14:03:00+09:00', now, true)).toBe('2026-10-15 14:03')
-  })
-})
-
-describe('manwon', () => {
-  it('should_round_down_to_10k_won', () => {
-    expect(manwon(3420000)).toBe('342만원')
-    expect(manwon(5920500)).toBe('592만원')
-  })
-  it('should_show_won_when_under_10k', () => {
-    expect(manwon(0)).toBe('0원')
   })
 })
 
