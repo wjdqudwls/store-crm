@@ -215,7 +215,7 @@ Oracle 무료 VM (Ubuntu)
 | 조회 SQL | MyBatis (`mybatis-spring-boot-starter` 4.1) | 예정 (목록·검색·집계 조회, ADR-018) |
 | QR | ZXing | 예정 (매장·직원 QR 이미지, ADR-019) |
 | 테스트 | JUnit 5, Mockito, MockMvc, Testcontainers (MariaDB), ArchUnit | JUnit 5 사용 중, 나머지 예정 (ADR-017·018) |
-| 프론트엔드 | Vue 3, Vite | 예정 |
+| 프론트엔드 | Vue 3, Vite, JavaScript, Vue Router, Pinia, Element Plus, Vitest | 진행 (F0, ADR-034) |
 
 ## 10. 관련 결정
 
@@ -250,3 +250,4 @@ Oracle 무료 VM (Ubuntu)
 | ADR-031 | ERD 문서는 개념·논리, 물리 명세는 `schema.sql` |
 | ADR-032 | 12단계 진행 순서: 화면 먼저, 로그인은 핵심 기능 뒤 |
 | ADR-033 | 무료 배포: Oracle 무료 VM 1대에 compose로 앱과 MariaDB |
+| ADR-034 | 화면: JavaScript와 Element Plus 하나, 폰 화면은 직접 CSS |

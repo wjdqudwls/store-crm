@@ -141,8 +141,8 @@ frontend/
 
 | 결정 | 선택지 | 추천 | 언제 |
 | --- | --- | --- | --- |
-| 언어 | JavaScript / TypeScript | JavaScript (이전 프로젝트와 같고 8주에 맞음). API 응답 모양은 JSDoc 주석으로 | F0 |
-| UI 라이브러리 | Vant 4 (모바일) / Element Plus (PC, 써 봄) / 둘 다 / 직접 CSS | **다시 정함**: 핵심 판매 화면이 노트북(PC)이 되어 Vant 4만으로는 표·입력 화면이 어색하다. F0에서 PC는 Element Plus, 폰은 Vant 4로 나눌지, 하나 + 직접 CSS로 할지 정한다 | F0 |
+| 언어 | JavaScript / TypeScript | **정함 (11/12, ADR-034)**: JavaScript (이전 프로젝트와 같고 8주에 맞음). API 응답 모양은 JSDoc 주석으로 | F0 |
+| UI 라이브러리 | Vant 4 (모바일) / Element Plus (PC, 써 봄) / 둘 다 / 직접 CSS | **정함 (11/12, ADR-034)**: Element Plus 하나, 폰 화면의 목록·카드·버튼은 직접 CSS. (이전: 핵심 판매 화면이 노트북(PC)이 되어 Vant 4만으로는 표·입력 화면이 어색해 F0에서 다시 정하기로 했다) | F0 |
 | 테스트 | Vitest만 / Vitest + Playwright | Vitest로 금액 기본값·표시 함수, 시간이 남으면 Playwright로 판매 기록 1개 시나리오 | F1 |
 | CI | 백엔드만 / 프론트 빌드·테스트 추가 | `frontend/**`가 바뀐 PR에 빌드·Vitest 추가 | F0 |
 | 폰 앱처럼 쓰기 (PWA) | 지금 / 나중 | 나중 (직원 폰 푸시 CAL-08과 같이) | - |
