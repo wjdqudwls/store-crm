@@ -21,9 +21,9 @@
 | A1 | 높음 | **시간대가 정해져 있지 않다.** 하루 마감 자정, 시즌 6/1 0시, 판매 시각 "오늘 0시 이후", 7/1 확정, 할 일 만기일이 모두 한국 시간 기준인데 무료 서버는 보통 UTC다 | "지금"은 주입한 `Clock`(Asia/Seoul)으로만 읽는다. DB에는 한국 시간으로 저장하고 SQL에서 `NOW()`를 쓰지 않는다(시각은 값으로 넘김). 테스트는 고정 시계로 자정·시즌 경계를 재현한다. 새 ADR | B0-6 (첫 코드 전에) | |
 | A2 | 중간 | **정기 산정과 이벤트 처리가 동시에 돌 수 있다.** 6월 수동 실행 중 판매가 들어오면 같은 고객 요약을 양쪽이 고쳐 한쪽 값이 덮어써질 수 있다 | 정기 산정은 어디서 시작하든(새벽, 서버 시작, 수동) outbox 발행기와 같은 스케줄 스레드 1개에서 차례로 돈다. 그동안 반영이 늦는 것(최대 30초)은 받아들인다 | B3-4 | |
 | A3 | 중간 | **퇴사 이관 응답의 "옮긴 고객 수"를 common이 알 수 없다** (03 4.11). 이벤트는 값을 돌려주지 않고, common이 고객 모듈을 부르면 순환이다 | 이관 이벤트에 결과 칸을 두고 고객 모듈 리스너가 같은 트랜잭션에서 채운다(`@EventListener`, 커밋 뒤에 도는 방식 아님). ADR-024 변경 | B4-6 | |
-| A4 | 중간 | **배포할 곳이 정해지지 않았고 MariaDB가 걸림돌이다.** 무료 DB는 PostgreSQL이 많은데 설계는 MariaDB 동작(`FOR UPDATE`, JSON, UNIQUE)에 기댄다 | 선택 기준: MariaDB 또는 그대로 도는 MySQL 호환, 월 0원, 잠드는지, 앱과 DB를 같은 곳에. 후보는 "무료 VM에 compose로 앱+DB" 또는 "앱 호스팅 + MySQL 호환 무료 DB" | B0-4 (6단계) | |
+| A4 | 중간 | **배포할 곳이 정해지지 않았고 MariaDB가 걸림돌이다.** 무료 DB는 PostgreSQL이 많은데 설계는 MariaDB 동작(`FOR UPDATE`, JSON, UNIQUE)에 기댄다 | 선택 기준: MariaDB 또는 그대로 도는 MySQL 호환, 월 0원, 잠드는지, 앱과 DB를 같은 곳에. 후보는 "무료 VM에 compose로 앱+DB" 또는 "앱 호스팅 + MySQL 호환 무료 DB" | B0-4 (6단계) | Oracle 무료 VM 1대에 compose로 앱+MariaDB 11. DB 포트는 VM 안에만 (ADR-033, 11/12) |
 | A5 | 낮음 | `spring.sql.init.mode=always`라 기본 데이터 SQL이 켜질 때마다 다시 들어간다(중복). `schema.sql` 변경은 이미 있는 배포 DB에 반영되지 않는다 | 기본 데이터는 `INSERT IGNORE`로 여러 번 돌아도 같게. 배포 DB는 12단계 전에 스키마를 확정한 뒤 만든다 | B0-6, 12단계 | |
-| A6 | 낮음 | NFR-11은 "`docker compose up` 한 번으로 실행"인데 지금 compose는 DB만 띄운다 | B0-4의 Dockerfile을 compose에 `app`으로 넣는다. 리뷰어는 한 번에, 개발은 지금처럼 `bootRun` | B0-4 | |
+| A6 | 낮음 | NFR-11은 "`docker compose up` 한 번으로 실행"인데 지금 compose는 DB만 띄운다 | B0-4의 Dockerfile을 compose에 `app`으로 넣는다. 리뷰어는 한 번에, 개발은 지금처럼 `bootRun` | B0-4 | compose에 `app` 서비스를 더한다 (ADR-033, 11/12) |
 | A7 | 낮음 | 테스트 DB가 두 갈래다. 문서는 Testcontainers, CI는 GitHub의 MariaDB 서비스 | Testcontainers로 바꾸면서 CI의 DB 서비스를 지운다. 그 뒤 `./gradlew test`는 Docker만 있으면 된다 | B0-6 | |
 | A8 | 낮음 | 04에 ADR-032의 자리가 없다: 로그인 계정 자리(`common.security`, `local` 전용 임시 구현), 화면 가짜 데이터(`frontend/src/mocks`) | 04 4장·7장·8장에 적는다 | B0-6, F0 | |
 | A9 | 낮음 | 고객 목록 20명마다 직원 이름을 common에 하나씩 물으면 느려진다(N+1). 판매 내역·영수증의 고객 이름(sales → customer), 판매 사원·매장 이름(sales → common)도 같다 (2026-11-05 화면 대조) | 각 모듈 `api`가 "ID 목록 → 이름"을 한 번에 주는 조회를 둔다 (NFR-01, 03 4.12) | B1-5, B2-2 | |

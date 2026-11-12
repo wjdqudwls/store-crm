@@ -5,6 +5,7 @@
 > 2026-10-23 요구사항 점검 반영: 역할·기기(2장), 공통 → 고객 동기 이벤트(3장), 교환·정정 이벤트(5장), 정기 산정 임시/확정(6장), 보안(7장) (ADR-021~029).
 > 2026-10-30 ERD 점검 반영: 공통 → 판매는 부르지 않음(3장), 이벤트 순서 묶음 = 처음 판매(5장), 물리 명세는 `schema.sql`(8.1), 동시 반품 테스트(8.3) (ADR-030·031).
 > 2026-10-30 시스템 아키텍처 그림 추가: [images/architecture.png](images/architecture.png) (원본 `images/architecture.svg`). 점검 결과는 [architecture-review.md](architecture-review.md)이고, 정할 것(A1~A10)은 개발하면서 해당 작업 때 정해 이 문서와 그림을 고친다. 그때까지 이 문서는 **초안**이다.
+> 2026-11-12 B0-4: 배포할 곳 = Oracle 무료 VM 1대에 compose로 앱+MariaDB(8.2), 배포용 프로필 `prod`(8.1) (ADR-033). 그림은 배포를 확인한 뒤 고친다.
 
 ## 1. 한눈에 보기
 
@@ -175,13 +176,22 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 ```
 
 - 테이블은 `schema.sql`로 만들고, Hibernate는 엔티티와 테이블이 맞는지 검사만 한다 (ADR-010). 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이고, 02-erd.md는 개념·논리를 남긴다 (ADR-031).
-- 프로필: 기본(로컬), `seed`(과거 판매 시각 허용과 더미 판매 생성기, ING-01), 배포용(이름은 배포 확인 때 정한다).
+- 프로필: 기본(로컬), `seed`(과거 판매 시각 허용과 더미 판매 생성기, ING-01), 배포용 `prod`(ADR-033).
 
 ### 8.2 배포
 
 - Vue를 빌드한 파일을 Spring Boot jar의 정적 파일로 넣어 한 번에 배포한다 (ADR-013). 앱은 1개이고 역할·화면 너비로 PC·폰 레이아웃을 나눈다 (2장).
 - 화면 주소(예: `/customers/1024`)로 바로 들어와도 `index.html`을 돌려준다. `/api/**`, `/actuator/**`, `/swagger-ui/**`는 그대로 둔다.
-- 무료 호스팅 1곳에 서버와 DB를 둔다. 어디에 올릴지는 실제로 배포해 보고 정한다 (B0-4, 01-requirements.md 11장).
+- 무료 VM 1대(Oracle Cloud Always Free, Ampere A1, Ubuntu)에 서버와 DB를 둔다. VM에서 레포의 compose로 앱(`app`)과 MariaDB(`db`)를 같이 띄운다. 로컬과 같은 compose 파일이다 (ADR-033).
+
+```
+Oracle 무료 VM (Ubuntu)
+ └─ docker compose  (.env는 VM에만, 커밋 안 함)
+     ├─ app: Spring Boot jar (+ Vue 빌드 파일), 프로필 prod ── HTTP ──▶ 밖
+     └─ db:  MariaDB 11 (VM 안 127.0.0.1에만)
+```
+
+- 밖으로는 SSH(22)와 앱 HTTP만 연다. B0-4는 IP 주소로 `/actuator/health`만 확인하고, 도메인·HTTPS는 12단계에서 정한다.
 
 ### 8.3 테스트
 
@@ -239,3 +249,4 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 | ADR-030 | 남은 수량은 판매 행 잠금으로 지킨다 |
 | ADR-031 | ERD 문서는 개념·논리, 물리 명세는 `schema.sql` |
 | ADR-032 | 12단계 진행 순서: 화면 먼저, 로그인은 핵심 기능 뒤 |
+| ADR-033 | 무료 배포: Oracle 무료 VM 1대에 compose로 앱과 MariaDB |
