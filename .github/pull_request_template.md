@@ -9,6 +9,7 @@
 
 ## 확인
 
-- [ ] `./gradlew test` 통과 (PR의 backend-ci)
+- [ ] `./gradlew test` 통과 (PR의 backend-ci, `backend/`가 바뀔 때)
+- [ ] 린트·Vitest·빌드 통과 (PR의 frontend-ci, `frontend/`가 바뀔 때)
 - [ ] 바뀐 규칙이 있으면 문서(01~04, decisions.md)에 같이 반영
 - [ ] 실제 고객 데이터나 비밀 값이 들어가지 않음 (NFR-06, NFR-07)
