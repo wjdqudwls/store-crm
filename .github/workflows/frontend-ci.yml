@@ -1,0 +1,47 @@
+# 프론트엔드 검사: PR과 main push마다 린트·형식·Vitest·빌드를 돌린다.
+# frontend/만 바뀐 PR에는 backend-ci가 돌지 않으므로 이 검사가 대신 확인한다.
+name: frontend-ci
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: |
+          npx oxlint .
+          npx eslint .
+
+      - name: Format
+        run: npx prettier --check src/
+
+      - name: Test
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
