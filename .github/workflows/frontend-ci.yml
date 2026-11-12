@@ -29,8 +29,10 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # npm ci는 쓰지 않는다: macOS에서 만든 lock 파일에 리눅스용 선택 패키지(@emnapi/*)가 빠져
+      # "lock 파일과 맞지 않음"으로 멈춘다. npm install은 lock의 버전을 따르면서 빠진 것만 채운다.
       - name: Install
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Lint
         run: |
