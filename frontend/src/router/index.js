@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import MoreView from '@/views/MoreView.vue'
+import SaleRecordView from '@/views/SaleRecordView.vue'
 import { screens, menuFor, allowedPaths } from '@/config/menus'
 import { useSessionStore } from '@/stores/session'
 import { isPhoneNow } from '@/composables/useIsPhone'
@@ -23,7 +24,12 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
-        ...uniqueScreens.map(placeholder),
+        {
+          path: screens.saleNew.path,
+          component: SaleRecordView,
+          meta: { title: screens.saleNew.label },
+        },
+        ...uniqueScreens.filter((x) => x !== screens.saleNew).map(placeholder),
         { path: '/more', component: MoreView, meta: { title: '더보기' } },
       ],
     },
