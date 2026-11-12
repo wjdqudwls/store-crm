@@ -20,6 +20,7 @@ export const customers = [
   {
     id: 1024,
     name: '김하늘',
+    phone: '010-2943-4821',
     phoneMasked: '****-4821',
     grade: 'B',
     lastVisitAt: '2026-10-15T14:03:00+09:00',
@@ -32,6 +33,7 @@ export const customers = [
   {
     id: 2310,
     name: '김하늘',
+    phone: '010-5512-0937',
     phoneMasked: '****-0937',
     grade: 'NORMAL',
     lastVisitAt: '2025-10-02T11:40:00+09:00',
@@ -41,6 +43,7 @@ export const customers = [
   {
     id: 1187,
     name: '오세진',
+    phone: '010-8820-1290',
     phoneMasked: '****-1290',
     grade: 'A',
     lastVisitAt: '2026-11-08T16:20:00+09:00',
@@ -50,6 +53,7 @@ export const customers = [
   {
     id: 1502,
     name: '윤가람',
+    phone: '010-3071-7713',
     phoneMasked: '****-7713',
     grade: 'C',
     lastVisitAt: '2026-09-21T13:10:00+09:00',
@@ -59,6 +63,7 @@ export const customers = [
   {
     id: 1733,
     name: '서다인',
+    phone: '010-6645-3358',
     phoneMasked: '****-3358',
     grade: 'D',
     lastVisitAt: '2026-06-03T18:45:00+09:00',
@@ -108,7 +113,7 @@ export const products = [
     itemType: 'BOTTOM',
     target: 'WOMEN',
     listPrice: 159000,
-    skus: skus(5801, ['블랙', '베이지'], ['25', '26', '27', '28']),
+    skus: skus(5801, ['블랙', '베이지'], ['24', '26', '28', '30']),
   },
   {
     id: 330,
@@ -135,11 +140,8 @@ export const sizeOptions = [
   { itemType: 'OUTER', target: 'WOMEN', sizes: ['85', '90', '95', '100', '105'] },
   { itemType: 'OUTER', target: 'MEN', sizes: ['95', '100', '105', '110', '115'] },
   { itemType: 'TOP', target: null, sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] },
-  {
-    itemType: 'BOTTOM',
-    target: null,
-    sizes: ['24', '25', '26', '27', '28', '29', '30', '32', '34'],
-  },
+  { itemType: 'BOTTOM', target: 'WOMEN', sizes: ['24', '26', '28', '30', '32'] },
+  { itemType: 'BOTTOM', target: 'MEN', sizes: ['28', '30', '32', '34', '36', '38'] },
   {
     itemType: 'SHOES',
     target: null,

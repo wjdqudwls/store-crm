@@ -3,6 +3,7 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import MoreView from '@/views/MoreView.vue'
 import SaleRecordView from '@/views/SaleRecordView.vue'
+import CustomerNewView from '@/views/CustomerNewView.vue'
 import { screens, menuFor, allowedPaths } from '@/config/menus'
 import { useSessionStore } from '@/stores/session'
 import { isPhoneNow } from '@/composables/useIsPhone'
@@ -29,7 +30,14 @@ const router = createRouter({
           component: SaleRecordView,
           meta: { title: screens.saleNew.label },
         },
-        ...uniqueScreens.filter((x) => x !== screens.saleNew).map(placeholder),
+        {
+          path: screens.customerNew.path,
+          component: CustomerNewView,
+          meta: { title: screens.customerNew.label },
+        },
+        ...uniqueScreens
+          .filter((x) => x !== screens.saleNew && x !== screens.customerNew)
+          .map(placeholder),
         { path: '/more', component: MoreView, meta: { title: '더보기' } },
       ],
     },

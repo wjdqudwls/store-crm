@@ -1,10 +1,11 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
 import CustomerSearch from '@/components/CustomerSearch.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
+import CustomerForm from '@/components/CustomerForm.vue'
 import { getCustomerForSale, getDailySummary, getStaff, createSale } from '@/api/sales'
 import { defaultLineAmount, recalcLines, totals } from '@/features/sale/saleAmount'
 import { formatWon, itemTypeLabels, sizeLabel, todayLabel } from '@/utils/format'
@@ -87,8 +88,39 @@ function clearCustomer() {
   lines.value.forEach((l) => (l.memberId = null))
 }
 
-function openRegister() {
-  ElMessage.info('고객등록 창은 F4에서 만듭니다')
+// ---- 고객 등록 창 (SCR-04, C1·C2): 판매 사원이 담당 직원으로 미리 들어간다 ----
+const registerOpen = ref(false)
+const registerName = ref('')
+const registerFormRef = ref()
+
+function openRegister(name) {
+  registerName.value = typeof name === 'string' ? name.trim() : ''
+  registerOpen.value = true
+}
+
+async function beforeCloseRegister(done) {
+  if (!registerFormRef.value?.isDirty()) return done()
+  try {
+    await ElMessageBox.confirm('입력한 내용을 버리고 판매로 돌아갈까요?', '고객 등록 닫기', {
+      confirmButtonText: '버리고 닫기',
+      cancelButtonText: '계속 입력',
+      type: 'warning',
+    })
+    done()
+  } catch {
+    // 계속 입력
+  }
+}
+
+async function onRegistered(res) {
+  registerOpen.value = false
+  await selectCustomer(res)
+  ElMessage.success(`${res.name}님을 등록했습니다. 이 고객으로 판매를 이어서 기록하세요`)
+}
+
+async function onUseExisting(customerId) {
+  registerOpen.value = false
+  await selectCustomer({ id: customerId })
 }
 
 // ---- 판매 시각 (오늘 0시 이후, 지금보다 이른 시각) ----
@@ -196,7 +228,7 @@ function resetAll() {
 
 // Ctrl+Enter = 저장, 확인 창에서 Enter = 저장
 function onKeydown(e) {
-  if (mode.value !== 'PURCHASE') return
+  if (mode.value !== 'PURCHASE' || registerOpen.value) return
   if (confirmOpen.value && e.key === 'Enter' && !e.isComposing) {
     e.preventDefault()
     save()
@@ -444,6 +476,34 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         <el-button @click="confirmOpen = false">돌아가기 (Esc)</el-button>
         <el-button type="primary" :loading="saving" @click="save">저장 (Enter)</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 고객 등록 창 (SCR-04). 닫았다 열면 새 폼 -->
+    <el-dialog
+      v-model="registerOpen"
+      title="고객 등록"
+      width="min(720px, 96vw)"
+      :fullscreen="isPhone"
+      :before-close="beforeCloseRegister"
+      :close-on-click-modal="false"
+      destroy-on-close
+      align-center
+      class="register-dialog"
+    >
+      <CustomerForm
+        ref="registerFormRef"
+        :preset-staff-id="sellerId"
+        :preset-name="registerName"
+        in-sale
+        @created="onRegistered"
+        @use-existing="onUseExisting"
+      >
+        <template #actions>
+          <el-button size="large" @click="beforeCloseRegister(() => (registerOpen = false))"
+            >닫기</el-button
+          >
+        </template>
+      </CustomerForm>
     </el-dialog>
   </div>
 </template>
