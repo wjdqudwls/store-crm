@@ -10,6 +10,11 @@ import '@fontsource/ibm-plex-sans-kr/500.css'
 import '@fontsource/ibm-plex-sans-kr/600.css'
 import '@fontsource/ibm-plex-sans-kr/700.css'
 
+// 우리 색·글꼴 이름(05 1.6·1.7). Element Plus 스타일 뒤에 둬야 덮어쓴다 (ADR-034)
+import './styles/tokens.css'
+import './styles/element-theme.css'
+import './styles/base.css'
+
 import App from './App.vue'
 import router from './router'
 

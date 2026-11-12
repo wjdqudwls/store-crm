@@ -1,0 +1,62 @@
+/*
+ * Element Plus 기본 변수에 우리 색·글꼴을 넣는다 (ADR-034).
+ * 주요 색 하나만 바꾸면 마우스를 올렸을 때 쓰는 밝은 단계가 기본 파랑으로 남으므로,
+ * 밝은 단계(light-3~9, 흰색과 섞음)와 어두운 단계(dark-2, 검정 20%)까지 계산해 넣었다.
+ * info는 Element Plus에서 회색(중립) 뜻으로 쓰여 바꾸지 않는다.
+ */
+:root {
+  --el-color-primary: #2563eb;
+  --el-color-primary-light-3: #6692f1;
+  --el-color-primary-light-5: #92b1f5;
+  --el-color-primary-light-7: #bed0f9;
+  --el-color-primary-light-8: #d3e0fb;
+  --el-color-primary-light-9: #e9effd;
+  --el-color-primary-dark-2: #1e4fbc;
+
+  --el-color-success: #15803d;
+  --el-color-success-light-3: #5ba677;
+  --el-color-success-light-5: #8ac09e;
+  --el-color-success-light-7: #b9d9c5;
+  --el-color-success-light-8: #d0e6d8;
+  --el-color-success-light-9: #e8f2ec;
+  --el-color-success-dark-2: #116631;
+
+  --el-color-warning: #b45309;
+  --el-color-warning-light-3: #ca8753;
+  --el-color-warning-light-5: #daa984;
+  --el-color-warning-light-7: #e8cbb5;
+  --el-color-warning-light-8: #f0ddce;
+  --el-color-warning-light-9: #f8eee6;
+  --el-color-warning-dark-2: #904207;
+
+  --el-color-danger: #c62828;
+  --el-color-danger-light-3: #d76868;
+  --el-color-danger-light-5: #e29494;
+  --el-color-danger-light-7: #eebebe;
+  --el-color-danger-light-8: #f4d4d4;
+  --el-color-danger-light-9: #f9eaea;
+  --el-color-danger-dark-2: #9e2020;
+
+  --el-color-error: #c62828;
+  --el-color-error-light-3: #d76868;
+  --el-color-error-light-5: #e29494;
+  --el-color-error-light-7: #eebebe;
+  --el-color-error-light-8: #f4d4d4;
+  --el-color-error-light-9: #f9eaea;
+  --el-color-error-dark-2: #9e2020;
+
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-bg);
+  --el-border-color: var(--color-border);
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text);
+  --el-text-color-secondary: var(--color-text-muted);
+
+  --el-font-family: var(--font-sans);
+  --el-font-size-base: var(--font-size-base);
+  --el-font-size-small: var(--font-size-sm);
+  --el-font-size-extra-small: var(--font-size-xs);
+  --el-font-size-medium: var(--font-size-lg);
+  --el-font-size-large: var(--font-size-lg);
+  --el-font-size-extra-large: var(--font-size-xl);
+}
