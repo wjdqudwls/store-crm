@@ -19,7 +19,17 @@ export function getDailySummary() {
 /** GET /customers?name= : 이름이 같은 고객 목록 */
 export function searchCustomers(name) {
   const q = name.trim()
-  const content = customers.filter((c) => q && c.name.includes(q)).map(({ members, ...c }) => c)  
+  const content = customers
+    .filter((c) => q && c.name.includes(q))
+    // 목록에는 전체 번호·가족을 넣지 않는다 (NFR-05)
+    .map(({ id, name, phoneMasked, grade, lastVisitAt, staffName }) => ({
+      id,
+      name,
+      phoneMasked,
+      grade,
+      lastVisitAt,
+      staffName,
+    }))
   return fakeResponse({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
 }
 
