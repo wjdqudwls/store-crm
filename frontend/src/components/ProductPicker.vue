@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { searchProducts, getSizes } from '@/api/sales'
+import { searchProducts } from '@/api/sales'
+import { getSizes } from '@/api/public'
 import { useSaleRecentStore } from '@/stores/saleRecent'
 import { formatWon, itemTypeLabels, targetLabels, sizeLabel } from '@/utils/format'
 

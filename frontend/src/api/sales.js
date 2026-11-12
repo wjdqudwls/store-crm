@@ -1,5 +1,5 @@
 import { fakeResponse, fakeError } from './fake'
-import { staff, customers, products, dailySummary, gradeDiscounts, sizeOptions } from '@/mocks/data'
+import { staff, customers, products, dailySummary, gradeDiscounts } from '@/mocks/data'
 
 /**
  * 판매 기록 화면이 쓰는 API (05 SCR-02 "쓰는 API"). 지금은 가짜 데이터이고 12단계에서 axios로 바꾼다.
@@ -19,7 +19,17 @@ export function getDailySummary() {
 /** GET /customers?name= : 이름이 같은 고객 목록 */
 export function searchCustomers(name) {
   const q = name.trim()
-  const content = customers.filter((c) => q && c.name.includes(q)).map(({ members, ...c }) => c)  
+  const content = customers
+    .filter((c) => q && c.name.includes(q))
+    // 목록에는 전체 번호·가족을 넣지 않는다 (NFR-05)
+    .map(({ id, name, phoneMasked, grade, lastVisitAt, staffName }) => ({
+      id,
+      name,
+      phoneMasked,
+      grade,
+      lastVisitAt,
+      staffName,
+    }))
   return fakeResponse({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
 }
 
@@ -43,10 +53,6 @@ export function searchProducts(keyword) {
     (p) => q && (p.name.toLowerCase().includes(q) || p.productCode.toLowerCase().includes(q)),
   )
   return fakeResponse({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
-}
-
-export function getSizes() {
-  return fakeResponse(sizeOptions)
 }
 
 /**
