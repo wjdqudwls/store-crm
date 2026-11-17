@@ -4,6 +4,8 @@ import PlaceholderView from '@/views/PlaceholderView.vue'
 import MoreView from '@/views/MoreView.vue'
 import SaleRecordView from '@/views/SaleRecordView.vue'
 import CustomerNewView from '@/views/CustomerNewView.vue'
+import CustomerListView from '@/views/CustomerListView.vue'
+import CustomerDetailView from '@/views/CustomerDetailView.vue'
 import { screens, menuFor, allowedPaths } from '@/config/menus'
 import { useSessionStore } from '@/stores/session'
 import { isPhoneNow } from '@/composables/useIsPhone'
@@ -35,8 +37,18 @@ const router = createRouter({
           component: CustomerNewView,
           meta: { title: screens.customerNew.label },
         },
+        {
+          path: screens.customers.path,
+          component: CustomerListView,
+          meta: { title: screens.customers.label },
+        },
+        {
+          path: '/customers/:id(\\d+)',
+          component: CustomerDetailView,
+          meta: { title: '고객 상세', allowedAs: screens.customers.path },
+        },
         ...uniqueScreens
-          .filter((x) => x !== screens.saleNew && x !== screens.customerNew)
+          .filter((x) => ![screens.saleNew, screens.customerNew, screens.customers].includes(x))
           .map(placeholder),
         { path: '/more', component: MoreView, meta: { title: '더보기' } },
       ],
@@ -56,7 +68,8 @@ router.beforeEach((to) => {
   const first = firstScreenPath(me.role, isPhoneNow())
   if (to.path === '/') return first
   // 그 계정의 메뉴에 없는 화면은 첫 화면으로 보낸다 (05 1.2)
-  if (!allowedPaths(me.role).has(to.path)) return first
+  // 상세처럼 주소에 ID가 든 화면은 목록 화면의 권한을 따른다 (meta.allowedAs)
+  if (!allowedPaths(me.role).has(to.meta.allowedAs ?? to.path)) return first
 })
 
 export default router

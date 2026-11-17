@@ -16,23 +16,6 @@ export function getDailySummary() {
   return fakeResponse({ ...dailySummary, saleCount: receiptSeq })
 }
 
-/** GET /customers?name= : 이름이 같은 고객 목록 */
-export function searchCustomers(name) {
-  const q = name.trim()
-  const content = customers
-    .filter((c) => q && c.name.includes(q))
-    // 목록에는 전체 번호·가족을 넣지 않는다 (NFR-05)
-    .map(({ id, name, phoneMasked, grade, lastVisitAt, staffName }) => ({
-      id,
-      name,
-      phoneMasked,
-      grade,
-      lastVisitAt,
-      staffName,
-    }))
-  return fakeResponse({ content, page: 0, size: 20, totalElements: content.length, totalPages: 1 })
-}
-
 /** GET /customers/{id} 중 판매 기록에 쓰는 부분(등급·할인율) + GET /customers/{id}/members */
 export function getCustomerForSale(id) {
   const c = customers.find((x) => x.id === id)
