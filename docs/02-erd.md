@@ -12,6 +12,7 @@
 > 변경: 2026-10-30 ERD 개념·논리 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-022·026·030·031) — `sale.root_sale_id`(처음 판매)·`created_at`, `sale_return.new_sale_id`, `customer_purchase.voided_qty`, 구매 건 = 처음 판매(교환·정정은 티켓 없이 금액만), `UNIQUE(store_id, manager_slot)`, 반품·교환·정정·기록 취소 때 판매 행 잠금, 하루 마감 잠김·다시 마감 규칙, 요약 행은 고객 등록 때, 정기 산정 이력은 고객마다, 후속 연락 단계는 끄기만, 그림의 빠진 관계. 이 문서는 개념·논리이고, 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이다 (ADR-031).
 > 변경: 2026-11-05 화면 대조 반영 ([erd-review.md](erd-review.md) 8장, 05-screens.md 7장) — `sale_line.returned_amount`(줄마다 환불된 금액 합계) 추가 (5장 #25). `schema.sql`은 B0-5에서 맞춘다.
 > 변경: 2026-11-09 B0-5에서 `schema.sql`과 엔티티를 이 문서의 테이블 24개에 맞췄다. 3.3에 남아 있던 등급 할인율 칸 이름을 `grade_discount.rate`로 고침 (2026-10-23에 `grade_rule`에서 옮긴 것, ADR-027).
+> 변경: 2026-11-13 방문 예약·재연락 알림 (01-requirements.md CAL-08·10~12, BR-14, ADR-035) — `consult_note.type`에 `RESERVATION`, `follow_up_task`에 `kind`(SALE·VISIT·RECALL)·`source_note_id`, 수동 할 일은 `sale_id`·`rule_id`가 NULL, `staff_notification.type`에 `VISIT`·`RECALL`, `staff.notify_timing`, `push_subscription` 추가(테이블 25개). `schema.sql`과 엔티티는 B4 작업 때 바꾼다.
 > DB: MariaDB · 금액은 원 단위 `BIGINT` · 시각은 `DATETIME(6)` · enum은 `VARCHAR(20)` 문자열로 저장
 
 ## 1. 한눈에 보기
@@ -23,7 +24,7 @@
 
 | 모듈 | 테이블 | 역할 |
 | --- | --- | --- |
-| common | `store`, `staff`, `staff_notification` | 매장, 계정(본사·매장 계정·직원·키오스크), 직원 알림함 |
+| common | `store`, `staff`, `staff_notification`, `push_subscription` | 매장, 계정(본사·매장 계정·직원·키오스크), 직원 알림함, 폰 푸시 구독 |
 | product | `product`, `product_sku` | 상품(품번)과 색상·사이즈 단위 SKU |
 | sales | `sale`, `sale_line`, `sale_return`, `sale_return_line`, `receipt_sequence`, `store_day_close`, `outbox_event` | 판매·반품·교환·정정 원본, 영수증 번호 채번, 하루 마감, 발행할 이벤트 |
 | customer | `customer`, `customer_member`, `customer_purchase`, `customer_summary`, `grade_policy`, `grade_rule`, `grade_discount`, `grade_history`, `consult_note`, `follow_up_rule`, `follow_up_task`, `processed_event` | 고객, 가족 구성원, 구매 기록(이벤트로 받은 것), 등급, 할인율, 메모, 후속 연락 |
@@ -36,6 +37,8 @@
 erDiagram
     store ||--o{ staff : "소속"
     staff ||--o{ staff_notification : "알림"
+    staff ||--o{ push_subscription : "폰 푸시 구독"
+    consult_note |o--o| follow_up_task : "source_note_id (예약·재연락)"
     product ||--o{ product_sku : "색상·사이즈"
 
     sale ||--|{ sale_line : "포함"
@@ -92,11 +95,20 @@ erDiagram
         VARCHAR staff_code UK "QR 담당 지정용"
         BOOLEAN active
         DATETIME tokens_valid_after "로그인 기준 시각"
+        VARCHAR notify_timing "NONE, DAY_BEFORE, SAME_DAY, BOTH (기본 DAY_BEFORE)"
+    }
+    push_subscription {
+        BIGINT id PK
+        BIGINT staff_id FK "받는 직원"
+        VARCHAR endpoint UK "웹 푸시 주소"
+        VARCHAR p256dh "브라우저 공개키"
+        VARCHAR auth "인증 비밀"
+        DATETIME created_at
     }
     staff_notification {
         BIGINT id PK
         BIGINT staff_id FK "받는 직원"
-        VARCHAR type "FOLLOW_UP, NOTE"
+        VARCHAR type "FOLLOW_UP, NOTE, VISIT, RECALL"
         BIGINT customer_id
         BIGINT ref_id "할 일·메모 ID"
         VARCHAR message
@@ -311,7 +323,7 @@ erDiagram
         BIGINT id PK
         BIGINT customer_id FK
         BIGINT staff_id "작성 직원 (매장 계정이면 고름)"
-        VARCHAR type "CONSULT, PURCHASE, CALL, ETC"
+        VARCHAR type "CONSULT, PURCHASE, CALL, RESERVATION, ETC"
         VARCHAR call_result "COMPLETED, ABSENT, RECALL"
         VARCHAR channel "CALL, SMS, KAKAO (연락일 때)"
         BIGINT recorded_by "기록한 계정"
@@ -334,9 +346,11 @@ erDiagram
         BIGINT id PK
         BIGINT customer_id FK
         BIGINT staff_id "받는 직원"
-        BIGINT sale_id "기준 판매"
-        BIGINT rule_id FK
-        VARCHAR rule_name "단계 이름 스냅샷"
+        VARCHAR kind "SALE, VISIT, RECALL"
+        BIGINT sale_id "기준 판매 (SALE만, 수동 할 일은 NULL)"
+        BIGINT rule_id FK "SALE만"
+        BIGINT source_note_id "만든 메모 (VISIT·RECALL)"
+        VARCHAR rule_name "단계 이름 스냅샷 (수동은 '방문 예정'·'다시 연락')"
         BOOLEAN promotional "스냅샷"
         DATE due_date "만기일"
         VARCHAR status "OPEN, DONE, SKIPPED, CANCELLED, REPLACED"
@@ -361,6 +375,7 @@ erDiagram
 - `tokens_valid_after`보다 먼저 발급된 토큰은 거절한다. 비밀번호를 바꾸거나 "모든 기기에서 로그아웃"을 하면 지금 시각으로 바꾼다. 요청마다 `active`와 함께 확인한다 (ADR-025).
 - `KIOSK` 계정은 고객 등록 API만 호출할 수 있다 (REG-02, NFR-04a).
 - `store.code`와 `staff.staff_code`가 QR 링크에 들어간다 (`/join?store=GN01&staff=S017`). 내부 ID를 노출하지 않기 위해 별도 코드를 둔다.
+- `push_subscription`은 직원 폰(브라우저)의 웹 푸시 구독이다. 한 직원이 폰·PC 여러 개를 켤 수 있어 직원당 여러 행이고, 보내기가 410(만료)이면 지운다. `staff.notify_timing`은 방문 예약·재연락 알림 시점이다 (CAL-08·12, ADR-035).
 - `staff_notification`은 직원 개인 웹앱의 알림함이다 (CAL-09). 알림을 쌓는 코드는 인터페이스 하나 뒤에 있어, 나중에 폰 푸시로 바꿔도 부르는 쪽은 그대로다 (ADR-029).
 
 ### 3.2 product: `product`, `product_sku`
