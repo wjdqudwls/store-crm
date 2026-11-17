@@ -163,6 +163,3 @@ export const sizeOptions = [
   },
   { itemType: 'ACC', target: null, sizes: ['FREE'] },
 ]
-
-/** GET /sales/daily-summary?date=오늘 */
-export const dailySummary = { storeId: 1, saleCount: 12, closed: false, closedAt: null }

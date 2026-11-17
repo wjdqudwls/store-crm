@@ -1,15 +1,20 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import CustomerForm from '@/components/CustomerForm.vue'
+import { useIsPhone } from '@/composables/useIsPhone'
 
 /**
  * 고객 등록 화면 `/customers/new` (05 SCR-04, 매장 계정).
+ * PC는 기존 매장 POS처럼 화면 제목 오른쪽 위에 [신규] [등록]을 둔다. 폰은 폼 아래 버튼.
  * 등록 뒤에는 고객 상세로 간다. 같은 번호가 있으면 기존 고객 상세로 (REG-05).
  */
 const router = useRouter()
+const isPhone = useIsPhone()
 const formKey = ref(0)
+const formRef = ref()
+const saving = computed(() => formRef.value?.saving ?? false)
 
 function onCreated(res) {
   ElMessage.success({
@@ -22,52 +27,41 @@ function onCreated(res) {
 function onExisting(customerId) {
   router.push(`/customers/${customerId}`)
 }
+
+/** [신규]: 입력한 칸을 모두 비운다 */
+function reset() {
+  formKey.value += 1
+}
 </script>
 
 <template>
-  <div class="cnew">
-    <header class="cnew__head">
-      <h1 class="cnew__title">고객 등록</h1>
-      <p class="cnew__desc">
-        종이 고객등록카드 대신 직원이 입력합니다. 필수 칸만 채워도 등록됩니다.
-      </p>
+  <div class="page cnew">
+    <header class="page__head">
+      <div>
+        <h1 class="page__title">고객 등록</h1>
+        <p class="page__sub">
+          종이 고객등록카드 대신 직원이 입력합니다. 필수 칸만 채워도 등록됩니다.
+        </p>
+      </div>
+      <div v-if="!isPhone" class="page__actions">
+        <el-button @click="reset">신규</el-button>
+        <el-button type="primary" :loading="saving" @click="formRef?.submit()">등록</el-button>
+      </div>
     </header>
-    <div class="cnew__card">
-      <CustomerForm :key="formKey" @created="onCreated" @use-existing="onExisting" />
+    <div class="card">
+      <CustomerForm
+        ref="formRef"
+        :key="formKey"
+        :hide-actions="!isPhone"
+        @created="onCreated"
+        @use-existing="onExisting"
+      />
     </div>
   </div>
 </template>
 
 <style scoped>
 .cnew {
-  max-width: 760px;
-  margin: 0 auto;
-}
-.cnew__head {
-  margin-bottom: 16px;
-}
-.cnew__title {
-  margin: 0 0 4px;
-  font-size: var(--font-size-xl);
-}
-.cnew__desc {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-.cnew__card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 20px;
-}
-@media (max-width: 767.98px) {
-  /* 폰은 위 막대가 화면 이름을 보여준다 */
-  .cnew__title {
-    display: none;
-  }
-  .cnew__card {
-    padding: 16px;
-  }
+  max-width: 1000px;
 }
 </style>

@@ -166,3 +166,42 @@ export function toRegistrationBody(f) {
 export function daysInMonth(month) {
   return month ? new Date(2024, month, 0).getDate() : 31
 }
+
+/**
+ * 고객 상세(`GET /customers/{id}?include=address`) → 수정 폼 (CUS-04).
+ * 이미 등록된 고객이라 필수 동의는 켜진 채로 둔다 (수정 폼에서는 숨긴다).
+ */
+export function formFromCustomer(c, addressDetail) {
+  const p = c.profile ?? {}
+  const md = p.birthMd
+  return {
+    ...emptyForm(),
+    nationality: c.nationality ?? 'DOMESTIC',
+    name: c.name ?? '',
+    nameEn: c.nameEn ?? '',
+    phone: c.phone ?? '',
+    privacy: true,
+    age14: true,
+    marketingSms: Boolean(c.marketing?.sms),
+    marketingKakao: Boolean(c.marketing?.kakao),
+    staffId: c.staff?.id ?? null,
+    birthYear: p.birthYear ? String(p.birthYear) : '',
+    birthMonth: md ? Number(md.slice(0, 2)) : null,
+    birthDay: md ? Number(md.slice(2)) : null,
+    sido: p.regionSido ?? '',
+    gu: p.regionGu ?? '',
+    detail: addressDetail ?? '',
+    gender: p.gender ?? null,
+    preferredItemTypes: [...(p.preferredItemTypes ?? [])],
+    sizes: { top: '', outer: '', bottom: '', shoes: '', ...p.sizes },
+    contactChannel: p.contactChannel ?? null,
+  }
+}
+
+/** 수정 폼 → `PATCH /customers/{id}`. 동의 대신 마케팅 수신, 담당 직원은 비우면 null */
+export function toProfilePatch(f) {
+  const { agreements, ...body } = toRegistrationBody(f)
+  body.marketing = { sms: agreements.marketingSms, kakao: agreements.marketingKakao }
+  body.staffId = f.staffId ?? null
+  return body
+}

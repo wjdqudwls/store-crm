@@ -35,6 +35,11 @@ describe('계정별 메뉴 (05 1.2)', () => {
     expect(allowedPaths('HQ').has('/sales/new')).toBe(false)
   })
 
+  it('키오스크는 등록 화면 밖으로 나갈 수 없다 (REG-02)', () => {
+    expect([...allowedPaths('KIOSK')]).toEqual(['/kiosk'])
+    expect(menuFor('KIOSK').firstPc.path).toBe('/kiosk')
+  })
+
   it('위 막대에 계정 이름과 역할을 보여준다 (AUTH-03)', () => {
     expect(accountLabel(store)).toBe('강남점 · 매장 계정')
     expect(accountLabel(senior)).toBe('이지은 · 시니어')

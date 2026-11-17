@@ -15,6 +15,7 @@ import {
   visibleSizeFields,
   validateRegistration,
   toRegistrationBody,
+  toProfilePatch,
   daysInMonth,
   sidoList,
 } from '@/features/customer/customerForm'
@@ -32,11 +33,28 @@ const props = defineProps({
   inSale: { type: Boolean, default: false },
   showStaff: { type: Boolean, default: true },
   collapseOptional: { type: Boolean, default: true },
+  /** 키오스크·QR은 다른 API로 보낸다 (기본: POST /customers) */
+  submitFn: { type: Function, default: null },
+  /** 키오스크·QR: 필수 동의 2개 전에는 [등록]을 끈다 (SCR-01, U6) */
+  lockUntilConsent: { type: Boolean, default: false },
+  /** 가입매장 이름 (QR은 로그인 계정이 없다) */
+  storeName: { type: String, default: '' },
+  /** 화면 위에 [등록]을 따로 둘 때 폼 아래 버튼을 숨긴다 (PC 고객 등록 화면) */
+  hideActions: { type: Boolean, default: false },
+  /** 'edit': 프로필 수정 (CUS-04). 필수 동의 칸을 숨기고 `toProfilePatch`로 보낸다 */
+  mode: { type: String, default: 'create' },
+  /** 수정할 때 처음 값 (`formFromCustomer`) */
+  initial: { type: Object, default: null },
 })
-const emit = defineEmits(['created', 'use-existing'])
+const emit = defineEmits(['created', 'saved', 'use-existing'])
+const editing = computed(() => props.mode === 'edit')
 
 const session = useSessionStore()
-const form = reactive({ ...emptyForm(), staffId: props.presetStaffId, name: props.presetName })
+const base = () =>
+  props.initial
+    ? JSON.parse(JSON.stringify(props.initial))
+    : { ...emptyForm(), staffId: props.presetStaffId, name: props.presetName }
+const form = reactive(base())
 const errors = ref({})
 const duplicate = ref(null) // 409 details
 const saving = ref(false)
@@ -130,8 +148,13 @@ async function submit() {
   }
   saving.value = true
   try {
-    const res = await createCustomer(toRegistrationBody(form))
-    emit('created', res)
+    if (editing.value) {
+      const res = await props.submitFn(toProfilePatch(form))
+      emit('saved', res)
+    } else {
+      const res = await (props.submitFn ?? createCustomer)(toRegistrationBody(form))
+      emit('created', res)
+    }
   } catch (e) {
     const body = e?.body
     if (e?.status === 409 && body?.code === 'CUSTOMER_PHONE_DUPLICATED') {
@@ -149,11 +172,10 @@ async function submit() {
 
 /** 입력한 것이 있는지 (창을 닫을 때 버릴지 묻는다) */
 function isDirty() {
-  const base = { ...emptyForm(), staffId: props.presetStaffId, name: props.presetName }
-  return JSON.stringify(form) !== JSON.stringify(base)
+  return JSON.stringify(form) !== JSON.stringify(base())
 }
 
-defineExpose({ isDirty, submit })
+defineExpose({ isDirty, submit, saving, consentsOk })
 </script>
 
 <template>
@@ -161,105 +183,132 @@ defineExpose({ isDirty, submit })
     <!-- 409 중복: 기존 정보는 바꾸지 않는다 (REG-05) -->
     <div v-if="duplicate" class="cform__dup" role="alert">
       <span>
-        이미 등록된 고객입니다 · <strong>{{ duplicate.name }}</strong>
+        {{ editing ? '이미 다른 고객의 번호입니다' : '이미 등록된 고객입니다' }} ·
+        <strong>{{ duplicate.name }}</strong>
         {{ duplicate.phoneMasked }}
       </span>
       <el-button type="primary" size="small" @click="emit('use-existing', duplicate.customerId)">
-        {{ inSale ? '이 고객으로 판매' : '기존 고객 보기' }}
+        {{ inSale ? '이 고객으로 판매' : editing ? '그 고객 보기' : '기존 고객 보기' }}
       </el-button>
     </div>
 
-    <!-- 기본 -->
-    <section class="cform__group">
-      <h3 class="cform__title">기본</h3>
-      <div class="cform__row">
-        <div class="cfield">
-          <span class="cfield__label">내/외국인 <em>필수</em></span>
-          <el-radio-group v-model="form.nationality">
-            <el-radio-button value="DOMESTIC">내국인</el-radio-button>
-            <el-radio-button value="FOREIGN">외국인</el-radio-button>
-          </el-radio-group>
-        </div>
-        <div class="cfield cfield--muted">
-          <span class="cfield__label">가입매장</span>
-          <span>{{ session.me.name }}</span>
-        </div>
+    <p class="ft-legend"><b>빨간 글씨</b>는 필수 칸입니다.</p>
+
+    <!-- 기본 · 동의 -->
+    <div class="ftable">
+      <div class="ft-caption">기본</div>
+
+      <div class="ft-label is-required">내/외국인</div>
+      <div class="ft-value">
+        <el-radio-group v-model="form.nationality">
+          <el-radio-button value="DOMESTIC">내국인</el-radio-button>
+          <el-radio-button value="FOREIGN">외국인</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div class="ft-label">가입매장</div>
+      <div class="ft-value ft-muted">
+        {{ storeName || session.me.storeName || session.me.name }}
       </div>
 
-      <div class="cform__row">
-        <div v-if="foreign" class="cfield" data-field="nameEn">
-          <label class="cfield__label" for="cf-name-en">영문 이름 <em>필수</em></label>
+      <template v-if="foreign">
+        <label class="ft-label is-required" for="cf-name-en">영문 이름</label>
+        <div class="ft-value" data-field="nameEn">
           <el-input id="cf-name-en" v-model="form.nameEn" maxlength="100" placeholder="Aiko Sato" />
           <p v-if="errors.nameEn" class="cfield__error">{{ errors.nameEn }}</p>
         </div>
-        <div class="cfield" data-field="name">
-          <label class="cfield__label" for="cf-name">
-            {{ foreign ? '한글 이름' : '이름' }} <em>{{ foreign ? '선택' : '필수' }}</em>
-          </label>
+        <label class="ft-label" for="cf-name">한글 이름</label>
+        <div class="ft-value" data-field="name">
           <el-input
             id="cf-name"
             v-model="form.name"
             maxlength="50"
-            :placeholder="foreign ? '비우면 영문 이름을 씁니다' : '김하늘'"
+            placeholder="비우면 영문 이름을 씁니다"
           />
           <p v-if="errors.name" class="cfield__error">{{ errors.name }}</p>
         </div>
-        <div class="cfield" data-field="phone">
-          <label class="cfield__label" for="cf-phone">전화번호 <em>필수</em></label>
+        <label class="ft-label is-required" for="cf-phone">전화번호</label>
+        <div class="ft-value ft-wide" data-field="phone">
           <el-input
             id="cf-phone"
             :model-value="form.phone"
-            :inputmode="foreign ? 'tel' : 'numeric'"
-            :placeholder="foreign ? '+81 90 1234 5678' : '010-0000-0000'"
+            inputmode="tel"
+            placeholder="+81 90 1234 5678"
+            class="cform__phone"
             @update:model-value="onPhoneInput"
           />
           <p v-if="errors.phone" class="cfield__error">{{ errors.phone }}</p>
         </div>
-      </div>
-    </section>
+      </template>
+      <template v-else>
+        <label class="ft-label is-required" for="cf-name">고객명</label>
+        <div class="ft-value" data-field="name">
+          <el-input id="cf-name" v-model="form.name" maxlength="50" placeholder="김하늘" />
+          <p v-if="errors.name" class="cfield__error">{{ errors.name }}</p>
+        </div>
+        <label class="ft-label is-required" for="cf-phone">휴대폰 번호</label>
+        <div class="ft-value" data-field="phone">
+          <el-input
+            id="cf-phone"
+            :model-value="form.phone"
+            inputmode="numeric"
+            placeholder="010-0000-0000"
+            @update:model-value="onPhoneInput"
+          />
+          <p v-if="errors.phone" class="cfield__error">{{ errors.phone }}</p>
+        </div>
+      </template>
 
-    <!-- 동의 (BR-08) -->
-    <section class="cform__group">
-      <h3 class="cform__title">동의</h3>
-      <div class="cfield" data-field="privacy">
-        <div class="cform__consent">
-          <el-checkbox v-model="form.privacy">개인정보 수집·이용 동의 <em>필수</em></el-checkbox>
-          <el-button link type="primary" size="small" @click="showConsentText = !showConsentText">
-            {{ showConsentText ? '접기' : '내용 보기' }}
-          </el-button>
+      <div class="ft-caption">{{ editing ? '수신 동의' : '동의' }}</div>
+
+      <template v-if="!editing">
+        <div class="ft-label is-required">개인정보 수집·이용</div>
+        <div class="ft-value ft-wide" data-field="privacy">
+          <div class="ft-inline">
+            <el-checkbox v-model="form.privacy">동의합니다</el-checkbox>
+            <el-button link type="primary" size="small" @click="showConsentText = !showConsentText">
+              {{ showConsentText ? '접기' : '내용 보기' }}
+            </el-button>
+          </div>
+          <div v-if="showConsentText" class="cform__consent-text">
+            <p><b>수집 목적</b> 매장 단골 관리, 구매이력·등급 할인 안내, 사이즈 맞춤 상담, 연락</p>
+            <p>
+              <b>수집 항목</b> 필수: 이름, 전화번호, 내/외국인 · 선택: 생년·생일, 주소, 성별, 선호
+              품목, 사이즈, 연락 채널, 가족 구성원(호칭·관계·사이즈)
+            </p>
+            <p><b>상세주소</b> 사은품·우편 발송에만 쓰며 암호화해 보관합니다</p>
+            <p>동의하지 않을 수 있으며, 이 경우 고객 등록과 등급 할인을 받을 수 없습니다</p>
+          </div>
+          <p v-if="errors.privacy" class="cfield__error">{{ errors.privacy }}</p>
         </div>
-        <div v-if="showConsentText" class="cform__consent-text">
-          <p><b>수집 목적</b> 매장 단골 관리, 구매이력·등급 할인 안내, 사이즈 맞춤 상담, 연락</p>
-          <p>
-            <b>수집 항목</b> 필수: 이름, 전화번호, 내/외국인 · 선택: 생년·생일, 주소, 성별, 선호
-            품목, 사이즈, 연락 채널, 가족 구성원(호칭·관계·사이즈)
-          </p>
-          <p><b>상세주소</b> 사은품·우편 발송에만 쓰며 암호화해 보관합니다</p>
-          <p>동의하지 않을 수 있으며, 이 경우 고객 등록과 등급 할인을 받을 수 없습니다</p>
+
+        <div class="ft-label is-required">나이 확인</div>
+        <div class="ft-value" data-field="age14">
+          <el-checkbox v-model="form.age14">만 14세 이상입니다</el-checkbox>
+          <p v-if="errors.age14" class="cfield__error">{{ errors.age14 }}</p>
         </div>
-        <p v-if="errors.privacy" class="cfield__error">{{ errors.privacy }}</p>
-      </div>
-      <div class="cfield" data-field="age14">
-        <el-checkbox v-model="form.age14">만 14세 이상입니다 <em>필수</em></el-checkbox>
-        <p v-if="errors.age14" class="cfield__error">{{ errors.age14 }}</p>
-      </div>
-      <div class="cfield">
-        <span class="cfield__label">마케팅 수신 <em>선택</em></span>
-        <div class="cform__inline">
+      </template>
+      <div class="ft-label">마케팅 수신</div>
+      <div class="ft-value" :class="{ 'ft-wide': editing }">
+        <div class="ft-inline">
           <el-checkbox v-model="form.marketingSms">문자</el-checkbox>
           <el-checkbox v-model="form.marketingKakao">카톡</el-checkbox>
         </div>
       </div>
-    </section>
 
-    <!-- 직원 화면만 -->
-    <section v-if="showStaff" class="cform__group">
-      <div class="cfield" data-field="staffId">
-        <label class="cfield__label" for="cf-staff">담당 직원 <em>선택</em></label>
-        <StaffSelect id="cf-staff" v-model="form.staffId" placeholder="담당 직원을 고르세요" />
-        <p v-if="errors.staffId" class="cfield__error">{{ errors.staffId }}</p>
-      </div>
-    </section>
+      <!-- 직원 화면만 -->
+      <template v-if="showStaff">
+        <label class="ft-label" for="cf-staff">담당 직원</label>
+        <div class="ft-value ft-wide" data-field="staffId">
+          <StaffSelect
+            id="cf-staff"
+            v-model="form.staffId"
+            placeholder="담당 직원을 고르세요"
+            class="cform__staff"
+          />
+          <p v-if="errors.staffId" class="cfield__error">{{ errors.staffId }}</p>
+        </div>
+      </template>
+    </div>
 
     <!-- 선택 항목 (직원 화면은 접어 둠, C3) -->
     <el-button
@@ -272,36 +321,36 @@ defineExpose({ isDirty, submit })
       {{ showOptional ? '선택 항목 접기 ▲' : '더 입력하기 ▼ (생일·주소·성별·사이즈)' }}
     </el-button>
 
-    <section v-show="showOptional" class="cform__group">
-      <h3 class="cform__title">선택</h3>
-      <div class="cform__row">
-        <div class="cfield cfield--narrow" data-field="birthYear">
-          <label class="cfield__label" for="cf-year">생년</label>
-          <el-input
-            id="cf-year"
-            v-model="form.birthYear"
-            inputmode="numeric"
-            maxlength="4"
-            placeholder="1991"
-          />
-          <p v-if="errors.birthYear" class="cfield__error">{{ errors.birthYear }}</p>
+    <div v-show="showOptional" class="ftable">
+      <div class="ft-caption">선택</div>
+
+      <label class="ft-label" for="cf-year">생년</label>
+      <div class="ft-value" data-field="birthYear">
+        <el-input
+          id="cf-year"
+          v-model="form.birthYear"
+          inputmode="numeric"
+          maxlength="4"
+          placeholder="1991"
+          class="cform__year"
+        />
+        <p v-if="errors.birthYear" class="cfield__error">{{ errors.birthYear }}</p>
+      </div>
+      <div class="ft-label">생일</div>
+      <div class="ft-value" data-field="birthMd">
+        <div class="ft-inline">
+          <el-select v-model="form.birthMonth" placeholder="월" clearable class="cform__md">
+            <el-option v-for="m in months" :key="m" :label="`${m}월`" :value="m" />
+          </el-select>
+          <el-select v-model="form.birthDay" placeholder="일" clearable class="cform__md">
+            <el-option v-for="d in days" :key="d" :label="`${d}일`" :value="d" />
+          </el-select>
         </div>
-        <div class="cfield" data-field="birthMd">
-          <span class="cfield__label">생일</span>
-          <div class="cform__inline">
-            <el-select v-model="form.birthMonth" placeholder="월" clearable class="cform__md">
-              <el-option v-for="m in months" :key="m" :label="`${m}월`" :value="m" />
-            </el-select>
-            <el-select v-model="form.birthDay" placeholder="일" clearable class="cform__md">
-              <el-option v-for="d in days" :key="d" :label="`${d}일`" :value="d" />
-            </el-select>
-          </div>
-          <p v-if="errors.birthMd" class="cfield__error">{{ errors.birthMd }}</p>
-        </div>
+        <p v-if="errors.birthMd" class="cfield__error">{{ errors.birthMd }}</p>
       </div>
 
-      <div class="cfield">
-        <span class="cfield__label">주소</span>
+      <div class="ft-label">주소</div>
+      <div class="ft-value ft-wide">
         <div class="cform__address">
           <el-select v-model="form.sido" placeholder="시/도" clearable class="cform__sido">
             <el-option v-for="s in sidoList" :key="s" :label="s" :value="s" />
@@ -321,18 +370,22 @@ defineExpose({ isDirty, submit })
         </div>
       </div>
 
-      <div class="cfield">
-        <span class="cfield__label">성별</span>
+      <div class="ft-label">성별</div>
+      <div class="ft-value">
         <ChoiceButtons v-model="form.gender" :options="genderOptions" />
       </div>
+      <div class="ft-label">연락 채널</div>
+      <div class="ft-value">
+        <ChoiceButtons v-model="form.contactChannel" :options="channelOptions" />
+      </div>
 
-      <div class="cfield">
-        <span class="cfield__label">선호 품목 <em>여러 개</em></span>
+      <div class="ft-label">선호 품목<small>여러 개</small></div>
+      <div class="ft-value ft-wide">
         <ChoiceButtons v-model="form.preferredItemTypes" :options="itemTypeOptions" multiple />
       </div>
 
-      <div class="cfield">
-        <span class="cfield__label">사이즈</span>
+      <div class="ft-label">사이즈</div>
+      <div class="ft-value ft-wide">
         <p v-if="!form.gender" class="cform__hint">
           성별을 고르면 아우터·하의 사이즈도 고를 수 있어요
         </p>
@@ -341,18 +394,20 @@ defineExpose({ isDirty, submit })
           <ChoiceButtons v-model="form.sizes[f.key]" :options="f.options" size="small" />
         </div>
       </div>
+    </div>
 
-      <div class="cfield">
-        <span class="cfield__label">연락 채널</span>
-        <ChoiceButtons v-model="form.contactChannel" :options="channelOptions" />
-      </div>
-    </section>
-
-    <div class="cform__actions">
+    <div v-if="!hideActions" class="cform__actions">
       <slot name="actions" />
-      <span v-if="!consentsOk" class="cform__hint">필수 동의 2개에 체크해 주세요</span>
-      <el-button type="primary" size="large" native-type="submit" :loading="saving">
-        {{ saving ? '등록 중…' : '등록' }}
+      <span v-if="!consentsOk && !editing" class="cform__hint">필수 동의 2개에 체크해 주세요</span>
+      <el-button
+        type="primary"
+        size="large"
+        native-type="submit"
+        :loading="saving"
+        :disabled="lockUntilConsent && !consentsOk"
+      >
+        <template v-if="editing">{{ saving ? '저장 중…' : '저장' }}</template>
+        <template v-else>{{ saving ? '등록 중…' : '등록' }}</template>
       </el-button>
     </div>
   </form>
@@ -362,57 +417,6 @@ defineExpose({ isDirty, submit })
 .cform {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-.cform__group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.cform__title {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  font-weight: var(--font-weight-semibold);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 6px;
-}
-.cform__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 16px;
-}
-.cform__row > .cfield {
-  flex: 1 1 200px;
-}
-.cform__row > .cfield--narrow {
-  flex: 0 1 120px;
-}
-.cfield {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.cfield--muted {
-  color: var(--color-text-muted);
-}
-.cfield__label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-.cfield__label em,
-.cform em {
-  margin-left: 4px;
-  font-style: normal;
-  font-weight: var(--font-weight-regular);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-}
-.cfield__error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--font-size-sm);
 }
 .cform__dup {
   display: flex;
@@ -420,41 +424,46 @@ defineExpose({ isDirty, submit })
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
   border-radius: 6px;
   background: var(--el-color-warning-light-9);
-  border: 1px solid var(--el-color-warning-light-5);
+  color: var(--color-warning);
 }
-.cform__consent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.cfield__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
 }
 .cform__consent-text {
   padding: 10px 12px;
   border-radius: 6px;
   background: var(--color-subtle);
   font-size: var(--font-size-sm);
-  line-height: 1.6;
 }
 .cform__consent-text p {
-  margin: 0;
+  margin: 0 0 4px;
 }
-.cform__inline {
-  display: flex;
-  gap: 8px 16px;
-  flex-wrap: wrap;
+.cform__phone {
+  max-width: 280px;
+}
+.cform__staff {
+  max-width: 280px;
+}
+.cform__year {
+  max-width: 120px;
+}
+.cform__md {
+  width: 96px;
 }
 .cform__more {
   align-self: flex-start;
+  margin: 8px 0;
   padding-left: 0;
-}
-.cform__md {
-  width: 100px;
 }
 .cform__address {
   display: grid;
-  grid-template-columns: 120px 160px 1fr;
+  grid-template-columns: 130px 160px minmax(0, 1fr);
   gap: 8px;
 }
 .cform__size {
@@ -462,33 +471,40 @@ defineExpose({ isDirty, submit })
   align-items: flex-start;
   gap: 12px;
 }
+.cform__size + .cform__size {
+  margin-top: 6px;
+}
 .cform__size-label {
   flex: 0 0 48px;
   padding-top: 4px;
-  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 .cform__hint {
   margin: 0;
-  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 .cform__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
   flex-wrap: wrap;
-  padding-top: 8px;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--color-border);
 }
-
 @media (max-width: 767.98px) {
   .cform__address {
     grid-template-columns: 1fr 1fr;
   }
   .cform__detail {
     grid-column: 1 / -1;
+  }
+  .cform__phone,
+  .cform__staff {
+    max-width: none;
   }
   .cform__actions .el-button {
     flex: 1;

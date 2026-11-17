@@ -74,7 +74,13 @@ export const gradeReasonLabels = {
   REVOKE: '승급 취소',
 }
 
-export const noteTypeLabels = { CONSULT: '상담', PURCHASE: '구매', CALL: '연락', ETC: '기타' }
+export const noteTypeLabels = {
+  CONSULT: '상담',
+  PURCHASE: '구매',
+  CALL: '연락',
+  RESERVATION: '예약',
+  ETC: '기타',
+}
 export const callResultLabels = { COMPLETED: '통화 완료', ABSENT: '부재', RECALL: '재연락' }
 export const channelLabels = { CALL: '전화', SMS: '문자', KAKAO: '카톡' }
 export const followUpStatusLabels = {

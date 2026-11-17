@@ -6,6 +6,7 @@ import CustomerSearch from '@/components/CustomerSearch.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import CustomerForm from '@/components/CustomerForm.vue'
+import PurchaseTab from '@/components/customer/PurchaseTab.vue'
 import { getCustomerForSale, getDailySummary, getStaff, createSale } from '@/api/sales'
 import { defaultLineAmount, recalcLines, totals } from '@/features/sale/saleAmount'
 import { formatWon, itemTypeLabels, sizeLabel, todayLabel } from '@/utils/format'
@@ -123,6 +124,8 @@ async function onUseExisting(customerId) {
   await selectCustomer({ id: customerId })
 }
 
+const historyOpen = ref(false)
+
 // ---- 판매 시각 (오늘 0시 이후, 지금보다 이른 시각) ----
 const editingTime = ref(false)
 function disabledHours() {
@@ -228,7 +231,7 @@ function resetAll() {
 
 // Ctrl+Enter = 저장, 확인 창에서 Enter = 저장
 function onKeydown(e) {
-  if (mode.value !== 'PURCHASE' || registerOpen.value) return
+  if (mode.value !== 'PURCHASE' || registerOpen.value || historyOpen.value) return
   if (confirmOpen.value && e.key === 'Enter' && !e.isComposing) {
     e.preventDefault()
     save()
@@ -267,7 +270,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <p>F1 다음 단계에서 만듭니다. 회원의 구매 목록에서 상품명으로 찾아 영수증의 줄을 고릅니다.</p>
     </section>
 
-    <div v-else class="sale__body">
+    <!-- 폰(매장폰): 단계 카드를 위에서 아래로 (지금 그대로) -->
+    <div v-else-if="isPhone" class="sale__body">
       <!-- 왼쪽: 입력 (Tab 순서대로) -->
       <div class="sale__form">
         <section class="card field">
@@ -441,6 +445,222 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </el-button>
       </aside>
     </div>
+
+    <!-- PC: 기존 매장 POS 판매등록 배치 (2026-11-12). 왼쪽 입력·담은 상품, 오른쪽 고객 정보·결제 -->
+    <div v-else class="pos">
+      <div class="pos__main">
+        <div class="ftable">
+          <div class="ft-label">판매일자</div>
+          <div class="ft-value">{{ todayLabel() }}</div>
+          <label class="ft-label is-required" for="seller">판매 사원</label>
+          <div class="ft-value">
+            <StaffSelect
+              id="seller"
+              ref="staffSelectRef"
+              v-model="sellerId"
+              placeholder="판매 사원을 고르세요"
+            />
+            <p v-if="errors.seller" class="field__error">{{ errors.seller }}</p>
+          </div>
+          <div class="ft-label">판매 시각</div>
+          <div class="ft-value ft-wide">
+            <div class="ft-inline">
+              <template v-if="!editingTime">
+                <span>{{ soldAtLabel }}</span>
+                <el-button link type="primary" @click="editingTime = true">시각 바꾸기</el-button>
+              </template>
+              <template v-else>
+                <el-time-picker
+                  v-model="soldAt"
+                  format="HH:mm"
+                  placeholder="시:분"
+                  :disabled-hours="disabledHours"
+                  :disabled-minutes="disabledMinutes"
+                />
+                <el-button link @click="((soldAt = null), (editingTime = false))"
+                  >지금으로</el-button
+                >
+              </template>
+            </div>
+            <p v-if="errors.soldAt" class="field__error">{{ errors.soldAt }}</p>
+          </div>
+        </div>
+
+        <ProductPicker layout="row" @add="addLine" />
+
+        <!-- 담은 상품 표 -->
+        <div class="pos__lines" role="table" aria-label="담은 상품">
+          <div class="pos__row pos__row--head" role="row">
+            <span role="columnheader">구분</span>
+            <span role="columnheader">품번</span>
+            <span role="columnheader">상품명</span>
+            <span role="columnheader">색상</span>
+            <span role="columnheader">사이즈</span>
+            <span role="columnheader" class="num">정가</span>
+            <span role="columnheader" class="num">수량</span>
+            <span role="columnheader" class="num">결제 금액</span>
+            <span role="columnheader">착용자</span>
+            <span role="columnheader">삭제</span>
+          </div>
+          <div v-if="!lines.length" class="pos__empty">
+            품번이나 상품명으로 찾아 [담기]를 누르면 여기에 나옵니다
+          </div>
+          <div v-for="line in lines" :key="line.key" class="pos__row" role="row">
+            <span>구매</span>
+            <span>{{ line.productCode ?? '직접' }}</span>
+            <span class="pos__name">{{ line.productName }}</span>
+            <span>{{ line.color ?? '-' }}</span>
+            <span>{{ sizeLabel(line.size, line.itemType, line.target) }}</span>
+            <span class="num">{{ line.listPrice ? formatWon(line.listPrice) : '-' }}</span>
+            <span class="num">
+              <el-input-number
+                :model-value="line.qty"
+                :min="1"
+                :max="99"
+                size="small"
+                class="pos__qty"
+                aria-label="수량"
+                @update:model-value="(v) => changeQty(line, v ?? 1)"
+              />
+            </span>
+            <span class="num pos__amount">
+              <el-input-number
+                :model-value="line.lineAmount"
+                :min="0"
+                :step="1000"
+                :controls="false"
+                size="small"
+                placeholder="결제 금액"
+                aria-label="결제 금액"
+                @update:model-value="(v) => changeAmount(line, v)"
+              />
+              <span v-if="line.edited" class="tag-edited">고침</span>
+            </span>
+            <span>
+              <el-select
+                v-if="hasMembers"
+                v-model="line.memberId"
+                placeholder="본인"
+                clearable
+                size="small"
+                class="pos__wearer"
+              >
+                <el-option
+                  v-for="m in customer.members"
+                  :key="m.id"
+                  :label="m.label"
+                  :value="m.id"
+                />
+              </el-select>
+              <span v-else class="muted">-</span>
+            </span>
+            <span>
+              <el-button link type="danger" aria-label="삭제" @click="removeLine(line.key)"
+                >✕</el-button
+              >
+            </span>
+          </div>
+          <div class="pos__row pos__row--total" role="row">
+            <span class="pos__total-label">합계</span>
+            <span class="num">{{ sum.qty }}개</span>
+            <span class="num">{{ formatWon(sum.amount) }}</span>
+            <span />
+          </div>
+        </div>
+        <p v-if="errors.lines" class="field__error">{{ errors.lines }}</p>
+
+        <div v-if="customer" class="ftable">
+          <label class="ft-label" for="memo">응대 메모</label>
+          <div class="ft-value ft-wide">
+            <el-input
+              id="memo"
+              v-model="memo"
+              type="textarea"
+              :rows="2"
+              maxlength="1000"
+              show-word-limit
+              placeholder="찾던 상품, 다음에 관심 있는 것 등"
+            />
+          </div>
+        </div>
+      </div>
+
+      <aside class="pos__side" aria-label="고객 정보와 결제">
+        <div class="ftable ftable--2">
+          <div class="ft-caption">고객 정보</div>
+          <template v-if="customer">
+            <div class="ft-label">고객명</div>
+            <div class="ft-value">
+              <div class="ft-inline">
+                <strong>{{ customer.name }}</strong>
+                <el-button link size="small" class="pos__change" @click="clearCustomer"
+                  >바꾸기</el-button
+                >
+              </div>
+            </div>
+            <div class="ft-label">연락처</div>
+            <div class="ft-value">{{ customer.phoneMasked }}</div>
+            <div class="ft-label">매장 단골 등급</div>
+            <div class="ft-value">
+              <div class="ft-inline"><GradeBadge :grade="customer.grade.current" /></div>
+            </div>
+            <div class="ft-label">등급 할인</div>
+            <div class="ft-value">
+              <span v-if="discountRate" class="pos__discount">{{ discountRate }}% 대상</span>
+              <span v-else class="muted">없음</span>
+            </div>
+          </template>
+          <div v-else class="ft-value ft-full pos__search">
+            <CustomerSearch
+              ref="customerSearchRef"
+              @select="selectCustomer"
+              @register="openRegister"
+              @non-member="ElMessage.info('비회원으로 기록합니다')"
+            />
+            <p class="non-member">비회원 · 고객등록하면 등급 할인을 받을 수 있어요</p>
+          </div>
+        </div>
+        <div class="pos__cbtns">
+          <el-button @click="customer ? clearCustomer() : customerSearchRef?.focus()"
+            >고객 검색</el-button
+          >
+          <el-button :disabled="!customer" @click="historyOpen = true">구매이력</el-button>
+          <el-button @click="openRegister">고객 등록</el-button>
+        </div>
+
+        <div class="ftable ftable--2">
+          <div class="ft-caption">결제 내역</div>
+          <div class="ft-label">판매 사원</div>
+          <div class="ft-value">{{ sellerName ?? '-' }}</div>
+          <div class="ft-label">수량</div>
+          <div class="ft-value">{{ sum.qty }}개</div>
+          <div class="ft-label">결제 금액</div>
+          <div class="ft-value pos__sum">{{ formatWon(sum.amount) }}</div>
+        </div>
+        <el-button
+          type="primary"
+          size="large"
+          class="sale__save"
+          :disabled="dayClosed"
+          :loading="saving"
+          @click="requestSave"
+        >
+          {{ saving ? '저장 중…' : '저장' }}
+          <span class="sale__shortcut">Ctrl+Enter</span>
+        </el-button>
+      </aside>
+    </div>
+
+    <!-- 구매이력 (기존 POS의 [구매내역]) -->
+    <el-dialog
+      v-model="historyOpen"
+      :title="customer ? `${customer.name}님 구매이력` : '구매이력'"
+      width="min(880px, 96vw)"
+      align-center
+      destroy-on-close
+    >
+      <PurchaseTab v-if="customer" :customer-id="customer.id" />
+    </el-dialog>
 
     <!-- 저장 확인 창 -->
     <el-dialog
@@ -747,6 +967,120 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   font-size: var(--font-size-lg);
 }
 .confirm__total {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ---- PC: 기존 매장 POS 판매등록 배치 ---- */
+.pos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+.pos__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.pos__main .ftable + .ftable {
+  margin-top: 0;
+}
+.pos__lines {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.pos__row {
+  display: grid;
+  grid-template-columns: 36px 56px minmax(120px, 1fr) 64px 64px 88px 96px 140px 92px 32px;
+  align-items: center;
+  gap: 8px;
+  min-width: 860px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.pos__row--head {
+  border-top: 0;
+  background: var(--color-subtle);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+}
+.pos__row--total {
+  background: var(--color-subtle);
+  font-weight: var(--font-weight-semibold);
+}
+.pos__total-label {
+  grid-column: 1 / 7;
+  text-align: center;
+}
+.pos__row .num {
+  text-align: right;
+  justify-self: end;
+}
+.pos__name {
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pos__qty {
+  width: 92px;
+}
+.pos__amount {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pos__amount :deep(.el-input-number) {
+  width: 100px;
+}
+.pos__amount :deep(input) {
+  text-align: right;
+}
+.pos__wearer {
+  width: 88px;
+}
+.pos__empty {
+  min-width: 860px;
+  padding: 28px 12px;
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.pos__side {
+  position: sticky;
+  top: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pos__side .ftable + .ftable {
+  margin-top: 0;
+}
+.pos__search {
+  gap: 8px;
+}
+.pos__discount {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+.pos__change {
+  margin-left: auto;
+}
+.pos__cbtns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.pos__cbtns .el-button {
+  margin: 0;
+}
+.pos__sum {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
 }

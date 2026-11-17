@@ -11,6 +11,7 @@
  * @property {number|null} storeId
  * @property {string|null} storeCode
  * @property {string|null} storeName
+ * @property {string} loginId 가짜 로그인 화면(F13 초안)에서 쓰는 아이디
  */
 
 /** @type {Me[]} */
@@ -23,6 +24,7 @@ export const fakeAccounts = [
     storeId: 1,
     storeCode: 'GN01',
     storeName: '강남점',
+    loginId: 'gn01',
   },
   {
     id: 17,
@@ -32,6 +34,7 @@ export const fakeAccounts = [
     storeId: 1,
     storeCode: 'GN01',
     storeName: '강남점',
+    loginId: 'gn01-jieun',
   },
   {
     id: 1,
@@ -41,5 +44,16 @@ export const fakeAccounts = [
     storeId: null,
     storeCode: null,
     storeName: null,
+    loginId: 'hq-yuna',
+  },
+  {
+    id: 3,
+    name: '강남점 키오스크',
+    role: 'KIOSK',
+    managerSlot: null,
+    storeId: 1,
+    storeCode: 'GN01',
+    storeName: '강남점',
+    loginId: 'gn01-kiosk',
   },
 ]
