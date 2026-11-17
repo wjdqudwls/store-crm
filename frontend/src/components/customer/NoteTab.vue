@@ -3,7 +3,9 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
 import ChoiceButtons from '@/components/ChoiceButtons.vue'
+import ReminderFields from '@/components/ReminderFields.vue'
 import { createNote, deleteNote, getNotes, updateNote } from '@/api/customers'
+import { getStaff } from '@/api/sales'
 import { useSessionStore } from '@/stores/session'
 import {
   callResultLabels,
@@ -29,6 +31,7 @@ onMounted(load)
 const typeOptions = [
   { value: 'CONSULT', label: '상담' },
   { value: 'CALL', label: '연락' },
+  { value: 'RESERVATION', label: '예약' },
   { value: 'ETC', label: '기타' },
 ]
 const resultOptions = Object.entries(callResultLabels).map(([value, label]) => ({ value, label }))
@@ -40,6 +43,9 @@ const blank = () => ({
   staffId: null,
   callResult: null,
   channel: null,
+  reminderOn: false,
+  reminderDate: null,
+  reminderStaffId: null,
 })
 const draft = reactive(blank())
 const errors = ref({})
@@ -52,7 +58,10 @@ function validate() {
   if (draft.type === 'CALL') {
     if (!draft.callResult) e.callResult = '연락 결과를 골라 주세요'
     if (!draft.channel) e.channel = '채널을 골라 주세요'
+    if (draft.callResult === 'RECALL' && draft.reminderOn && !draft.reminderDate)
+      e.reminder = '다시 연락할 날을 골라 주세요'
   }
+  if (draft.type === 'RESERVATION' && !draft.reminderDate) e.reminder = '방문 날짜를 골라 주세요'
   return e
 }
 
@@ -65,15 +74,38 @@ async function save() {
     if (session.isStore) body.staffId = draft.staffId
     if (draft.type === 'CALL')
       Object.assign(body, { callResult: draft.callResult, channel: draft.channel })
+    const wantsReminder =
+      draft.type === 'RESERVATION' ||
+      (draft.type === 'CALL' && draft.callResult === 'RECALL' && draft.reminderOn)
+    if (wantsReminder) {
+      body.reminder = { date: draft.reminderDate, staffId: draft.reminderStaffId ?? undefined }
+    }
     await createNote(props.customerId, body)
     Object.assign(draft, blank())
-    ElMessage.success('메모를 남겼습니다')
+    ElMessage.success(
+      body.reminder
+        ? `메모를 남겼습니다. ${body.reminder.date}에 맞춰 알림이 갑니다`
+        : '메모를 남겼습니다',
+    )
     await load()
   } catch (e) {
     ElMessage.error(e?.body?.message ?? '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요')
   } finally {
     saving.value = false
   }
+}
+
+const staffOf = (id) => staffList.value.find((x) => x.id === id)?.name
+const writerName = computed(() =>
+  session.isStore ? (staffOf(draft.staffId) ?? '') : session.me.name,
+)
+const staffList = ref([])
+onMounted(async () => {
+  staffList.value = await getStaff()
+})
+function shortDate(ymd) {
+  const [, m, d] = ymd.split('-').map(Number)
+  return `${m}/${d}`
 }
 
 // ---- 수정·삭제 (editable인 메모만, MEM-03) ----
@@ -104,40 +136,89 @@ async function remove(n) {
   await load()
 }
 
-const typeTag = { CONSULT: 'primary', PURCHASE: 'success', CALL: 'warning', ETC: 'info' }
+const typeTag = {
+  RESERVATION: 'danger',
+  CONSULT: 'primary',
+  PURCHASE: 'success',
+  CALL: 'warning',
+  ETC: 'info',
+}
 </script>
 
 <template>
   <div class="ntab">
     <form v-if="canWrite" class="nform" @submit.prevent="save">
-      <div class="nform__row">
-        <ChoiceButtons v-model="draft.type" :options="typeOptions" size="small" />
-        <div v-if="session.isStore" class="nform__staff">
-          <StaffSelect v-model="draft.staffId" placeholder="작성 직원" />
-          <p v-if="errors.staffId" class="nform__error">{{ errors.staffId }}</p>
+      <div class="ftable">
+        <div class="ft-caption">메모 쓰기</div>
+        <div class="ft-label is-required">유형</div>
+        <div class="ft-value">
+          <ChoiceButtons v-model="draft.type" :options="typeOptions" size="small" />
         </div>
-        <span v-else class="nform__me">작성 {{ session.me.name }}</span>
+        <div class="ft-label" :class="{ 'is-required': session.isStore }">작성 직원</div>
+        <div class="ft-value">
+          <template v-if="session.isStore">
+            <StaffSelect v-model="draft.staffId" placeholder="작성 직원" />
+            <p v-if="errors.staffId" class="field-error">{{ errors.staffId }}</p>
+          </template>
+          <span v-else>{{ session.me.name }}</span>
+        </div>
+        <template v-if="draft.type === 'CALL'">
+          <div class="ft-label is-required">연락 결과</div>
+          <div class="ft-value">
+            <ChoiceButtons v-model="draft.callResult" :options="resultOptions" size="small" />
+            <p v-if="errors.callResult" class="field-error">{{ errors.callResult }}</p>
+          </div>
+          <div class="ft-label is-required">채널</div>
+          <div class="ft-value">
+            <ChoiceButtons v-model="draft.channel" :options="channelOptions" size="small" />
+            <p v-if="errors.channel" class="field-error">{{ errors.channel }}</p>
+          </div>
+          <template v-if="draft.callResult === 'RECALL'">
+            <div class="ft-label">다시 연락할 날</div>
+            <div class="ft-value ft-wide">
+              <ReminderFields
+                v-model:enabled="draft.reminderOn"
+                v-model:date="draft.reminderDate"
+                v-model:staff-id="draft.reminderStaffId"
+                toggle-label="날짜 정하고 알림 받기"
+                date-placeholder="다시 연락할 날"
+                :writer-name="writerName"
+                :error="errors.reminder"
+              />
+            </div>
+          </template>
+        </template>
+        <template v-if="draft.type === 'RESERVATION'">
+          <div class="ft-label is-required">방문 날짜</div>
+          <div class="ft-value ft-wide">
+            <ReminderFields
+              v-model:date="draft.reminderDate"
+              v-model:staff-id="draft.reminderStaffId"
+              required
+              date-placeholder="방문 날짜"
+              :writer-name="writerName"
+              :error="errors.reminder"
+            />
+          </div>
+        </template>
+        <label class="ft-label is-required" for="note-content">내용</label>
+        <div class="ft-value ft-wide">
+          <el-input
+            id="note-content"
+            v-model="draft.content"
+            type="textarea"
+            :rows="3"
+            maxlength="1000"
+            show-word-limit
+            :placeholder="
+              draft.type === 'RESERVATION'
+                ? '방문 이유 (예: 코트 소매 수선 맡기러 옴)'
+                : '상담 내용, 고객 취향, 다음에 권할 것'
+            "
+          />
+          <p v-if="errors.content" class="field-error">{{ errors.content }}</p>
+        </div>
       </div>
-      <div v-if="draft.type === 'CALL'" class="nform__row">
-        <div>
-          <ChoiceButtons v-model="draft.callResult" :options="resultOptions" size="small" />
-          <p v-if="errors.callResult" class="nform__error">{{ errors.callResult }}</p>
-        </div>
-        <div>
-          <ChoiceButtons v-model="draft.channel" :options="channelOptions" size="small" />
-          <p v-if="errors.channel" class="nform__error">{{ errors.channel }}</p>
-        </div>
-      </div>
-      <el-input
-        v-model="draft.content"
-        type="textarea"
-        :rows="3"
-        maxlength="1000"
-        show-word-limit
-        placeholder="상담 내용, 고객 취향, 다음에 권할 것"
-        aria-label="메모 내용"
-      />
-      <p v-if="errors.content" class="nform__error">{{ errors.content }}</p>
       <div class="nform__actions">
         <el-button type="primary" native-type="submit" :loading="saving">
           {{ saving ? '저장 중…' : '메모 남기기' }}
@@ -155,6 +236,9 @@ const typeTag = { CONSULT: 'primary', PURCHASE: 'success', CALL: 'warning', ETC:
           </el-tag>
           <span v-if="n.callResult" class="note__call">
             {{ callResultLabels[n.callResult] }} · {{ channelLabels[n.channel] }}
+          </span>
+          <span v-if="n.reminderDate" class="note__reminder">
+            {{ n.type === 'RESERVATION' ? '방문' : '다시 연락' }} {{ shortDate(n.reminderDate) }}
           </span>
           <span class="note__staff">{{ n.staffName }}</span>
           <span class="note__date">
@@ -188,10 +272,6 @@ const typeTag = { CONSULT: 'primary', PURCHASE: 'success', CALL: 'warning', ETC:
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background: var(--color-subtle);
 }
 .nform__row {
   display: flex;
@@ -242,6 +322,13 @@ const typeTag = { CONSULT: 'primary', PURCHASE: 'success', CALL: 'warning', ETC:
   flex-wrap: wrap;
   gap: 4px 10px;
   font-size: var(--font-size-sm);
+}
+.note__reminder {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--el-color-danger-light-9);
+  color: var(--color-danger);
+  font-weight: var(--font-weight-semibold);
 }
 .note__call {
   font-weight: var(--font-weight-semibold);

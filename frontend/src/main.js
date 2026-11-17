@@ -3,6 +3,11 @@ import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import ko from 'element-plus/es/locale/lang/ko'
+import dayjs from 'dayjs'
+import 'dayjs/locale/ko'
+
+// 날짜 고르기의 요일·달 이름도 한국어로
+dayjs.locale('ko')
 
 // 글꼴 파일은 앱에 넣는다. 화면에서 쓰는 4가지 굵기만 (05 1.7)
 import '@fontsource/ibm-plex-sans-kr/400.css'
@@ -14,6 +19,7 @@ import '@fontsource/ibm-plex-sans-kr/700.css'
 import './styles/tokens.css'
 import './styles/element-theme.css'
 import './styles/base.css'
+import './styles/page.css'
 
 import App from './App.vue'
 import router from './router'

@@ -1,13 +1,7 @@
 import { fakeResponse, fakeError } from './fake'
 import { customers, staff, gradeDiscounts } from '@/mocks/data'
-import {
-  customerDetails,
-  purchases,
-  gradeHistory,
-  notes,
-  followUps,
-  members,
-} from '@/mocks/customerDetail'
+import { customerDetails, gradeHistory, notes, followUps, members } from '@/mocks/customerDetail'
+import { sales } from '@/mocks/sales'
 import { useSessionStore } from '@/stores/session'
 
 /**
@@ -67,6 +61,50 @@ export function createCustomer(body) {
     marketing: { sms: body.agreements.marketingSms, kakao: body.agreements.marketingKakao },
   }
   return fakeResponse({ id: created.id, name: created.name, phoneMasked: created.phoneMasked }, 300)
+}
+
+/**
+ * PATCH /customers/{id} (CUS-04): 프로필·담당 직원·마케팅 수신. 매장 계정·본사만.
+ * 바꾼 번호가 다른 고객 것이면 409 CUSTOMER_PHONE_DUPLICATED (그 고객 이름·뒷자리).
+ */
+export function updateCustomer(id, body) {
+  if (!['STORE', 'HQ'].includes(me().role)) {
+    return fakeError(403, 'ACCESS_DENIED', '이 계정으로는 할 수 없는 일입니다.')
+  }
+  const c = customers.find((x) => x.id === id)
+  if (!c) return fakeError(404, 'CUSTOMER_NOT_FOUND', '고객을 찾을 수 없습니다.')
+  const dup = customers.find((x) => x.id !== id && phoneKey(x.phone) === phoneKey(body.phone))
+  if (dup) {
+    return fakeError(409, 'CUSTOMER_PHONE_DUPLICATED', '이미 다른 고객의 번호입니다.', {
+      details: { customerId: dup.id, name: dup.name, phoneMasked: dup.phoneMasked },
+    })
+  }
+  const st = staff.find((s) => s.id === body.staffId) ?? null
+  Object.assign(c, {
+    name: body.name ?? body.nameEn,
+    phone: body.phone,
+    phoneMasked: `****-${phoneKey(body.phone).slice(-4)}`,
+    staffName: st?.name ?? null,
+  })
+  const d = (customerDetails[id] ??= {})
+  Object.assign(d, {
+    nationality: body.nationality,
+    nameEn: body.nameEn ?? null,
+    staff: st ? { id: st.id, name: st.name } : null,
+    profile: {
+      gender: body.gender ?? null,
+      birthYear: body.birthYear ?? null,
+      birthMd: body.birthMd ?? null,
+      regionSido: body.address?.sido ?? null,
+      regionGu: body.address?.gu ?? null,
+      preferredItemTypes: body.preferredItemTypes ?? [],
+      sizes: body.sizes ?? {},
+      contactChannel: body.contactChannel ?? null,
+    },
+    addressDetail: body.address?.detail ?? null,
+    marketing: { ...body.marketing },
+  })
+  return getCustomer(id)
 }
 
 // ---- 고객 검색·상세 (05 SCR-06) ----
@@ -159,9 +197,17 @@ export function getCustomer(id, { includeAddress = false } = {}) {
 /** GET /customers/{id}/purchases?keyword= (03 4.12) */
 export function getPurchases(id, keyword = '') {
   const q = keyword.trim().toLowerCase()
-  const list = (purchases[id] ?? [])
+  // 판매 목록에서 이 고객의 영수증만 (기록 취소 제외, 최신순). 실제로는 sales 모듈이 준다 (03 3.3)
+  const list = sales
+    .filter((s) => s.customerId === id && s.status !== 'VOIDED')
     .map((p) => ({
-      ...p,
+      saleId: p.id,
+      receiptNo: p.receiptNo,
+      soldAt: p.soldAt,
+      storeName: p.store.name,
+      kind: p.kind,
+      status: p.status,
+      totalAmount: p.totalAmount,
       lines: p.lines.filter(
         (l) =>
           !q ||
@@ -181,6 +227,68 @@ export function getGradeHistory(id) {
 /** GET /customers/{id}/members */
 export function getMembers(id) {
   return fakeResponse(members[id] ?? [])
+}
+
+const relations = ['SPOUSE', 'CHILD', 'PARENT', 'OTHER']
+function checkMember(body) {
+  const fieldErrors = []
+  if (!body.nickname?.trim())
+    fieldErrors.push({ field: 'nickname', reason: '호칭을 입력해 주세요.' })
+  if (!relations.includes(body.relation))
+    fieldErrors.push({ field: 'relation', reason: '관계를 골라 주세요.' })
+  return fieldErrors.length
+    ? fakeError(400, 'VALIDATION_FAILED', '입력값을 확인해 주세요.', { fieldErrors })
+    : null
+}
+const storeOnly = () =>
+  me().role === 'STORE'
+    ? null
+    : fakeError(403, 'ACCESS_DENIED', '이 계정으로는 할 수 없는 일입니다.')
+
+/** 판매 기록의 착용자 목록(data.js customers[].members)도 같이 맞춘다 */
+function syncWearers(customerId) {
+  const c = customers.find((x) => x.id === customerId)
+  if (c) c.members = (members[customerId] ?? []).map((m) => ({ id: m.id, label: m.nickname }))
+}
+
+/** POST /customers/{id}/members (CUS-05, 매장 계정) */
+export function createMember(customerId, body) {
+  const err = storeOnly() ?? checkMember(body)
+  if (err) return err
+  const m = { id: Date.now(), ...body, nickname: body.nickname.trim() }
+  members[customerId] = [...(members[customerId] ?? []), m]
+  syncWearers(customerId)
+  return fakeResponse(m, 250)
+}
+
+function findMember(memberId) {
+  for (const [cid, list] of Object.entries(members)) {
+    const m = list.find((x) => x.id === memberId)
+    if (m) return { cid: Number(cid), m }
+  }
+  return null
+}
+
+/** PATCH /members/{memberId} */
+export function updateMember(memberId, body) {
+  const err = storeOnly() ?? checkMember(body)
+  if (err) return err
+  const found = findMember(memberId)
+  if (!found) return fakeError(404, 'MEMBER_NOT_FOUND', '가족 구성원을 찾을 수 없습니다.')
+  Object.assign(found.m, body, { nickname: body.nickname.trim() })
+  syncWearers(found.cid)
+  return fakeResponse(found.m, 250)
+}
+
+/** DELETE /members/{memberId}. 과거 판매의 착용자 호칭은 남는다 */
+export function deleteMember(memberId) {
+  const err = storeOnly()
+  if (err) return err
+  const found = findMember(memberId)
+  if (!found) return fakeError(404, 'MEMBER_NOT_FOUND', '가족 구성원을 찾을 수 없습니다.')
+  members[found.cid] = members[found.cid].filter((x) => x.id !== memberId)
+  syncWearers(found.cid)
+  return fakeResponse(null, 250)
 }
 
 /** 메모를 고치고 지울 수 있는지 (MEM-03): 작성 직원 본인, 그 매장의 매장 계정, 본사 */
@@ -218,9 +326,39 @@ export function createNote(id, body) {
     staffName: staff.find((s) => s.id === author)?.name ?? me().name,
     saleId: null,
     followUpId: body.followUpId ?? null,
+    reminderDate: body.reminder?.date ?? null,
     createdAt: new Date().toISOString(),
     updatedAt: null,
     editable: true,
+  }
+  // 예약(방문 날짜 필수)·재연락(날짜 선택)이면 그날의 할 일을 만든다 (CAL-10·11)
+  if (body.type === 'RESERVATION' && !body.reminder?.date) {
+    return fakeError(400, 'VALIDATION_FAILED', '입력값을 확인해 주세요.', {
+      fieldErrors: [{ field: 'reminderDate', reason: '방문 날짜를 골라 주세요.' }],
+    })
+  }
+  if (body.reminder?.date) {
+    const to = body.reminder.staffId ?? author
+    const kind = body.type === 'RESERVATION' ? 'VISIT' : 'RECALL'
+    followUps[id] = [
+      ...(followUps[id] ?? []),
+      {
+        id: Date.now() + 1,
+        kind,
+        stage: kind === 'VISIT' ? '방문 예정' : '다시 연락',
+        promotional: false,
+        saleId: null,
+        soldAt: null,
+        noteId: note.id,
+        noteContent: note.content,
+        dueDate: body.reminder.date,
+        status: 'OPEN',
+        assignee: 'STAFF',
+        staffId: to,
+        staffName: staff.find((s) => s.id === to)?.name ?? me().name,
+        closedAt: null,
+      },
+    ]
   }
   notes[id] = [note, ...(notes[id] ?? [])]
   return fakeResponse(note, 250)
@@ -296,9 +434,137 @@ export async function completeFollowUp(taskId, body) {
   return fakeResponse({ ...found.t }, 250)
 }
 
+/** POST /follow-ups/{id}/visited: 방문 예약 할 일을 '방문함'으로 완료 (CAL-10) */
+export function completeVisit(taskId) {
+  const { found, error } = closeTask(taskId, 'DONE')
+  if (error) return error
+  return fakeResponse({ ...found.t }, 250)
+}
+
+/** 받는 직원의 할 일 전부 (알림 묶음 계산용, 서버에서는 스케줄러가 읽는다) */
+export function tasksOfStaff(staffId) {
+  const out = []
+  for (const [cid, tasks] of Object.entries(followUps)) {
+    const c = customers.find((x) => x.id === Number(cid))
+    for (const t of tasks) {
+      if (t.staffId === staffId)
+        out.push({ ...t, kind: t.kind ?? 'SALE', customerId: c.id, customerName: c.name })
+    }
+  }
+  return out
+}
+
 /** POST /follow-ups/{id}/skip */
 export function skipFollowUp(taskId) {
   const { found, error } = closeTask(taskId, 'SKIPPED')
   if (error) return error
   return fakeResponse({ ...found.t }, 250)
+}
+
+// ---- 오늘 할 일 · 콜리스트 (05 SCR-07) ----
+
+const todayText = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const dayDiff = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000)
+
+/**
+ * GET /follow-ups/today (03 4.7): 만기일이 오늘이거나 지난 OPEN 할 일, 만기일 오래된 순.
+ * 직원은 내 할 일, 매장 계정은 매장 전체.
+ */
+export function getToday() {
+  const today = todayText()
+  const list = []
+  for (const [cid, tasks] of Object.entries(followUps)) {
+    const c = customers.find((x) => x.id === Number(cid))
+    const d = customerDetails[cid] ?? {}
+    for (const t of tasks) {
+      if (t.status !== 'OPEN' || t.dueDate > today) continue
+      if (isEmployee() && t.staffId !== me().id) continue
+      list.push({
+        id: t.id,
+        customerId: c.id,
+        customerName: c.name,
+        phoneMasked: c.phoneMasked,
+        grade: c.grade,
+        stage: t.stage,
+        promotional: t.promotional,
+        dueDate: t.dueDate,
+        overdueDays: Math.max(0, dayDiff(today, t.dueDate)),
+        kind: t.kind ?? 'SALE',
+        noteContent: t.noteContent ?? null,
+        saleId: t.saleId,
+        soldAt: t.soldAt,
+        marketingAllowed: Boolean(d.marketing?.sms || d.marketing?.kakao),
+        assignee: t.assignee,
+        staffId: t.staffId,
+        staffName: t.staffName,
+      })
+    }
+  }
+  list.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  return fakeResponse(page(list))
+}
+
+const gradeOrder = ['NORMAL', 'D', 'C', 'B', 'A']
+
+/**
+ * GET /call-list (03 3.3 파라미터). 마지막 방문이 오래된 순.
+ * @param {{ scope?: string, staffId?: number, minGrade?: string, inactiveDays?: number,
+ *   promoOnly?: boolean, target?: string, itemType?: string, memberRelation?: string }} f
+ */
+export function getCallList(f = {}) {
+  const today = todayText()
+  const list = customers
+    .map((c) => {
+      const d = customerDetails[c.id] ?? {}
+      const staffId = d.staff?.id ?? null
+      return {
+        id: c.id,
+        name: c.name,
+        phoneMasked: c.phoneMasked,
+        grade: c.grade,
+        lastVisitAt: c.lastVisitAt,
+        createdAt: d.createdAt ?? null,
+        staffId,
+        staffName: c.staffName,
+        marketingAllowed: Boolean(d.marketing?.sms || d.marketing?.kakao),
+        gender: d.profile?.gender ?? null,
+        preferred: d.profile?.preferredItemTypes ?? [],
+        relations: (members[c.id] ?? []).map((m) => m.relation),
+      }
+    })
+    .filter((c) => f.scope !== 'MINE' || c.staffId === me().id)
+    .filter((c) => !f.staffId || c.staffId === f.staffId)
+    .filter((c) => !f.minGrade || gradeOrder.indexOf(c.grade) >= gradeOrder.indexOf(f.minGrade))
+    .filter((c) => {
+      if (!f.inactiveDays) return true
+      const base = c.lastVisitAt ?? c.createdAt
+      return base && dayDiff(today, base.slice(0, 10)) >= f.inactiveDays
+    })
+    .filter((c) => !f.promoOnly || c.marketingAllowed)
+    .filter(
+      (c) =>
+        !f.target ||
+        (f.target === 'WOMEN' ? c.gender === 'F' : f.target === 'MEN' ? c.gender === 'M' : true),
+    )
+    .filter((c) => !f.itemType || c.preferred.includes(f.itemType))
+    .filter((c) => !f.memberRelation || c.relations.includes(f.memberRelation))
+    .sort((a, b) =>
+      (a.lastVisitAt ?? a.createdAt ?? '').localeCompare(b.lastVisitAt ?? b.createdAt ?? ''),
+    )
+    .map(
+      ({ id, name, phoneMasked, grade, lastVisitAt, createdAt, staffName, marketingAllowed }) => ({
+        id,
+        name,
+        phoneMasked,
+        grade,
+        lastVisitAt,
+        createdAt,
+        staffName,
+        marketingAllowed,
+      }),
+    )
+  return fakeResponse(page(list))
 }

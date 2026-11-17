@@ -77,7 +77,38 @@ function back() {
 
     <template v-else>
       <!-- 상세 머리: 모든 탭 위에 고정 -->
-      <header class="chead cdetail__card">
+      <!-- PC: 기존 POS처럼 라벨 칸 표 -->
+      <header v-if="!isPhone" class="cdetail__card chead-pc">
+        <div class="chead-pc__top">
+          <h1 class="chead__name">{{ customer.name }}</h1>
+        </div>
+        <div class="ftable">
+          <div class="ft-label">휴대폰 번호</div>
+          <div class="ft-value">{{ customer.phone }}</div>
+          <div class="ft-label">매장 단골 등급</div>
+          <div class="ft-value">
+            <div class="ft-inline">
+              <GradeBadge :grade="customer.grade.current" :provisional="provisional" />
+              <span v-if="provisional" class="chead__muted">7/1 확정</span>
+              <span v-if="customer.grade.discountRate" class="chead__discount">
+                할인 {{ customer.grade.discountRate }}% 대상
+              </span>
+            </div>
+          </div>
+          <div class="ft-label">담당 직원</div>
+          <div class="ft-value">{{ customer.staff?.name ?? '없음' }}</div>
+          <div class="ft-label">홍보 연락</div>
+          <div class="ft-value">
+            <div class="ft-inline">
+              <el-tag :type="promo ? 'success' : 'info'" size="small" effect="light">
+                {{ promo ? '가능' : '불가' }}
+              </el-tag>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <header v-else class="chead cdetail__card">
         <div class="chead__line">
           <h1 class="chead__name">{{ customer.name }}</h1>
           <span class="chead__phone">{{ customer.phone }}</span>
@@ -127,7 +158,11 @@ function back() {
               :marketing-allowed="promo"
             />
             <FamilyTab v-else-if="tab === 'family'" :customer-id="customer.id" />
-            <ProfileTab v-else-if="tab === 'profile'" :customer="customer" />
+            <ProfileTab
+              v-else-if="tab === 'profile'"
+              :customer="customer"
+              @updated="load(customer.id)"
+            />
           </div>
         </section>
       </div>
@@ -136,6 +171,11 @@ function back() {
 </template>
 
 <style scoped>
+.chead-pc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .cdetail {
   max-width: 1200px;
   margin: 0 auto;

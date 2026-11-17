@@ -6,6 +6,8 @@ import {
   visibleSizeFields,
   validateRegistration,
   toRegistrationBody,
+  formFromCustomer,
+  toProfilePatch,
 } from './customerForm'
 
 const table = [
@@ -138,5 +140,60 @@ describe('toRegistrationBody (03 4.5, 직원 등록은 staffId)', () => {
     expect(body.nameEn).toBe('Aiko Sato')
     expect(body.name).toBeUndefined()
     expect(body.phone).toBe('+819012345678')
+  })
+})
+
+describe('프로필 수정 (CUS-04)', () => {
+  const detail = {
+    nationality: 'DOMESTIC',
+    name: '김하늘',
+    nameEn: null,
+    phone: '010-2943-4821',
+    staff: { id: 17, name: '이지은' },
+    profile: {
+      gender: 'F',
+      birthYear: 1991,
+      birthMd: '0314',
+      regionSido: '서울',
+      regionGu: '강남구',
+      preferredItemTypes: ['OUTER'],
+      sizes: { top: 'M', outer: '90' },
+      contactChannel: 'KAKAO',
+    },
+    marketing: { sms: true, kakao: false },
+  }
+
+  it('should_fill_form_from_customer_detail', () => {
+    const f = formFromCustomer(detail, '테헤란로 000')
+    expect(f).toMatchObject({
+      name: '김하늘',
+      phone: '010-2943-4821',
+      staffId: 17,
+      birthYear: '1991',
+      birthMonth: 3,
+      birthDay: 14,
+      sido: '서울',
+      gu: '강남구',
+      detail: '테헤란로 000',
+      marketingSms: true,
+      marketingKakao: false,
+      privacy: true,
+      age14: true,
+    })
+    expect(f.sizes).toEqual({ top: 'M', outer: '90', bottom: '', shoes: '' })
+  })
+
+  it('should_send_marketing_and_staff_but_no_consents_in_patch', () => {
+    const body = toProfilePatch(formFromCustomer(detail, null))
+    expect(body.agreements).toBeUndefined()
+    expect(body.marketing).toEqual({ sms: true, kakao: false })
+    expect(body.staffId).toBe(17)
+    expect(body.birthMd).toBe('0314')
+  })
+
+  it('should_clear_staff_when_unset', () => {
+    const f = formFromCustomer(detail, null)
+    f.staffId = null
+    expect(toProfilePatch(f).staffId).toBeNull()
   })
 })

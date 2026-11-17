@@ -1,6 +1,9 @@
+/** 화면의 반응형 값(Proxy)도 복사할 수 있게 JSON으로 깊은 복사 */
+export const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)))
+
 /** 가짜 응답을 진짜 API처럼 조금 늦게, 복사본으로 돌려준다 */
 export function fakeResponse(data, delayMs = 150) {
-  return new Promise((resolve) => setTimeout(() => resolve(structuredClone(data)), delayMs))
+  return new Promise((resolve) => setTimeout(() => resolve(clone(data)), delayMs))
 }
 
 /** 실패 응답 (03 1장 에러 형식). 409 중복처럼 `details`가 있는 에러도 만든다 */

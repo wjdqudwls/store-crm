@@ -16,6 +16,9 @@ export const screens = {
   gradeView: { path: '/settings/grade', label: '기준 보기', task: 'F9' },
   settings: { path: '/settings/grade', label: '설정', task: 'F9' },
   stores: { path: '/hq/stores', label: '매장 목록', task: 'F8' },
+  kiosk: { path: '/kiosk', label: '키오스크 등록', task: 'F5' },
+  password: { path: '/me/password', label: '비밀번호 바꾸기', task: 'F13' },
+  notifySettings: { path: '/me/notifications', label: '알림 설정', task: 'F10' },
 }
 
 const s = screens
@@ -33,7 +36,7 @@ const EMPLOYEE = {
   pc: [s.today, s.callList, s.customers, s.notifications],
   phoneTabs: [s.today, s.callList, s.customers, { ...s.notifications, label: '알림' }],
   phoneMore: [],
-  extra: [],
+  extra: [s.password, s.notifySettings],
   firstPc: s.today,
   firstPhone: s.today,
 }
@@ -42,15 +45,26 @@ const HQ = {
   pc: [s.stores, s.customers, s.callList, s.products, s.settings],
   phoneTabs: [s.stores, s.customers, s.callList],
   phoneMore: [s.products, s.settings],
-  extra: [],
+  extra: [s.password],
   firstPc: s.stores,
   firstPhone: s.stores,
+}
+
+/** 키오스크는 등록 화면 밖으로 나갈 수 없다 (REG-02) */
+const KIOSK = {
+  pc: [],
+  phoneTabs: [],
+  phoneMore: [],
+  extra: [s.kiosk],
+  firstPc: s.kiosk,
+  firstPhone: s.kiosk,
 }
 
 /** @param {import('../mocks/accounts').Role} role */
 export function menuFor(role) {
   if (role === 'STORE') return STORE
   if (role === 'HQ') return HQ
+  if (role === 'KIOSK') return KIOSK
   return EMPLOYEE
 }
 

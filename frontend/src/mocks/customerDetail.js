@@ -3,6 +3,13 @@
  * 고객 목록의 기본 정보는 data.js의 customers에 있고, 여기는 상세에만 쓰는 값이다.
  */
 
+/** 오늘에서 n일 전 `2026-11-10` (데모를 언제 열어도 오늘 할 일이 보이게) */
+function daysAgo(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const grade = (current, computed, confirmed, season, basis, discountRate) => ({
   current,
   computed,
@@ -178,94 +185,6 @@ export const customerDetails = {
   },
 }
 
-const line = (lineId, productCode, productName, color, size, qty, lineAmount, more = {}) => ({
-  lineId,
-  productCode,
-  productName,
-  color,
-  size,
-  qty,
-  lineAmount,
-  returnedQty: 0,
-  returnedAmount: 0,
-  wearerLabel: null,
-  ...more,
-})
-
-/** GET /customers/{id}/purchases 항목 (영수증 단위, 최신순) */
-export const purchases = {
-  1024: [
-    {
-      saleId: 88231,
-      receiptNo: 'GN01-20261015-0012',
-      soldAt: '2026-10-15T14:03:00+09:00',
-      storeName: '강남점',
-      kind: 'NORMAL',
-      status: 'PARTIAL_RETURNED',
-      totalAmount: 991860,
-      lines: [
-        line(1, 'D2110', '울 블렌드 롱코트', '차콜', '90', 1, 774060),
-        line(2, null, '캐시미어 머플러', '오트밀', 'FREE', 1, 217800, {
-          returnedQty: 1,
-          returnedAmount: 217800,
-          wearerLabel: '남편',
-        }),
-      ],
-    },
-    {
-      saleId: 86120,
-      receiptNo: 'GN01-20260712-0004',
-      soldAt: '2026-07-12T16:40:00+09:00',
-      storeName: '강남점',
-      kind: 'NORMAL',
-      status: 'COMPLETED',
-      totalAmount: 1428000,
-      lines: [
-        line(1, 'D3305', '린넨 셔츠 원피스', '아이보리', 'M', 1, 279000),
-        line(2, 'K1102', '아동 데님 점퍼', '인디고', '8', 1, 149000, { wearerLabel: '딸' }),
-        line(3, 'D2204', '라이트 트렌치코트', '베이지', '90', 1, 1000000),
-      ],
-    },
-    {
-      saleId: 84077,
-      receiptNo: 'SC02-20260405-0021',
-      soldAt: '2026-04-05T12:15:00+09:00',
-      storeName: '서초점',
-      kind: 'NORMAL',
-      status: 'COMPLETED',
-      totalAmount: 1000140,
-      lines: [
-        line(1, 'D4120', '울 와이드 팬츠', '블랙', '26', 2, 556140),
-        line(2, 'S0710', '레더 로퍼', '브라운', '240', 1, 444000),
-      ],
-    },
-  ],
-  1187: [
-    {
-      saleId: 88402,
-      receiptNo: 'GN01-20261108-0009',
-      soldAt: '2026-11-08T16:20:00+09:00',
-      storeName: '강남점',
-      kind: 'NORMAL',
-      status: 'COMPLETED',
-      totalAmount: 1515250,
-      lines: [line(1, 'M2010', '캐시미어 더블 코트', '네이비', '105', 1, 1515250)],
-    },
-  ],
-  1502: [
-    {
-      saleId: 87700,
-      receiptNo: 'GN01-20260921-0003',
-      soldAt: '2026-09-21T13:10:00+09:00',
-      storeName: '강남점',
-      kind: 'NORMAL',
-      status: 'COMPLETED',
-      totalAmount: 820000,
-      lines: [line(1, 'D5501', '실크 블라우스', '블랙', 'S', 2, 820000)],
-    },
-  ],
-}
-
 /** GET /customers/{id}/grade-history (최신순) */
 export const gradeHistory = {
   1024: [
@@ -324,7 +243,73 @@ export const gradeHistory = {
 
 /** GET /customers/{id}/notes (최신순) */
 export const notes = {
+  1733: [
+    {
+      id: 7201,
+      type: 'CALL',
+      content: '부재. 저녁에 다시 연락 원함.',
+      callResult: 'RECALL',
+      channel: 'CALL',
+      staffId: 17,
+      staffName: '이지은',
+      saleId: null,
+      followUpId: null,
+      reminderDate: daysAgo(0),
+      createdAt: '2026-11-11T14:10:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
+  ],
+  1502: [
+    {
+      id: 7301,
+      type: 'RESERVATION',
+      content: '블라우스 소매 수선 맡기러 옴.',
+      callResult: null,
+      channel: null,
+      staffId: 17,
+      staffName: '이지은',
+      saleId: null,
+      followUpId: null,
+      reminderDate: daysAgo(0),
+      createdAt: '2026-11-06T17:20:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
+  ],
+  1187: [
+    {
+      id: 7101,
+      type: 'RESERVATION',
+      content: '코트 소매 수선 맡기러 온다고 함.',
+      callResult: null,
+      channel: null,
+      staffId: 17,
+      staffName: '이지은',
+      saleId: null,
+      followUpId: null,
+      reminderDate: daysAgo(-1),
+      createdAt: '2026-11-08T16:40:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
+  ],
   1024: [
+    {
+      id: 7002,
+      type: 'RESERVATION',
+      content: '딸 점퍼 8 사이즈 입어 보러 온다고 함.',
+      callResult: null,
+      channel: null,
+      staffId: 17,
+      staffName: '이지은',
+      saleId: null,
+      followUpId: null,
+      reminderDate: daysAgo(-1),
+      createdAt: '2026-11-10T11:05:00+09:00',
+      updatedAt: null,
+      editable: true,
+    },
     {
       id: 7001,
       type: 'CALL',
@@ -374,6 +359,22 @@ export const notes = {
 export const followUps = {
   1024: [
     {
+      id: 541,
+      kind: 'VISIT',
+      stage: '방문 예정',
+      promotional: false,
+      saleId: null,
+      soldAt: null,
+      noteId: 7002,
+      noteContent: '딸 점퍼 8 사이즈 입어 보러 온다고 함.',
+      dueDate: daysAgo(-1),
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: null,
+    },
+    {
       id: 502,
       stage: '신상·재방문 안내',
       promotional: true,
@@ -400,14 +401,107 @@ export const followUps = {
       closedAt: '2026-10-29T15:20:00+09:00',
     },
   ],
+  1187: [
+    {
+      id: 540,
+      kind: 'VISIT',
+      stage: '방문 예정',
+      promotional: false,
+      saleId: null,
+      soldAt: null,
+      noteId: 7101,
+      noteContent: '코트 소매 수선 맡기러 온다고 함.',
+      dueDate: daysAgo(-1),
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: null,
+    },
+    {
+      id: 510,
+      stage: '감사 인사',
+      promotional: false,
+      saleId: 88402,
+      soldAt: '2026-11-08T16:20:00+09:00',
+      dueDate: daysAgo(2),
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: null,
+    },
+  ],
+  1733: [
+    {
+      id: 542,
+      kind: 'RECALL',
+      stage: '다시 연락',
+      promotional: false,
+      saleId: null,
+      soldAt: null,
+      noteId: 7201,
+      noteContent: '부재. 저녁에 다시 연락 원함.',
+      dueDate: daysAgo(0),
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: null,
+    },
+    {
+      id: 520,
+      stage: '신상·재방문 안내',
+      promotional: true,
+      saleId: 81240,
+      soldAt: '2026-06-03T18:45:00+09:00',
+      dueDate: daysAgo(0),
+      status: 'OPEN',
+      assignee: 'STORE',
+      staffId: null,
+      staffName: '강남점',
+      closedAt: null,
+    },
+  ],
+  2310: [
+    {
+      id: 530,
+      stage: '신상·재방문 안내',
+      promotional: true,
+      saleId: 80112,
+      soldAt: '2025-10-02T11:40:00+09:00',
+      dueDate: daysAgo(3),
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 24,
+      staffName: '박도윤',
+      closedAt: null,
+    },
+  ],
   1502: [
+    {
+      id: 543,
+      kind: 'VISIT',
+      stage: '방문 예정',
+      promotional: false,
+      saleId: null,
+      soldAt: null,
+      noteId: 7301,
+      noteContent: '블라우스 소매 수선 맡기러 옴.',
+      dueDate: daysAgo(0),
+      status: 'OPEN',
+      assignee: 'STAFF',
+      staffId: 17,
+      staffName: '이지은',
+      closedAt: null,
+    },
     {
       id: 471,
       stage: '착용감 확인',
       promotional: false,
       saleId: 87700,
       soldAt: '2026-09-21T13:10:00+09:00',
-      dueDate: '2026-10-05',
+      dueDate: daysAgo(1),
       status: 'OPEN',
       assignee: 'STAFF',
       staffId: 21,

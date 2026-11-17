@@ -5,6 +5,7 @@ import { searchCustomers } from '@/api/customers'
 import GradeBadge from '@/components/GradeBadge.vue'
 import { useSessionStore } from '@/stores/session'
 import { daysAgoLabel } from '@/features/customer/customerDetail'
+import { useIsPhone } from '@/composables/useIsPhone'
 
 /**
  * 고객 검색 `/customers` (05 SCR-06). 이름 + Enter → 줄을 누르면 상세 (터치 2번, NFR-08).
@@ -13,6 +14,7 @@ import { daysAgoLabel } from '@/features/customer/customerDetail'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const isPhone = useIsPhone()
 
 const name = ref(String(route.query.name ?? ''))
 const results = ref(null)
@@ -46,15 +48,34 @@ function open(c) {
 </script>
 
 <template>
-  <div class="clist">
-    <header class="clist__head">
-      <h1 class="clist__title">고객</h1>
-      <el-button v-if="session.isStore" type="primary" @click="router.push('/customers/new')">
-        고객 등록
-      </el-button>
+  <div class="page clist">
+    <header class="page__head">
+      <h1 class="page__title">고객 검색</h1>
+      <div class="page__actions">
+        <el-button v-if="!isPhone" type="primary" :loading="loading" @click="search"
+          >조회</el-button
+        >
+        <el-button v-if="session.isStore" @click="router.push('/customers/new')"
+          >고객 등록</el-button
+        >
+      </div>
     </header>
 
-    <form class="clist__search" @submit.prevent="search">
+    <!-- 조회 조건 (PC는 기존 POS처럼 라벨 칸 표) -->
+    <form v-if="!isPhone" class="ftable" @submit.prevent="search">
+      <label class="ft-label" for="cl-name">고객명</label>
+      <div class="ft-value ft-wide">
+        <el-input
+          id="cl-name"
+          ref="inputRef"
+          v-model="name"
+          placeholder="고객 이름 입력 후 Enter (일부만 입력해도 찾습니다)"
+          clearable
+          class="clist__name"
+        />
+      </div>
+    </form>
+    <form v-else class="clist__search" @submit.prevent="search">
       <el-input
         ref="inputRef"
         v-model="name"
@@ -76,7 +97,24 @@ function open(c) {
         같은 이름이 여럿입니다. 전화번호 뒷자리로 구별하세요.
       </p>
 
-      <ul v-if="results.length" class="clist__list" aria-label="검색 결과">
+      <section v-if="results.length && !isPhone" class="card clist__table">
+        <p class="muted">{{ results.length }}명 · 줄을 누르면 고객 상세</p>
+        <el-table :data="results" row-class-name="clickable-row" @row-click="open">
+          <el-table-column prop="name" label="고객명" min-width="120" />
+          <el-table-column prop="phoneMasked" label="연락처" width="120" />
+          <el-table-column label="매장 단골 등급" width="130">
+            <template #default="{ row }"><GradeBadge :grade="row.grade" /></template>
+          </el-table-column>
+          <el-table-column label="마지막 방문" width="140">
+            <template #default="{ row }">{{ daysAgoLabel(row.lastVisitAt) }}</template>
+          </el-table-column>
+          <el-table-column label="담당 직원" width="140">
+            <template #default="{ row }">{{ row.staffName ?? '없음' }}</template>
+          </el-table-column>
+        </el-table>
+      </section>
+
+      <ul v-else-if="results.length" class="clist__list" aria-label="검색 결과">
         <li v-for="c in results" :key="c.id">
           <button type="button" class="crow" @click="open(c)">
             <span class="crow__name">{{ c.name }}</span>
@@ -106,17 +144,19 @@ function open(c) {
       </div>
     </template>
 
-    <p v-else class="clist__hint">이름 일부만 입력해도 찾습니다. 예: 김하늘, 오세진</p>
+    <p v-else-if="isPhone" class="clist__hint">이름 일부만 입력해도 찾습니다. 예: 김하늘, 오세진</p>
   </div>
 </template>
 
 <style scoped>
 .clist {
-  max-width: 880px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  max-width: 1000px;
+}
+.clist__name {
+  max-width: 420px;
+}
+.clist__table .muted {
+  margin: 0 0 8px;
 }
 .clist__head {
   display: flex;

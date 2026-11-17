@@ -1,24 +1,35 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AppLayout from '@/layouts/AppLayout.vue'
-import PlaceholderView from '@/views/PlaceholderView.vue'
 import MoreView from '@/views/MoreView.vue'
 import SaleRecordView from '@/views/SaleRecordView.vue'
+import SalesListView from '@/views/SalesListView.vue'
+import SaleDetailView from '@/views/SaleDetailView.vue'
 import CustomerNewView from '@/views/CustomerNewView.vue'
 import CustomerListView from '@/views/CustomerListView.vue'
 import CustomerDetailView from '@/views/CustomerDetailView.vue'
-import { screens, menuFor, allowedPaths } from '@/config/menus'
+import TodayView from '@/views/TodayView.vue'
+import CallListView from '@/views/CallListView.vue'
+import NotificationsView from '@/views/NotificationsView.vue'
+import ProductsView from '@/views/ProductsView.vue'
+import ProductFormView from '@/views/ProductFormView.vue'
+import StoresView from '@/views/StoresView.vue'
+import StoreDetailView from '@/views/StoreDetailView.vue'
+import SettingsView from '@/views/SettingsView.vue'
+import PasswordView from '@/views/PasswordView.vue'
+import NotifySettingsView from '@/views/NotifySettingsView.vue'
+import KioskView from '@/views/KioskView.vue'
+import JoinView from '@/views/JoinView.vue'
+import LoginView from '@/views/LoginView.vue'
+import { screens as s, menuFor, allowedPaths } from '@/config/menus'
 import { useSessionStore } from '@/stores/session'
 import { isPhoneNow } from '@/composables/useIsPhone'
 
-/** 아직 만들지 않은 화면은 자리만 둔다. 화면을 만들면 component를 바꾼다 */
-const placeholder = (screen) => ({
+/** 메뉴의 화면 하나 = 경로 하나. 제목은 폰 위 막대에 보인다 */
+const page = (screen, component) => ({
   path: screen.path,
-  component: PlaceholderView,
-  props: { title: screen.label, task: screen.task },
+  component,
   meta: { title: screen.label },
 })
-
-const uniqueScreens = [...new Map(Object.values(screens).map((x) => [x.path, x])).values()]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,32 +38,51 @@ const router = createRouter({
       path: '/',
       component: AppLayout,
       children: [
+        page(s.saleNew, SaleRecordView),
+        page(s.sales, SalesListView),
         {
-          path: screens.saleNew.path,
-          component: SaleRecordView,
-          meta: { title: screens.saleNew.label },
+          path: '/sales/:id(\\d+)',
+          component: SaleDetailView,
+          // 본사는 매장 상세의 판매 내역에서 같은 화면을 연다 (05 SCR-03)
+          meta: { title: '영수증 상세', allowedAs: [s.sales.path, s.stores.path] },
         },
-        {
-          path: screens.customerNew.path,
-          component: CustomerNewView,
-          meta: { title: screens.customerNew.label },
-        },
-        {
-          path: screens.customers.path,
-          component: CustomerListView,
-          meta: { title: screens.customers.label },
-        },
+        page(s.customers, CustomerListView),
+        page(s.customerNew, CustomerNewView),
         {
           path: '/customers/:id(\\d+)',
           component: CustomerDetailView,
-          meta: { title: '고객 상세', allowedAs: screens.customers.path },
+          meta: { title: '고객 상세', allowedAs: [s.customers.path] },
         },
-        ...uniqueScreens
-          .filter((x) => ![screens.saleNew, screens.customerNew, screens.customers].includes(x))
-          .map(placeholder),
+        page(s.today, TodayView),
+        page(s.callList, CallListView),
+        page(s.notifications, NotificationsView),
+        page(s.products, ProductsView),
+        {
+          path: '/products/new',
+          component: ProductFormView,
+          meta: { title: '상품 등록', allowedAs: [s.products.path] },
+        },
+        {
+          path: '/products/:id(\\d+)',
+          component: ProductFormView,
+          meta: { title: '상품 수정', allowedAs: [s.products.path] },
+        },
+        page(s.stores, StoresView),
+        {
+          path: '/hq/stores/:id(\\d+)',
+          component: StoreDetailView,
+          meta: { title: '매장 상세', allowedAs: [s.stores.path] },
+        },
+        { ...page(s.gradeView, SettingsView), meta: { title: '기준·설정' } },
+        page(s.password, PasswordView),
+        page(s.notifySettings, NotifySettingsView),
         { path: '/more', component: MoreView, meta: { title: '더보기' } },
       ],
     },
+    // 레이아웃 밖: 키오스크는 메뉴가 없고, QR·로그인은 로그인 없이 연다
+    { path: s.kiosk.path, component: KioskView, meta: { title: s.kiosk.label } },
+    { path: '/join', component: JoinView, meta: { title: '고객 등록', public: true } },
+    { path: '/login', component: LoginView, meta: { title: '로그인', public: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })
@@ -64,12 +94,15 @@ export function firstScreenPath(role, isPhone) {
 }
 
 router.beforeEach((to) => {
+  if (to.meta.public) return
   const { me } = useSessionStore()
   const first = firstScreenPath(me.role, isPhoneNow())
   if (to.path === '/') return first
   // 그 계정의 메뉴에 없는 화면은 첫 화면으로 보낸다 (05 1.2)
   // 상세처럼 주소에 ID가 든 화면은 목록 화면의 권한을 따른다 (meta.allowedAs)
-  if (!allowedPaths(me.role).has(to.meta.allowedAs ?? to.path)) return first
+  const allowed = allowedPaths(me.role)
+  const keys = to.meta.allowedAs ?? [to.path]
+  if (!keys.some((k) => allowed.has(k))) return first
 })
 
 export default router

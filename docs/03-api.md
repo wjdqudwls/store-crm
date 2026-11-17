@@ -10,6 +10,7 @@
 > 변경: 2026-10-30 ERD 점검 반영 ([erd-review.md](erd-review.md), 01-requirements.md 8장, ADR-006·022·026·030) — `GET /sales/daily-summary`(본사 매장 목록의 판매 요약, `GET /stores`는 판매 데이터를 읽지 않음), 영수증 상세 라인 `returnedQty`, 구매이력 `keyword`, 반품·교환·정정·기록 취소의 동시 요청과 다른 영수증 줄, 교환 티켓 문구(금액만), 정정 본문에서 `sellerStaffId`·`memo`를 빼고 `staffId`, 남은 라인 없음 409, 다시 마감, 이벤트 `rootSaleId`·`recordedBy`와 `aggregate_id` = 처음 판매, 후속 연락·메모 처리 규칙.
 > 변경: 2026-11-04 화면설계 반영 ([05-screens.md](05-screens.md), 01-requirements.md 8장) — 직원 개인 계정도 연락 결과(`type=CALL`)를 남기고 내 할 일을 완료·건너뛰기(2장, 3.3), 직원 대리 등록의 담당 직원 `staffId`(3.2), 판매 사원은 화면이 저장할 때마다 비움(4.1), 판매 기록 화면이 마감 현황을 읽음(7장).
 > 변경: 2026-11-05 화면 대조 반영 ([erd-review.md](erd-review.md) 8장, [05-screens.md](05-screens.md) 7장) — 화면이 쓰는 조회 응답 모양(4.12), `GET /sales/daily-summary`를 매장 계정도(자기 매장) 쓰고 `saleCount` = 기록 취소를 뺀 영수증 수, 라인별 환불된 금액 `returnedAmount`, 등록 본문·고객 상세의 `nameEn`·`nationality`·`birthMd`, 오늘 할 일의 받는 사람(`assignee`·`staffName`), 예시 값(아우터 사이즈, 마지막 방문일).
+> 변경: 2026-11-13 방문 예약·재연락 알림 (01 CAL-08·10~12) — 메모 작성 본문에 `reminder`, 할 일 응답에 `kind`·`noteContent`, `POST /follow-ups/{id}/visited`, 알림 설정·푸시 구독 API, 알림 `type`에 `VISIT`·`RECALL`.
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -121,6 +122,7 @@
 | DELETE | `/members/{memberId}` | 구성원 삭제. 과거 판매의 착용자 호칭은 남는다 | 매장 | CUS-05 |
 | GET | `/customers/{id}/notes` | 메모 목록 (최신순) | 로그인 | MEM-02 |
 | POST | `/customers/{id}/notes` | 메모 작성. 매장 계정은 `staffId`(작성 직원) 필수. 연락 결과(`type=CALL` + `callResult` + `channel`)는 매장 계정과 직원(작성자는 본인) | 매장·직원 | MEM-01, CAL-02 |
+| | | 메모 본문의 `reminder: { date, staffId? }`: 유형 `RESERVATION`이면 필수(방문 날짜), `CALL` + `RECALL`이면 선택(다시 연락할 날). 그 날짜로 `VISIT`·`RECALL` 할 일을 만들고, `staffId`가 없으면 작성 직원이 받는다 | | CAL-10·11 |
 | PATCH | `/notes/{noteId}` | 메모 수정 (작성 직원 본인, 그 매장의 매장 계정, 본사는 전체) | 매장·직원·본사 | MEM-03 |
 | DELETE | `/notes/{noteId}` | 메모 삭제 (수정과 같은 규칙) | 매장·직원·본사 | MEM-03 |
 | GET | `/call-list` | 콜리스트. 아래 파라미터 참고 | 로그인 | CAL-01 |
@@ -128,7 +130,12 @@
 | GET | `/customers/{id}/follow-ups` | 고객의 후속 연락 할 일 (상세 화면) | 로그인 | CAL-06 |
 | POST | `/follow-ups/{id}/complete` | 연락 결과를 기록하고 완료. 본문은 연락 메모와 같다(`staffId`, `callResult`, `channel`, `content`). `consult_note`(type=`CALL`)를 만들고 할 일에 연결한다. 직원은 내 할 일만 되고(아니면 `403 ACCESS_DENIED`) `staffId`를 보내지 않는다 | 매장·직원 | CAL-06, CAL-02 |
 | POST | `/follow-ups/{id}/skip` | 건너뛰기. 직원은 내 할 일만 (아니면 `403 ACCESS_DENIED`) | 매장·직원 | CAL-06 |
+| POST | `/follow-ups/{id}/visited` | 방문 예약 할 일(`VISIT`)을 '방문함'으로 완료. 직원은 내 할 일만 | 매장·직원 | CAL-10 |
 | GET | `/notifications` | 내 알림함 (안 읽은 것 먼저) | 직원 | CAL-09 |
+| GET | `/me/notification-settings` | 내 알림 설정 `{ timing, push }` | 직원 | CAL-08·12 |
+| PUT | `/me/notification-settings` | 알림 시점 `timing`(NONE·DAY_BEFORE·SAME_DAY·BOTH) 바꾸기 | 직원 | CAL-12 |
+| POST | `/me/push-subscriptions` | 이 브라우저의 웹 푸시 구독 저장 (`endpoint`, `keys.p256dh`, `keys.auth`) | 직원 | CAL-08 |
+| DELETE | `/me/push-subscriptions?endpoint=` | 이 브라우저 구독 지우기 (푸시 끄기) | 직원 | CAL-08 |
 | POST | `/notifications/{id}/read` | 읽음 표시 | 직원 | CAL-09 |
 
 `GET /call-list` 파라미터 (모두 선택, 기본값은 BR-09)
@@ -569,10 +576,12 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 **고객 할 일 항목** `GET /customers/{id}/follow-ups`
 
 ```json
-{ "id": 501, "stage": "착용감 확인", "promotional": false, "saleId": 88231, "soldAt": "2026-10-15T14:03:00+09:00",
+{ "id": 501, "kind": "SALE", "stage": "착용감 확인", "promotional": false, "saleId": 88231, "soldAt": "2026-10-15T14:03:00+09:00", "noteContent": null,
   "dueDate": "2026-10-29", "status": "OPEN", "assignee": "STAFF", "staffId": 17, "staffName": "이지은", "closedAt": null }
 ```
 
+- `kind`가 `VISIT`·`RECALL`이면 메모에서 만든 할 일이라 `saleId`·`soldAt`이 `null`이고 `noteContent`에 그 메모 내용이 있다 (CAL-10·11). 오늘 할 일(4.7) 항목도 같은 두 칸을 갖는다.
+- `kind`가 `VISIT`·`RECALL`이면 메모에서 만든 할 일이라 `saleId`·`soldAt`이 `null`이고 `noteContent`에 그 메모 내용이 있다 (CAL-10·11). 오늘 할 일(4.7) 항목도 같은 두 칸을 갖는다.
 - `OPEN`을 먼저, 그 안에서 만기일 순. 기준 판매 시각(`soldAt`)은 고객 모듈의 `customer_purchase`에서 읽는다 (판매 테이블을 읽지 않음, ADR-003).
 
 **콜리스트 항목** `GET /call-list`
