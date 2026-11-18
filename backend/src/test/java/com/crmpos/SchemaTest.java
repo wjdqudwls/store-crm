@@ -2,17 +2,17 @@ package com.crmpos;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.crmpos.support.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
  * schema.sql이 02-erd.md의 테이블을 모두 만드는지 확인한다 (B0-5).
  * 테이블 수: common 3 + product 2 + sales 7 + customer 12 = 24 (02-erd.md 1장)
  */
-@SpringBootTest
+@IntegrationTest
 class SchemaTest {
 
     @Autowired
