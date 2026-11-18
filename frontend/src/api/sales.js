@@ -10,8 +10,11 @@ const fake = import.meta.env.VITE_API_MODE !== 'real' ? () => import('./fake/sal
 export const getStaff = (...args) =>
   fake ? fake().then((m) => m.getStaff(...args)) : notConnected('getStaff')
 
+/** GET /sales/daily-summary는 매장별 배열이다 (03 4.12). 화면은 내 매장 1개만 쓰므로 첫 항목을 준다 */
 export const getDailySummary = (...args) =>
-  fake ? fake().then((m) => m.getDailySummary(...args)) : notConnected('getDailySummary')
+  (fake ? fake().then((m) => m.getDailySummary(...args)) : notConnected('getDailySummary')).then(
+    (rows) => rows[0],
+  )
 
 export const getDailySummaries = (...args) =>
   fake ? fake().then((m) => m.getDailySummaries(...args)) : notConnected('getDailySummaries')

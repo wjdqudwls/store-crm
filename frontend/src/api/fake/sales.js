@@ -52,7 +52,7 @@ function summaryOf(storeId) {
 
 /** GET /sales/daily-summary?date=오늘 (03 4.12) */
 export function getDailySummary(storeId) {
-  return fakeResponse(summaryOf(storeId ?? me().storeId ?? 1))
+  return fakeResponse([summaryOf(storeId ?? me().storeId ?? 1)]) // 03: 배열
 }
 
 /** 본사 매장 목록용: 모든 매장의 오늘 요약 */
@@ -405,7 +405,10 @@ export function closeDay() {
 /** GET /stores/{storeId}/day-closes (최신순) */
 export function getDayCloses(storeId) {
   return fakeResponse(
-    dayCloses.filter((d) => d.storeId === storeId).sort((a, b) => b.date.localeCompare(a.date)),
+    dayCloses
+      .filter((d) => d.storeId === storeId)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map(({ storeId: _storeId, ...row }) => row), // 03 마감 현황 항목에는 storeId가 없다
   )
 }
 

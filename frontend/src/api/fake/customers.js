@@ -209,12 +209,14 @@ export function getPurchases(id, keyword = '') {
       kind: p.kind,
       status: p.status,
       totalAmount: p.totalAmount,
-      lines: p.lines.filter(
-        (l) =>
-          !q ||
-          l.productName.toLowerCase().includes(q) ||
-          (l.productCode ?? '').toLowerCase().includes(q),
-      ),
+      lines: p.lines
+        .filter(
+          (l) =>
+            !q ||
+            l.productName.toLowerCase().includes(q) ||
+            (l.productCode ?? '').toLowerCase().includes(q),
+        )
+        .map(({ skuId: _skuId, itemType: _itemType, listPrice: _listPrice, ...line }) => line), // 03 구매이력 줄 칸만
     }))
     .filter((p) => p.lines.length)
   return fakeResponse(page(list))
