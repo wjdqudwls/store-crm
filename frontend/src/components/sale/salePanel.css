@@ -1,0 +1,115 @@
+/*
+ * 판매 기록의 환불·교환 모드와 정정 화면이 같이 쓰는 배치 (05 1.8 판매 기록 배치).
+ * PC: 왼쪽 입력, 오른쪽 요약(스크롤해도 고정). 폰: 위아래로 쌓고 [저장]은 화면 아래 고정.
+ */
+.sp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+.sp__main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.sp__main .ftable + .ftable {
+  margin-top: 0;
+}
+.sp__sub {
+  margin: 4px 0 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+.sp__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.sp__side {
+  position: sticky;
+  top: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sp__side .ftable + .ftable {
+  margin-top: 0;
+}
+.sp__sum {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+.sp__minus {
+  color: var(--color-danger);
+}
+.sp__diff {
+  font-weight: var(--font-weight-bold);
+}
+.sp__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+.sp__save {
+  width: 100%;
+  height: 52px;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+.sp__shortcut {
+  margin-left: 8px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  opacity: 0.8;
+}
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.sp__confirm {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+.sp__confirm dt {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.sp__confirm dd {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sp__confirm-total {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+.sp__confirm-warn {
+  margin: 0 0 16px;
+  padding: 12px;
+  border-radius: 6px;
+  background: var(--el-color-warning-light-9);
+  color: var(--color-warning);
+  font-weight: var(--font-weight-semibold);
+}
+
+.sp--phone {
+  grid-template-columns: 1fr;
+}
+.sp--phone .sp__side {
+  position: static;
+  padding-bottom: 80px;
+}
+.sp--phone .sp__save {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  width: auto;
+  z-index: 11;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.15);
+}

@@ -1,5 +1,6 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
 import CustomerSearch from '@/components/CustomerSearch.vue'
@@ -7,17 +8,25 @@ import ProductPicker from '@/components/ProductPicker.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import CustomerForm from '@/components/CustomerForm.vue'
 import PurchaseTab from '@/components/customer/PurchaseTab.vue'
+import SaleLines from '@/components/sale/SaleLines.vue'
+import RefundPanel from '@/components/sale/RefundPanel.vue'
+import ExchangePanel from '@/components/sale/ExchangePanel.vue'
 import { getCustomerForSale, getDailySummary, getStaff, createSale } from '@/api/sales'
-import { defaultLineAmount, recalcLines, totals } from '@/features/sale/saleAmount'
-import { formatWon, itemTypeLabels, sizeLabel, todayLabel } from '@/utils/format'
+import { formatWon, todayLabel } from '@/utils/format'
 import { useIsPhone } from '@/composables/useIsPhone'
+import { useSaleLines } from '@/composables/useSaleLines'
+import { useSaleShortcuts } from '@/composables/useSaleShortcuts'
 
 /**
- * SCR-02 판매 기록 (05 3장). 지금은 구매 모드. 환불·교환은 다음 단계에서 만든다.
+ * SCR-02 판매 기록 (05 3장). 위에서 구매(기본)·환불·교환을 고른다.
+ * 영수증 상세의 [교환]은 `?mode=EXCHANGE&saleId=`로 이 화면의 교환 모드를 연다.
  * 목표: 노트북에서 30초 안에 1건 (NFR-08a).
  */
 const isPhone = useIsPhone()
-const mode = ref('PURCHASE')
+const route = useRoute()
+const modes = ['PURCHASE', 'REFUND', 'EXCHANGE']
+const mode = ref(modes.includes(route.query.mode) ? route.query.mode : 'PURCHASE')
+const exchangeSaleId = computed(() => Number(route.query.saleId) || null)
 
 // 오늘 판매 수·마감 상태 (S7)
 const summary = ref(null)
@@ -26,58 +35,38 @@ onMounted(async () => {
   ;[summary.value, staffList.value] = await Promise.all([getDailySummary(), getStaff()])
 })
 const dayClosed = computed(() => summary.value?.closed === true)
+function markClosed() {
+  summary.value = { ...summary.value, closed: true }
+}
 
 // ---- 입력 ----
 const sellerId = ref(null)
 const customer = ref(null) // null = 비회원
-const lines = ref([])
 const soldAt = ref(null) // null = 지금
 const memo = ref('')
 const errors = ref({})
 
 const discountRate = computed(() => customer.value?.grade.discountRate ?? 0)
-const hasMembers = computed(() => (customer.value?.members.length ?? 0) > 0)
-const sum = computed(() => totals(lines.value))
+const members = computed(() => customer.value?.members ?? [])
+const {
+  lines,
+  sum,
+  invalid,
+  addLine: pushLine,
+  removeLine,
+  changeQty,
+  changeAmount,
+  changeWearer,
+  clearWearers,
+  reset: resetLines,
+  toBody,
+} = useSaleLines(discountRate)
 const sellerName = computed(() => staffList.value.find((s) => s.id === sellerId.value)?.name)
 
-let lineSeq = 0
 function addLine(item) {
-  lines.value.push({
-    key: ++lineSeq,
-    ...item,
-    qty: 1,
-    lineAmount: defaultLineAmount({
-      listPrice: item.listPrice,
-      qty: 1,
-      discountRate: discountRate.value,
-    }),
-    edited: false,
-    memberId: null,
-  })
+  pushLine(item)
   errors.value.lines = null
 }
-
-function removeLine(key) {
-  lines.value = lines.value.filter((l) => l.key !== key)
-}
-
-function changeQty(line, qty) {
-  line.qty = qty
-  if (!line.edited && line.listPrice != null) {
-    line.lineAmount = defaultLineAmount({ ...line, discountRate: discountRate.value })
-  }
-}
-
-/** 직원이 금액을 고치면 "고침" 표시, 그 뒤에는 다시 계산하지 않는다 (S4) */
-function changeAmount(line, value) {
-  line.lineAmount = value
-  line.edited = true
-}
-
-// 고객이 바뀌면 고치지 않은 줄만 다시 계산. 할인은 판매 전 등급 기준 (BR-10)
-watch(discountRate, (rate) => {
-  lines.value = recalcLines(lines.value, rate)
-})
 
 async function selectCustomer(c) {
   customer.value = await getCustomerForSale(c.id)
@@ -86,7 +75,7 @@ async function selectCustomer(c) {
 function clearCustomer() {
   customer.value = null
   memo.value = ''
-  lines.value.forEach((l) => (l.memberId = null))
+  clearWearers()
 }
 
 // ---- 고객 등록 창 (SCR-04, C1·C2): 판매 사원이 담당 직원으로 미리 들어간다 ----
@@ -154,8 +143,7 @@ function validate() {
   const e = {}
   if (!sellerId.value) e.seller = '판매 사원을 고르세요'
   if (!lines.value.length) e.lines = '상품을 1개 이상 담으세요'
-  if (lines.value.some((l) => l.lineAmount == null || l.lineAmount < 0))
-    e.lines = '결제 금액을 입력하세요'
+  if (invalid.value) e.lines = '결제 금액을 입력하세요'
   if (soldAt.value && soldAt.value > new Date()) e.soldAt = '지금보다 이른 시각만 고를 수 있어요'
   errors.value = e
   return Object.keys(e).length === 0
@@ -174,25 +162,7 @@ async function save() {
     customerId: customer.value?.id,
     soldAt: soldAt.value?.toISOString(),
     memo: customer.value && memo.value.trim() ? memo.value.trim() : undefined,
-    lines: lines.value.map((l) =>
-      l.skuId
-        ? {
-            skuId: l.skuId,
-            qty: l.qty,
-            lineAmount: l.lineAmount,
-            memberId: l.memberId ?? undefined,
-          }
-        : {
-            productName: l.productName,
-            itemType: l.itemType,
-            size: l.size,
-            color: l.color ?? undefined,
-            target: l.target ?? undefined,
-            qty: l.qty,
-            lineAmount: l.lineAmount,
-            memberId: l.memberId ?? undefined,
-          },
-    ),
+    lines: toBody(),
   }
   try {
     const res = await createSale(body, idempotencyKey)
@@ -221,7 +191,7 @@ async function save() {
 function resetAll() {
   sellerId.value = null
   customer.value = null
-  lines.value = []
+  resetLines()
   soldAt.value = null
   editingTime.value = false
   memo.value = ''
@@ -229,19 +199,13 @@ function resetAll() {
   nextTick(() => staffSelectRef.value?.focus())
 }
 
-// Ctrl+Enter = 저장, 확인 창에서 Enter = 저장
-function onKeydown(e) {
-  if (mode.value !== 'PURCHASE' || registerOpen.value || historyOpen.value) return
-  if (confirmOpen.value && e.key === 'Enter' && !e.isComposing) {
-    e.preventDefault()
-    save()
-  } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-    e.preventDefault()
-    requestSave()
-  }
-}
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+// Ctrl+Enter = 저장, 확인 창에서 Enter = 저장. 환불·교환 모드는 각 패널이 따로 듣는다
+useSaleShortcuts({
+  confirmOpen,
+  onSave: save,
+  onRequest: requestSave,
+  blocked: () => mode.value !== 'PURCHASE' || registerOpen.value || historyOpen.value,
+})
 </script>
 
 <template>
@@ -265,10 +229,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       오늘 판매는 마감되었습니다. 다시 열려면 본사에 요청하세요
     </div>
 
-    <section v-if="mode !== 'PURCHASE'" class="card sale__todo">
-      <h2>{{ mode === 'REFUND' ? '환불' : '교환' }}</h2>
-      <p>F1 다음 단계에서 만듭니다. 회원의 구매 목록에서 상품명으로 찾아 영수증의 줄을 고릅니다.</p>
-    </section>
+    <RefundPanel
+      v-if="mode === 'REFUND'"
+      :day-closed="dayClosed"
+      :phone="isPhone"
+      @day-closed="markClosed"
+    />
+    <ExchangePanel
+      v-else-if="mode === 'EXCHANGE'"
+      :day-closed="dayClosed"
+      :phone="isPhone"
+      :sale-id="exchangeSaleId"
+      @day-closed="markClosed"
+    />
 
     <!-- 폰(매장폰): 단계 카드를 위에서 아래로 (지금 그대로) -->
     <div v-else-if="isPhone" class="sale__body">
@@ -318,62 +291,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <section class="card field">
           <span class="field__label">④ 담은 상품</span>
-          <p v-if="!lines.length" class="muted">아직 담은 상품이 없습니다</p>
-          <div v-else class="lines">
-            <div v-for="line in lines" :key="line.key" class="line">
-              <div class="line__product">
-                <strong>{{ line.productName }}</strong>
-                <span class="muted">
-                  {{ line.productCode ?? '직접 입력' }} · {{ itemTypeLabels[line.itemType] }} ·
-                  {{ line.color ?? '색상 없음' }} /
-                  {{ sizeLabel(line.size, line.itemType, line.target) }}
-                </span>
-                <span v-if="line.listPrice" class="muted"
-                  >정가 {{ formatWon(line.listPrice) }}</span
-                >
-              </div>
-              <el-input-number
-                :model-value="line.qty"
-                :min="1"
-                :max="99"
-                size="small"
-                class="line__qty"
-                aria-label="수량"
-                @update:model-value="(v) => changeQty(line, v ?? 1)"
-              />
-              <div class="line__amount">
-                <el-input-number
-                  :model-value="line.lineAmount"
-                  :min="0"
-                  :step="1000"
-                  :controls="false"
-                  placeholder="결제 금액"
-                  aria-label="결제 금액"
-                  @update:model-value="(v) => changeAmount(line, v)"
-                />
-                <span class="line__won">원</span>
-                <span v-if="line.edited" class="tag-edited">고침</span>
-              </div>
-              <el-select
-                v-if="hasMembers"
-                v-model="line.memberId"
-                placeholder="착용자"
-                clearable
-                size="small"
-                class="line__wearer"
-              >
-                <el-option
-                  v-for="m in customer.members"
-                  :key="m.id"
-                  :label="m.label"
-                  :value="m.id"
-                />
-              </el-select>
-              <el-button link type="danger" class="line__remove" @click="removeLine(line.key)"
-                >삭제</el-button
-              >
-            </div>
-          </div>
+          <SaleLines
+            phone
+            :lines="lines"
+            :members="members"
+            @qty="changeQty"
+            @amount="changeAmount"
+            @wearer="changeWearer"
+            @remove="removeLine"
+          />
           <p v-if="errors.lines" class="field__error">{{ errors.lines }}</p>
         </section>
 
@@ -488,85 +414,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
         <ProductPicker layout="row" @add="addLine" />
 
-        <!-- 담은 상품 표 -->
-        <div class="pos__lines" role="table" aria-label="담은 상품">
-          <div class="pos__row pos__row--head" role="row">
-            <span role="columnheader">구분</span>
-            <span role="columnheader">품번</span>
-            <span role="columnheader">상품명</span>
-            <span role="columnheader">색상</span>
-            <span role="columnheader">사이즈</span>
-            <span role="columnheader" class="num">정가</span>
-            <span role="columnheader" class="num">수량</span>
-            <span role="columnheader" class="num">결제 금액</span>
-            <span role="columnheader">착용자</span>
-            <span role="columnheader">삭제</span>
-          </div>
-          <div v-if="!lines.length" class="pos__empty">
-            품번이나 상품명으로 찾아 [담기]를 누르면 여기에 나옵니다
-          </div>
-          <div v-for="line in lines" :key="line.key" class="pos__row" role="row">
-            <span>구매</span>
-            <span>{{ line.productCode ?? '직접' }}</span>
-            <span class="pos__name">{{ line.productName }}</span>
-            <span>{{ line.color ?? '-' }}</span>
-            <span>{{ sizeLabel(line.size, line.itemType, line.target) }}</span>
-            <span class="num">{{ line.listPrice ? formatWon(line.listPrice) : '-' }}</span>
-            <span class="num">
-              <el-input-number
-                :model-value="line.qty"
-                :min="1"
-                :max="99"
-                size="small"
-                class="pos__qty"
-                aria-label="수량"
-                @update:model-value="(v) => changeQty(line, v ?? 1)"
-              />
-            </span>
-            <span class="num pos__amount">
-              <el-input-number
-                :model-value="line.lineAmount"
-                :min="0"
-                :step="1000"
-                :controls="false"
-                size="small"
-                placeholder="결제 금액"
-                aria-label="결제 금액"
-                @update:model-value="(v) => changeAmount(line, v)"
-              />
-              <span v-if="line.edited" class="tag-edited">고침</span>
-            </span>
-            <span>
-              <el-select
-                v-if="hasMembers"
-                v-model="line.memberId"
-                placeholder="본인"
-                clearable
-                size="small"
-                class="pos__wearer"
-              >
-                <el-option
-                  v-for="m in customer.members"
-                  :key="m.id"
-                  :label="m.label"
-                  :value="m.id"
-                />
-              </el-select>
-              <span v-else class="muted">-</span>
-            </span>
-            <span>
-              <el-button link type="danger" aria-label="삭제" @click="removeLine(line.key)"
-                >✕</el-button
-              >
-            </span>
-          </div>
-          <div class="pos__row pos__row--total" role="row">
-            <span class="pos__total-label">합계</span>
-            <span class="num">{{ sum.qty }}개</span>
-            <span class="num">{{ formatWon(sum.amount) }}</span>
-            <span />
-          </div>
-        </div>
+        <SaleLines
+          :lines="lines"
+          :members="members"
+          @qty="changeQty"
+          @amount="changeAmount"
+          @wearer="changeWearer"
+          @remove="removeLine"
+        />
         <p v-if="errors.lines" class="field__error">{{ errors.lines }}</p>
 
         <div v-if="customer" class="ftable">
@@ -786,9 +641,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   color: var(--color-danger);
   font-weight: var(--font-weight-semibold);
 }
-.sale__todo p {
-  color: var(--color-text-muted);
-}
 
 .sale__body {
   display: grid;
@@ -851,53 +703,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   margin: 0;
   color: var(--color-warning);
   font-size: var(--font-size-sm);
-}
-
-.lines {
-  display: flex;
-  flex-direction: column;
-}
-.line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 110px 180px auto auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-top: 1px solid var(--color-border);
-}
-.line:first-child {
-  border-top: 0;
-}
-.line__product {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.line__amount {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.line__amount :deep(.el-input-number) {
-  width: 120px;
-}
-.line__amount :deep(input) {
-  text-align: right;
-}
-.line__won {
-  color: var(--color-text-muted);
-}
-.tag-edited {
-  padding: 0 6px;
-  border-radius: 4px;
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-warning);
-  background: var(--el-color-warning-light-9);
-}
-.line__wearer {
-  width: 96px;
 }
 
 .sale__summary {
@@ -987,71 +792,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .pos__main .ftable + .ftable {
   margin-top: 0;
 }
-.pos__lines {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  overflow-x: auto;
-}
-.pos__row {
-  display: grid;
-  grid-template-columns: 36px 56px minmax(120px, 1fr) 64px 64px 88px 96px 140px 92px 32px;
-  align-items: center;
-  gap: 8px;
-  min-width: 860px;
-  padding: 6px 12px;
-  border-top: 1px solid var(--color-border);
-  font-size: var(--font-size-sm);
-}
-.pos__row--head {
-  border-top: 0;
-  background: var(--color-subtle);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-muted);
-}
-.pos__row--total {
-  background: var(--color-subtle);
-  font-weight: var(--font-weight-semibold);
-}
-.pos__total-label {
-  grid-column: 1 / 7;
-  text-align: center;
-}
-.pos__row .num {
-  text-align: right;
-  justify-self: end;
-}
-.pos__name {
-  font-weight: var(--font-weight-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pos__qty {
-  width: 92px;
-}
-.pos__amount {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.pos__amount :deep(.el-input-number) {
-  width: 100px;
-}
-.pos__amount :deep(input) {
-  text-align: right;
-}
-.pos__wearer {
-  width: 88px;
-}
-.pos__empty {
-  min-width: 860px;
-  padding: 28px 12px;
-  border-top: 1px solid var(--color-border);
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
 .pos__side {
   position: sticky;
   top: 72px;
@@ -1088,12 +828,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 /* 매장폰: 한 줄로 쌓고 요약은 맨 아래, [저장]은 화면 아래 고정 (R4) */
 .sale--phone .sale__body {
   grid-template-columns: 1fr;
-}
-.sale--phone .line {
-  grid-template-columns: 1fr auto;
-}
-.sale--phone .line__product {
-  grid-column: 1 / -1;
 }
 .sale--phone .sale__summary {
   position: static;
