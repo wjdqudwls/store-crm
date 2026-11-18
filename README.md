@@ -28,6 +28,7 @@
 | - | [docs/erd-review.md](docs/erd-review.md) | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정, 화면설계서와 대조) | 완료 (2026-11-05) |
 | - | [docs/screen-interview.md](docs/screen-interview.md) | 화면설계 인터뷰 기록 (질문과 답, 추천안대로 정한 것 W1~W14) | 완료 (2026-11-04) |
 | - | [docs/worklog.md](docs/worklog.md) | 작업 시간 기록 (날짜, 한 일, 걸린 시간). 일정 점검의 근거 | 계속 추가 |
+| - | [docs/sessions.md](docs/sessions.md) | 세션 운영 규칙(총괄·문서·백엔드·화면·배포 세션, 검토·승인 흐름)과 마무리 3주 계획 | 확정 (2026-11-18) |
 | - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 시장 규모, 확인 못 한 가설) | 참고 |
 
 규칙

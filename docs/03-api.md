@@ -11,6 +11,7 @@
 > 변경: 2026-11-04 화면설계 반영 ([05-screens.md](05-screens.md), 01-requirements.md 8장) — 직원 개인 계정도 연락 결과(`type=CALL`)를 남기고 내 할 일을 완료·건너뛰기(2장, 3.3), 직원 대리 등록의 담당 직원 `staffId`(3.2), 판매 사원은 화면이 저장할 때마다 비움(4.1), 판매 기록 화면이 마감 현황을 읽음(7장).
 > 변경: 2026-11-05 화면 대조 반영 ([erd-review.md](erd-review.md) 8장, [05-screens.md](05-screens.md) 7장) — 화면이 쓰는 조회 응답 모양(4.12), `GET /sales/daily-summary`를 매장 계정도(자기 매장) 쓰고 `saleCount` = 기록 취소를 뺀 영수증 수, 라인별 환불된 금액 `returnedAmount`, 등록 본문·고객 상세의 `nameEn`·`nationality`·`birthMd`, 오늘 할 일의 받는 사람(`assignee`·`staffName`), 예시 값(아우터 사이즈, 마지막 방문일).
 > 변경: 2026-11-13 방문 예약·재연락 알림 (01 CAL-08·10~12) — 메모 작성 본문에 `reminder`, 할 일 응답에 `kind`·`noteContent`, `POST /follow-ups/{id}/visited`, 알림 설정·푸시 구독 API, 알림 `type`에 `VISIT`·`RECALL`.
+> 변경: 2026-11-18 다른 매장 영수증은 보기만 (01 SAL-03·06, 8장) — 다른 매장 판매의 반품·교환은 `403 ACCESS_DENIED`(4.2·4.8), 구매이력 항목에 `storeId` 추가(4.12).
 > 구현 후에는 springdoc이 만드는 `/swagger-ui`가 최신 명세다. 이 문서는 설계 의도와 규칙을 남기는 용도다.
 
 ## 1. 공통 규칙
@@ -307,6 +308,7 @@ Idempotency-Key: 3d8a2f4b-6c1e-4b7a-8e2d-5f9c0a1b2c3d
 - 남은 수량보다 많이 반품하면 `409 RETURN_QTY_EXCEEDED`. 마감된 날이면 `409 DAY_CLOSED`, 기록 취소된 판매면 `409 SALE_ALREADY_VOIDED`.
 - **다른 키로 동시에 반품**(매장 노트북과 매장폰): 서버는 판매 행을 잠그고(`SELECT … FOR UPDATE`) 남은 수량을 확인하므로, 뒤 요청은 앞 요청이 끝난 뒤의 남은 수량을 보고 `409 RETURN_QTY_EXCEEDED`가 된다. 교환·정정·기록 취소도 같다 (ADR-030).
 - `lineId`가 이 판매의 라인이 아니면(다른 영수증의 줄) `400 VALIDATION_FAILED`.
+- **다른 매장 판매**: 판매한 매장(`sale.store_id`)이 매장 계정의 소속 매장과 다르면 `403 ACCESS_DENIED`. 다른 매장 영수증은 보기만 한다 (01 SAL-03, 2026-11-18). 교환(4.8)도 같다. 본사는 반품·교환을 하지 않고, 정정·기록 취소만 언제나 할 수 있다(4.9, BR-16).
 - 본문에 처리한 직원 `staffId`를 함께 보낸다 (매장 계정, 2장).
 - 응답 `201`: 반품 ID, 반품 금액, 판매의 새 상태(`PARTIAL_RETURNED` / `RETURNED`).
 
@@ -460,7 +462,7 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 - 한 트랜잭션으로 `sale_return`(kind=`EXCHANGE`, `new_sale_id` = 새 판매)과 새 `sale`(kind=`EXCHANGE`, `origin_sale_id` = 원 판매, `root_sale_id` = 원 판매의 처음 판매)을 만든다. 새 판매는 새 영수증 번호를 받는다. 반품 라인의 환불 금액은 BR-11과 같고, 새 상품 라인 규칙은 4.1과 같다.
 - 응답 `201`: `{ "returnId": 5030, "returnedAmount": 1000000, "newSale": { 4.1 응답과 같은 모양 }, "extraPaid": 100000 }`. `extraPaid` = 새 상품 합계 − 반품 금액이고, 음수면 차액 환불이다.
 - 티켓은 늘지 않는다. 추가 결제·차액 환불 모두 새 상품은 처음 판매의 구매 건에 붙어 금액만 바뀌고, 처음 판매 날짜의 시즌으로 센다. 고객 모듈이 이벤트의 `rootSaleId`로 정한다 (BR-17).
-- 남은 수량 초과면 `409 RETURN_QTY_EXCEEDED`, 마감된 날이면 `409 DAY_CLOSED`. 동시 요청은 4.2와 같다.
+- 남은 수량 초과면 `409 RETURN_QTY_EXCEEDED`, 마감된 날이면 `409 DAY_CLOSED`, 다른 매장 판매면 `403 ACCESS_DENIED`(4.2). 동시 요청은 4.2와 같다.
 - **중복 요청 방지**: 반품 행과 새 판매가 같은 `Idempotency-Key`를 갖는다. 같은 키로 다시 오면 키로 반품 행을 찾고 `new_sale_id`로 새 판매를 찾아 같은 응답을 `200`으로 준다 (ADR-006).
 
 ### 4.9 정정 `PUT /sales/{id}` · 기록 취소 `POST /sales/{id}/void`
@@ -536,13 +538,14 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 
 ```json
 { "saleId": 88231, "receiptNo": "GN01-20261015-0012", "soldAt": "2026-10-15T14:03:00+09:00",
-  "storeName": "강남점", "kind": "NORMAL", "status": "PARTIAL_RETURNED", "totalAmount": 991860,
+  "storeId": 1, "storeName": "강남점", "kind": "NORMAL", "status": "PARTIAL_RETURNED", "totalAmount": 991860,
   "lines": [
     { "lineId": 1, "productCode": "D2110", "productName": "울 블렌드 롱코트", "color": "차콜", "size": "90",
       "qty": 1, "lineAmount": 774060, "returnedQty": 0, "returnedAmount": 0, "wearerLabel": null } ] }
 ```
 
 - 영수증 단위, 최신순, 기록 취소된 영수증은 뺀다. `keyword`가 있으면 상품명·품번에 그 말이 든 줄만 남기고, 남은 줄이 없는 영수증은 뺀다 (환불·교환 모드, SAL-03).
+- 다른 매장 영수증도 목록에 나온다. 화면은 `storeId`가 로그인한 매장 계정의 매장과 다르면 그 영수증의 줄을 고를 수 없게 하고 "다른 매장 판매입니다. ○○점에서 환불·교환해 주세요"를 보여준다 (2026-11-18, 4.2).
 
 **상품 검색 항목** `GET /products?keyword=코트`
 
@@ -599,11 +602,13 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 ```json
 { "id": 7001, "type": "CALL", "content": "코트 착용감 만족. 소매 길이 수선 문의.",
   "callResult": "COMPLETED", "channel": "CALL", "staffId": 17, "staffName": "이지은",
-  "saleId": null, "followUpId": 501, "createdAt": "2026-10-29T15:20:00+09:00", "updatedAt": null, "editable": true }
+  "saleId": null, "followUpId": 501, "reminderDate": null,
+  "createdAt": "2026-10-29T15:20:00+09:00", "updatedAt": null, "editable": true }
 ```
 
 - `editable`은 지금 로그인한 계정이 이 메모를 고치고 지울 수 있는지다 (MEM-03). 화면은 이 값으로 [수정] [삭제]를 보인다.
 - `followUpId`는 이 연락으로 완료한 할 일이다 (`follow_up_task.note_id`).
+- `reminderDate`는 유형 `RESERVATION`이면 방문 날짜, `CALL` + `RECALL`이면 다시 연락할 날이고, 없으면 `null`이다 (CAL-10·11).
 
 **알림함** `GET /notifications`
 
@@ -673,7 +678,7 @@ Idempotency-Key: 9c1e2b3a-4d5e-4f60-8a7b-1c2d3e4f5a6b
 | `AUTH_TOKEN_INVALID` | 401 | 토큰 없음·형식 오류·서명 불일치 |
 | `AUTH_TOKEN_EXPIRED` | 401 | 토큰 만료 |
 | `AUTH_ACCOUNT_DISABLED` | 401 | 비활성화된 계정 (로그인·토큰 재발급 거절) |
-| `ACCESS_DENIED` | 403 | 역할 권한 없음 |
+| `ACCESS_DENIED` | 403 | 역할 권한 없음 (직원이 남의 할 일을 처리, 다른 매장 판매를 반품·교환 포함) |
 | `STORE_REQUIRED` | 403 | 매장 계정이 아닌 계정으로 판매 기록 |
 | `CUSTOMER_NOT_FOUND` | 404 | 고객 없음 |
 | `PRODUCT_NOT_FOUND` | 404 | 상품·SKU 없음 |

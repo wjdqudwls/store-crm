@@ -5,6 +5,8 @@
 > 2026-10-23 요구사항 점검 반영: 역할·기기(2장), 공통 → 고객 동기 이벤트(3장), 교환·정정 이벤트(5장), 정기 산정 임시/확정(6장), 보안(7장) (ADR-021~029).
 > 2026-10-30 ERD 점검 반영: 공통 → 판매는 부르지 않음(3장), 이벤트 순서 묶음 = 처음 판매(5장), 물리 명세는 `schema.sql`(8.1), 동시 반품 테스트(8.3) (ADR-030·031).
 > 2026-10-30 시스템 아키텍처 그림 추가: [images/architecture.png](images/architecture.png) (원본 `images/architecture.svg`). 점검 결과는 [architecture-review.md](architecture-review.md)이고, 정할 것(A1~A10)은 개발하면서 해당 작업 때 정해 이 문서와 그림을 고친다. 그때까지 이 문서는 **초안**이다.
+> 2026-11-18 6장: 아침 9시 묶음 알림 작업(웹 푸시 포함, ADR-035, 01 8장 D3), 정기 산정은 다음으로.
+> 2026-11-18 8.2: 배포를 Oracle 무료 VM + k3s 단일 노드 + 젠킨스 + Docker Hub로 (ADR-037, ADR-033 대체), 화면 데모는 GitHub Pages 고정본 (ADR-036).
 > 2026-11-12 B0-4: 배포할 곳 = Oracle 무료 VM 1대에 compose로 앱+MariaDB(8.2), 배포용 프로필 `prod`(8.1) (ADR-033). 그림은 배포를 확인한 뒤 고친다.
 
 ## 1. 한눈에 보기
@@ -144,9 +146,11 @@ sequenceDiagram
 | 작업 | 주기 | 하는 일 | 근거 |
 | --- | --- | --- | --- |
 | outbox 발행기 | 1초마다 | PENDING 이벤트를 고객 모듈에 전달, 실패하면 재시도 | BR-06, ADR-007 |
-| 정기 산정 | 매년 6월 1일 새벽 + 6월 중 서버가 켜질 때 1회, 수동 실행 API | 막 끝난 시즌 실적으로 다음 시즌 등급(6월은 임시)을 정하고, 집계를 새 시즌 기준으로 다시 계산. `current = max(confirmed, computed)`라 몇 번 돌아도 결과가 같다 | GRD-05, ADR-020·021 |
+| 아침 9시 묶음 알림 | 매일 9시 | 오늘·내일의 방문 예약·재연락(VISIT·RECALL) 할 일을 직원의 알림 시점 설정(전날·당일 아침·둘 다)대로 묶어 알림함(`staff_notification`)에 쌓고, 구독한 직원 폰에 같은 문구를 웹 푸시로 보낸다. 만료된 구독(410)은 지운다 | CAL-10~12, BR-14, ADR-029·035 |
+| 정기 산정 (**다음**, 2026-11-18 01 8장 D3) | 매년 6월 1일 새벽 + 6월 중 서버가 켜질 때 1회, 수동 실행 API | 막 끝난 시즌 실적으로 다음 시즌 등급(6월은 임시)을 정하고, 집계를 새 시즌 기준으로 다시 계산. `current = max(confirmed, computed)`라 몇 번 돌아도 결과가 같다 | GRD-05, ADR-020·021 |
 
 - 시즌 누적 실적은 판매·반품 이벤트 때만 바뀌므로 매일 도는 재계산 작업은 없다 (ADR-020, ADR-008 대체).
+- 아침 9시 알림은 같은 날 두 번 돌아도 같은 알림이 두 번 쌓이지 않게 한다(직원·할 일·날짜로 중복 확인). 방법은 B4 작업 때 정한다. 웹 푸시는 HTTPS가 있어야 해서 실서버에서만 확인된다.
 - 서버가 1개라 같은 작업이 동시에 두 번 도는 일이 없으므로 분산 잠금(ShedLock 등)은 쓰지 않는다.
 - 잠드는 무료 서버가 6월 1일 새벽을 놓쳐도 6월 중 서버가 켜질 때 정기 산정이 돈다. 재실행이 안전해 실행 기록은 두지 않는다 (ADR-021).
 - 7월 1일 확정과 자정의 하루 마감 자동 잠금은 날짜로 판단하므로 따로 도는 작업이 없다 (ADR-021·026).
@@ -176,22 +180,34 @@ Vue 개발 서버 (Vite) ── /api 요청 ──▶ Spring Boot 8080   (화면
 ```
 
 - 테이블은 `schema.sql`로 만들고, Hibernate는 엔티티와 테이블이 맞는지 검사만 한다 (ADR-010). 구현 뒤 물리 명세(타입·길이·기본값·성능 인덱스)의 최신본은 `schema.sql`이고, 02-erd.md는 개념·논리를 남긴다 (ADR-031).
-- 프로필: 기본(로컬), `seed`(과거 판매 시각 허용과 더미 판매 생성기, ING-01), 배포용 `prod`(ADR-033).
+- 프로필: 기본(로컬), `seed`(과거 판매 시각 허용과 더미 판매 생성기, ING-01), 배포용 `prod`(ADR-033, ADR-037).
 
 ### 8.2 배포
 
 - Vue를 빌드한 파일을 Spring Boot jar의 정적 파일로 넣어 한 번에 배포한다 (ADR-013). 앱은 1개이고 역할·화면 너비로 PC·폰 레이아웃을 나눈다 (2장).
 - 화면 주소(예: `/customers/1024`)로 바로 들어와도 `index.html`을 돌려준다. `/api/**`, `/actuator/**`, `/swagger-ui/**`는 그대로 둔다.
-- 무료 VM 1대(Oracle Cloud Always Free, Ampere A1, Ubuntu)에 서버와 DB를 둔다. VM에서 레포의 compose로 앱(`app`)과 MariaDB(`db`)를 같이 띄운다. 로컬과 같은 compose 파일이다 (ADR-033).
+- 무료 VM 1대(Oracle Cloud Always Free, Ampere A1, Ubuntu)에 k3s(가벼운 쿠버네티스)를 단일 노드로 깔고 앱과 MariaDB를 띄운다. Oracle에서는 VM만 빌리고 DB는 그 안의 MariaDB 11이다. Oracle Database는 쓰지 않는다 (ADR-037, ADR-033 대체).
 
 ```
-Oracle 무료 VM (Ubuntu)
- └─ docker compose  (.env는 VM에만, 커밋 안 함)
-     ├─ app: Spring Boot jar (+ Vue 빌드 파일), 프로필 prod ── HTTP ──▶ 밖
-     └─ db:  MariaDB 11 (VM 안 127.0.0.1에만)
+인터넷 ─▶ Oracle 무료 VM (Ubuntu, 포트 22·80·443)
+           ├─ k3s 단일 노드
+           │   ├─ Traefik Ingress + ACME HTTPS (DuckDNS 도메인)
+           │   │    로그인(B0-3) 전에는 basicAuth로 막음 (PWA 파일은 제외)
+           │   └─ namespace store-crm
+           │       ├─ Deployment app: Spring Boot jar (+ Vue 빌드 파일), 프로필 prod
+           │       ├─ StatefulSet mariadb 11 + PVC (클러스터 안에서만 접속)
+           │       ├─ Secret app-env (VM의 .env로 만듦, 레포에 없음)
+           │       └─ CronJob db-backup (매일 mysqldump)
+           └─ Docker: 젠킨스 컨테이너 (k3s 밖, UI는 밖에 열지 않음)
+
+GitHub PR ─▶ GitHub Actions (backend-ci·frontend-ci 검사)
+main 합침 ─▶ 젠킨스: 이미지 빌드 ─▶ Docker Hub push ─▶ 이미지 바꾸기 ─▶ 롤아웃 확인 (실패하면 되돌림)
 ```
 
-- 밖으로는 SSH(22)와 앱 HTTP만 연다. B0-4는 IP 주소로 `/actuator/health`만 확인하고, 도메인·HTTPS는 12단계에서 정한다.
+- 젠킨스가 12/02까지 안 되면 배포 스크립트로 대신하고, 12/08부터 배포를 멈춘다 (ADR-037).
+- 시간대는 VM·앱·MariaDB 모두 `Asia/Seoul`이다 (아침 9시 알림, 6장).
+- 화면 데모(가짜 데이터)는 실서버와 따로 GitHub Pages에 고정본(`demo-v1`)으로 공개한다 (ADR-036).
+- 로컬 개발의 `docker-compose.yml`(8.1)은 그대로 두고, 서버 배포에는 쓰지 않는다.
 
 ### 8.3 테스트
 
@@ -249,5 +265,8 @@ Oracle 무료 VM (Ubuntu)
 | ADR-030 | 남은 수량은 판매 행 잠금으로 지킨다 |
 | ADR-031 | ERD 문서는 개념·논리, 물리 명세는 `schema.sql` |
 | ADR-032 | 12단계 진행 순서: 화면 먼저, 로그인은 핵심 기능 뒤 |
-| ADR-033 | 무료 배포: Oracle 무료 VM 1대에 compose로 앱과 MariaDB |
+| ADR-033 | (대체됨: ADR-037) 무료 배포: Oracle 무료 VM 1대에 compose로 앱과 MariaDB |
 | ADR-034 | 화면: JavaScript와 Element Plus 하나, 폰 화면은 직접 CSS |
+| ADR-035 | 직원 폰 알림: 웹 푸시 |
+| ADR-036 | 화면 데모: 고정본(demo-v1)을 GitHub Pages에 손으로 공개 |
+| ADR-037 | 배포: Oracle 무료 VM에 k3s 단일 노드, 젠킨스, Docker Hub |
