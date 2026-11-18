@@ -164,7 +164,7 @@ const qrOpen = ref(false)
 const qrUrl = ref('')
 function openQr(a) {
   const code = store.value.code
-  qrUrl.value = `${location.origin}/join?store=${code}${a?.staffCode ? `&staff=${a.staffCode}` : ''}`
+  qrUrl.value = `${location.origin}${import.meta.env.BASE_URL}join?store=${code}${a?.staffCode ? `&staff=${a.staffCode}` : ''}`
   qrOpen.value = true
 }
 </script>

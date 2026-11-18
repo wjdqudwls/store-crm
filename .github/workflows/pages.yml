@@ -1,0 +1,66 @@
+# 화면 데모 공개: 가짜 데이터로 만든 화면을 GitHub Pages에 올린다.
+# main에 합칠 때마다 자동으로 올리지 않고, 사람이 Actions 탭에서 수동 실행한다.
+# 12단계에서 화면이 실제 API를 부르게 되면 서버 없는 Pages 화면이 비므로,
+# 가짜 데이터 완성본(태그 demo-v1 등)을 ref로 골라 올린다.
+name: pages-demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "올릴 브랜치·태그·커밋 (예: demo-v1)"
+        required: true
+        default: main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # frontend-ci와 같은 이유로 npm ci 대신 npm install을 쓴다.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        env:
+          VITE_BASE: /store-crm/
+        # build:demo는 가짜 데이터 모드(frontend/.env.demo의 VITE_API_MODE=fake)로 빌드한다.
+        run: npm run build:demo
+
+      # 하위 주소에서 새로고침하면 GitHub Pages가 404.html을 돌려주므로 index.html을 복사한다.
+      - name: SPA fallback
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
