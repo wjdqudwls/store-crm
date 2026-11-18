@@ -35,4 +35,12 @@ public class ProductSku {
 
     @Column(nullable = false, length = 20)
     private String size;
+
+    public static ProductSku of(Product product, String color, String size) {
+        ProductSku sku = new ProductSku();
+        sku.product = product;
+        sku.color = color;
+        sku.size = size;
+        return sku;
+    }
 }
