@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { useRoute, useRouter } from 'vue-router'
 import { searchCustomers } from '@/api/customers'
 import GradeBadge from '@/components/GradeBadge.vue'
@@ -21,14 +23,17 @@ const results = ref(null)
 const searched = ref('')
 const loading = ref(false)
 const inputRef = ref()
+const { error, retrying, run } = useLoadError()
 
 async function search() {
   const q = name.value.trim()
   if (!q) return
   loading.value = true
   router.replace({ query: { name: q } })
-  results.value = (await searchCustomers(q)).content
-  searched.value = q
+  await run(async () => {
+    results.value = (await searchCustomers(q)).content
+    searched.value = q
+  })
   loading.value = false
 }
 
@@ -86,6 +91,8 @@ function open(c) {
       />
       <el-button size="large" native-type="submit" :loading="loading">찾기</el-button>
     </form>
+
+    <LoadError :error="error" :busy="retrying" @retry="search" />
 
     <!-- 불러오는 중: 회색 줄 (05 1.5) -->
     <div v-if="loading && !results" class="clist__list">

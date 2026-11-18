@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { useRouter } from 'vue-router'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StaffSelect from '@/components/StaffSelect.vue'
@@ -28,10 +30,12 @@ const filters = reactive({ ...defaults(), target: null, itemType: null, memberRe
 const draft = reactive({ ...filters })
 const list = ref(null)
 
-async function load() {
-  list.value = null
-  list.value = (await getCallList({ ...filters })).content
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = null
+    list.value = (await getCallList({ ...filters })).content
+  })
 onMounted(load)
 
 const summary = computed(() => {
@@ -94,12 +98,13 @@ const grades = ['A', 'B', 'C', 'D']
       <el-button size="small" @click="openFilters">조건 바꾸기</el-button>
     </div>
 
-    <el-skeleton v-if="!list" animated :rows="4" class="card" />
-    <div v-else-if="!list.length" class="card empty">
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="4" class="card" />
+    <div v-else-if="list && !list.length" class="card empty">
       조건에 맞는 고객이 없습니다.
       <el-button link type="primary" @click="openFilters">조건 바꾸기</el-button>
     </div>
-    <template v-else>
+    <template v-else-if="list">
       <p class="muted">{{ list.length }}명 · 마지막 방문이 오래된 순</p>
       <section v-if="!isPhone" class="card">
         <el-table

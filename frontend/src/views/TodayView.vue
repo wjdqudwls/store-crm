@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GradeBadge from '@/components/GradeBadge.vue'
@@ -17,9 +19,11 @@ const session = useSessionStore()
 const notices = useNotificationStore()
 
 const list = ref(null)
-async function load() {
-  list.value = (await getToday()).content
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = (await getToday()).content
+  })
 onMounted(() => {
   load()
   if (!session.isStore && !session.isHq) notices.refresh()
@@ -98,10 +102,11 @@ async function skip(t) {
       </template>
     </p>
 
-    <el-skeleton v-if="!list" animated :rows="4" class="card" />
-    <p v-else-if="!list.length" class="card empty">오늘 할 일이 없습니다.</p>
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="4" class="card" />
+    <p v-else-if="list && !list.length" class="card empty">오늘 할 일이 없습니다.</p>
 
-    <section v-for="g in groups" v-else :key="g.key" class="today__group">
+    <section v-for="g in groups" v-else-if="list" :key="g.key" class="today__group">
       <h2 v-if="g.title" class="today__group-title">{{ g.title }} {{ g.items.length }}</h2>
       <article v-for="t in g.items" :key="t.id" class="tcard card">
         <button type="button" class="tcard__body" @click="openCustomer(t)">

@@ -2,6 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GradeBadge from '@/components/GradeBadge.vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import GradeSummary from '@/components/customer/GradeSummary.vue'
 import PurchaseTab from '@/components/customer/PurchaseTab.vue'
 import NoteTab from '@/components/customer/NoteTab.vue'
@@ -23,16 +25,18 @@ const isPhone = useIsPhone()
 const customer = ref(null)
 const notFound = ref(false)
 
-async function load(id) {
-  customer.value = null
-  notFound.value = false
-  try {
-    customer.value = await getCustomer(id)
-  } catch (e) {
-    if (e?.status === 404) notFound.value = true
-    else throw e
-  }
-}
+const { error, retrying, run } = useLoadError({ ignore: (e) => e?.status === 404 })
+const load = (id) =>
+  run(async () => {
+    customer.value = null
+    notFound.value = false
+    try {
+      customer.value = await getCustomer(id)
+    } catch (e) {
+      if (e?.status === 404) notFound.value = true
+      else throw e
+    }
+  })
 watch(
   () => route.params.id,
   (id) => id && load(Number(id)),
@@ -72,6 +76,13 @@ function back() {
       <p>찾을 수 없습니다.</p>
       <el-button @click="router.push('/customers')">목록으로 가기</el-button>
     </div>
+
+    <LoadError
+      v-else-if="error"
+      :error="error"
+      :busy="retrying"
+      @retry="load(Number(route.params.id))"
+    />
 
     <el-skeleton v-else-if="!customer" animated :rows="6" class="cdetail__card" />
 
