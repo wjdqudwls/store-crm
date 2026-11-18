@@ -2,34 +2,37 @@
 
 패션 오프라인 매장용 클라이언텔링 CRM. 판매를 기록하는 순간 고객관리가 시작되고, 언제 누구에게 연락할지 알려 준다. POS·ERP 옆에 붙어 상담 기록·콜리스트·고객 등급·후속 연락을 제공한다.
 
-> 서비스 이름: CRM pos · 상태: WBS 4단계 화면설계 (2026-11-04, 마감 12/09) · 진행 순서와 상태는 [docs/wbs.md](docs/wbs.md)
+> 서비스 이름: CRM pos · 상태: WBS 4단계 화면설계 (2026-11-04, 마감 12/09) · 진행 순서와 상태는 `docs/wbs.md`
 
 ## 시스템 아키텍처
 
-![CRM pos 시스템 아키텍처](docs/images/architecture.png)
+(시스템 아키텍처 그림은 로컬 문서에 있다: `docs/images/architecture.png`. 레포에는 올리지 않는다.)
 
-자세한 설명은 [docs/04-architecture.md](docs/04-architecture.md).
+자세한 설명은 `docs/04-architecture.md`.
 
 ## 문서 (읽는 순서 = 만드는 순서)
 
+> **기획 문서(`docs/`)는 레포에 올리지 않는다** (2026-11-19, `.gitignore`). 아래 표의 문서는 작성자의 로컬 폴더에만 있다. 이 README와 코드만 레포에 있다.
+
 | 순서 | 문서 | 내용 | 상태 |
 | --- | --- | --- | --- |
-| 0 | [docs/00-idea.md](docs/00-idea.md) | 왜 만드는가, 문제, 대상, 범위 | 확정 |
-| 1 | [docs/01-requirements.md](docs/01-requirements.md) | 기능·비기능 요구사항, 비즈니스 규칙, 8주 일정 | 확정 |
-| 2 | [docs/02-erd.md](docs/02-erd.md) | 데이터 모델 개념·논리 (ERD 그림은 문서 안 mermaid). 구현 뒤 물리 명세는 `schema.sql` | 확정 |
-| 3 | [docs/03-api.md](docs/03-api.md) | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
-| 4 | [docs/04-architecture.md](docs/04-architecture.md) | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
-| 5 | [docs/05-screens.md](docs/05-screens.md) | 화면설계: 계정별 화면·메뉴, 화면 흐름, 화면별 칸·검증·버튼·쓰는 API (그림은 피그마) | 정함 |
-| - | [docs/project-plan.md](docs/project-plan.md) | 프로젝트 계획 (목표, 우선순위, 일정·마일스톤, 검증, 리스크) | 초안 |
-| - | [docs/wbs.md](docs/wbs.md) | WBS: 12단계 진행 순서와 작업 상태 (매일 갱신) | 계속 갱신 |
-| - | [docs/dev-plan.md](docs/dev-plan.md) | 개발 계획 (백엔드·프론트엔드 PR 단위 작업, 완료 기준, 테스트, 정할 기술 결정) | 초안 |
-| - | [docs/decisions.md](docs/decisions.md) | 기술 결정 기록 (ADR) | 계속 추가 |
-| - | [docs/architecture-review.md](docs/architecture-review.md) | 시스템 아키텍처 점검 (통과한 것, 개발하면서 정할 것 A1~A12, 요구사항 대조) | 초안 |
-| - | [docs/erd-review.md](docs/erd-review.md) | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정, 화면설계서와 대조) | 완료 (2026-11-05) |
-| - | [docs/screen-interview.md](docs/screen-interview.md) | 화면설계 인터뷰 기록 (질문과 답, 추천안대로 정한 것 W1~W14) | 완료 (2026-11-04) |
-| - | [docs/worklog.md](docs/worklog.md) | 작업 시간 기록 (날짜, 한 일, 걸린 시간). 일정 점검의 근거 | 계속 추가 |
-| - | [docs/sessions.md](docs/sessions.md) | 세션 운영 규칙(총괄·문서·백엔드·화면·배포 세션, 검토·승인 흐름)과 마무리 3주 계획 | 확정 (2026-11-18) |
-| - | [docs/research.md](docs/research.md) | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 시장 규모, 확인 못 한 가설) | 참고 |
+| 0 | `docs/00-idea.md` | 왜 만드는가, 문제, 대상, 범위 | 확정 |
+| 1 | `docs/01-requirements.md` | 기능·비기능 요구사항, 비즈니스 규칙, 8주 일정 | 확정 |
+| 2 | `docs/02-erd.md` | 데이터 모델 개념·논리 (ERD 그림은 문서 안 mermaid). 구현 뒤 물리 명세는 `schema.sql` | 확정 |
+| 3 | `docs/03-api.md` | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
+| 4 | `docs/04-architecture.md` | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
+| 5 | `docs/05-screens.md` | 화면설계: 계정별 화면·메뉴, 화면 흐름, 화면별 칸·검증·버튼·쓰는 API (그림은 피그마) | 정함 |
+| - | `docs/project-plan.md` | 프로젝트 계획 (목표, 우선순위, 일정·마일스톤, 검증, 리스크) | 초안 |
+| - | `docs/wbs.md` | WBS: 12단계 진행 순서와 작업 상태 (매일 갱신) | 계속 갱신 |
+| - | `docs/dev-plan.md` | 개발 계획 (백엔드·프론트엔드 PR 단위 작업, 완료 기준, 테스트, 정할 기술 결정) | 초안 |
+| - | `docs/decisions.md` | 기술 결정 기록 (ADR) | 계속 추가 |
+| - | `docs/architecture-review.md` | 시스템 아키텍처 점검 (통과한 것, 개발하면서 정할 것 A1~A12, 요구사항 대조) | 초안 |
+| - | `docs/erd-review.md` | ERD 개념·논리 점검 (추적표, 시나리오, 찾은 것과 결정, 화면설계서와 대조) | 완료 (2026-11-05) |
+| - | `docs/screen-interview.md` | 화면설계 인터뷰 기록 (질문과 답, 추천안대로 정한 것 W1~W14) | 완료 (2026-11-04) |
+| - | `docs/worklog.md` | 작업 시간 기록 (날짜, 한 일, 걸린 시간). 일정 점검의 근거 | 계속 추가 |
+| - | `docs/sessions.md` | 세션 운영 규칙(총괄·문서·백엔드·화면·배포 세션, 검토·승인 흐름)과 마무리 3주 계획 | 확정 (2026-11-18) |
+| - | `docs/ui-test-report.md` | UI 테스트 결과서 (화면별 확인 항목과 결과, 가짜 데이터 기준. 12단계에서 실제 API로 다시) | 진행 (2026-11-18) |
+| - | `docs/research.md` | 시장·사용자 조사 (역할별 고객관리, 비슷한 서비스 비교, 시장 규모, 확인 못 한 가설) | 참고 |
 
 규칙
 
