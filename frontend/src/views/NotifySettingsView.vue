@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { ElMessage } from 'element-plus'
 import { getNotifySetting, saveNotifySetting } from '@/api/notifications'
 import { timingLabels } from '@/features/customer/reminder'
@@ -16,12 +18,15 @@ const permission = ref(
   typeof Notification === 'undefined' ? 'unsupported' : Notification.permission,
 )
 
-onMounted(async () => {
-  const s = await getNotifySetting()
-  timing.value = s.timing
-  push.value = s.push
-  loaded.value = true
-})
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    const s = await getNotifySetting()
+    timing.value = s.timing
+    push.value = s.push
+    loaded.value = true
+  })
+onMounted(load)
 
 async function save() {
   await saveNotifySetting({ timing: timing.value, push: push.value })
@@ -59,6 +64,8 @@ const timingOptions = Object.entries(timingLabels)
     <header class="page__head">
       <h1 class="page__title">알림 설정</h1>
     </header>
+
+    <LoadError :error="error" :busy="retrying" @retry="load" />
 
     <div v-if="loaded" class="card">
       <div class="ftable ftable--2">

@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { useRouter } from 'vue-router'
 import { getStores } from '@/api/stores'
 import { getDailySummaries } from '@/api/sales'
@@ -12,10 +14,13 @@ import { dateTimeLabel } from '@/features/customer/customerDetail'
 const router = useRouter()
 const list = ref(null)
 
-onMounted(async () => {
-  const [stores, summaries] = await Promise.all([getStores(), getDailySummaries()])
-  list.value = stores.map((s) => ({ ...s, today: summaries.find((x) => x.storeId === s.id) }))
-})
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    const [stores, summaries] = await Promise.all([getStores(), getDailySummaries()])
+    list.value = stores.map((s) => ({ ...s, today: summaries.find((x) => x.storeId === s.id) }))
+  })
+onMounted(load)
 </script>
 
 <template>
@@ -24,9 +29,10 @@ onMounted(async () => {
       <h1 class="page__title">매장 목록</h1>
     </header>
     <section class="card">
-      <el-skeleton v-if="!list" animated :rows="3" />
+      <LoadError :error="error" :busy="retrying" @retry="load" />
+      <el-skeleton v-if="!list && !error" animated :rows="3" />
       <el-table
-        v-else
+        v-else-if="list"
         :data="list"
         row-class-name="clickable-row"
         @row-click="(s) => router.push(`/hq/stores/${s.id}`)"

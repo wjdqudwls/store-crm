@@ -2,6 +2,8 @@
 import { showReference } from '@/config/reference'
 import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import { onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { useRouter } from 'vue-router'
 import { getProducts, importProducts } from '@/api/products'
 import { formatWon, itemTypeLabels, sizeLabel, targetLabels } from '@/utils/format'
@@ -14,9 +16,11 @@ const router = useRouter()
 const keyword = ref('')
 const list = ref(null)
 
-async function load() {
-  list.value = (await getProducts(keyword.value)).content
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = (await getProducts(keyword.value)).content
+  })
 onMounted(load)
 
 const colorsOf = (p) => [...new Set(p.skus.map((s) => s.color).filter(Boolean))].join(', ') || '-'
@@ -76,8 +80,9 @@ async function upload() {
     </form>
 
     <section class="card">
-      <el-skeleton v-if="!list" animated :rows="5" />
-      <p v-else-if="!list.length" class="empty">
+      <LoadError :error="error" :busy="retrying" @retry="load" />
+      <el-skeleton v-if="!list && !error" animated :rows="5" />
+      <p v-else-if="list && !list.length" class="empty">
         {{
           keyword
             ? `'${keyword}' 상품이 없습니다.`
@@ -85,7 +90,7 @@ async function upload() {
         }}
       </p>
       <el-table
-        v-else
+        v-else-if="list"
         :data="list"
         row-class-name="clickable-row"
         @row-click="(p) => router.push(`/products/${p.id}`)"

@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GradeBadge from '@/components/GradeBadge.vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import StaffSelect from '@/components/StaffSelect.vue'
 import { getSale, returnSale, voidSale } from '@/api/sales'
 import { useSaleChangeRules } from '@/composables/useSaleChangeRules'
@@ -22,14 +24,17 @@ const session = useSessionStore()
 
 const sale = ref(null)
 const notFound = ref(false)
-async function load() {
-  notFound.value = false
-  try {
-    sale.value = await getSale(Number(route.params.id))
-  } catch (e) {
-    if (e?.status === 404) notFound.value = true
-  }
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    notFound.value = false
+    try {
+      sale.value = await getSale(Number(route.params.id))
+    } catch (e) {
+      if (e?.status === 404) notFound.value = true
+      else throw e
+    }
+  })
 watch(() => route.params.id, load, { immediate: true })
 
 const statusLabels = {
@@ -132,6 +137,7 @@ async function saveVoid() {
       찾을 수 없습니다.
       <el-button link type="primary" @click="router.push('/sales')">판매 내역으로</el-button>
     </div>
+    <LoadError v-else-if="error && !sale" :error="error" :busy="retrying" @retry="load" />
     <el-skeleton v-else-if="!sale" animated :rows="6" class="card" />
 
     <template v-else>

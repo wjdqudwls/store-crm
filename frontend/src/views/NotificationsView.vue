@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { useRouter } from 'vue-router'
 import { getNotifications, markRead } from '@/api/notifications'
 import { useNotificationStore } from '@/stores/notifications'
@@ -13,11 +15,13 @@ const router = useRouter()
 const notices = useNotificationStore()
 const list = ref(null)
 
-async function load() {
-  const res = await getNotifications()
-  list.value = res.content
-  notices.unreadCount = res.unreadCount
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    const res = await getNotifications()
+    list.value = res.content
+    notices.unreadCount = res.unreadCount
+  })
 onMounted(load)
 
 const typeLabels = {
@@ -46,9 +50,10 @@ async function open(n) {
         <el-button size="small" @click="router.push('/me/notifications')">알림 설정</el-button>
       </div>
     </header>
-    <el-skeleton v-if="!list" animated :rows="3" class="card" />
-    <p v-else-if="!list.length" class="card empty">알림이 없습니다.</p>
-    <ul v-else class="nt card">
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="3" class="card" />
+    <p v-else-if="list && !list.length" class="card empty">알림이 없습니다.</p>
+    <ul v-else-if="list" class="nt card">
       <li v-for="n in list" :key="n.id">
         <button
           type="button"
