@@ -1,4 +1,5 @@
 <script setup>
+import { showReference } from '@/config/reference'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -230,7 +231,7 @@ function openQr(a) {
 
         <template v-else-if="tab === 'staff'">
           <div class="st__bar">
-            <el-button type="primary" @click="openAdd">직원 등록</el-button>
+            <el-button v-if="showReference" type="primary" @click="openAdd">직원 등록</el-button>
           </div>
           <el-table :data="people">
             <el-table-column prop="name" label="이름" min-width="120" />

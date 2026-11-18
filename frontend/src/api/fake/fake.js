@@ -1,5 +1,6 @@
-/** 화면의 반응형 값(Proxy)도 복사할 수 있게 JSON으로 깊은 복사 */
-export const clone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)))
+import { clone } from '@/utils/clone'
+
+export { clone }
 
 /** 가짜 응답을 진짜 API처럼 조금 늦게, 복사본으로 돌려준다 */
 export function fakeResponse(data, delayMs = 150) {

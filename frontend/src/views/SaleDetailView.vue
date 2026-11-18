@@ -4,14 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StaffSelect from '@/components/StaffSelect.vue'
-import {
-  canChangeSale,
-  getDailySummary,
-  getSale,
-  isOwnStoreSale,
-  returnSale,
-  voidSale,
-} from '@/api/sales'
+import { getSale, returnSale, voidSale } from '@/api/sales'
+import { useSaleChangeRules } from '@/composables/useSaleChangeRules'
+import { showReference } from '@/config/reference'
 import { useSessionStore } from '@/stores/session'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { leftQty, refundTotal } from '@/features/sale/returnAmount'
@@ -37,10 +32,6 @@ async function load() {
 }
 watch(() => route.params.id, load, { immediate: true })
 
-// 반품·교환은 오늘 마감 전에만 새로 기록한다 (BR-16). 지난 날 판매도 반품할 수 있다
-const todayClosed = ref(false)
-if (session.isStore) getDailySummary().then((d) => (todayClosed.value = d.closed))
-
 const statusLabels = {
   COMPLETED: '정상',
   PARTIAL_RETURNED: '일부 반품',
@@ -58,16 +49,12 @@ const kindLabels = { EXCHANGE: '교환', CORRECTION: '정정' }
 
 const left = leftQty
 const hasLeft = computed(() => sale.value?.lines.some((l) => left(l) > 0))
-const changeable = computed(() => sale.value && canChangeSale(sale.value, session.me.role))
+const { canChange, canReturn: canReturnRule, isOwnStore } = useSaleChangeRules()
+const changeable = computed(() => sale.value && canChange(sale.value))
 // 매장 계정은 자기 매장 판매만 고친다. 다른 매장 영수증은 보기만 한다
-const otherStore = computed(() => session.isStore && sale.value && !isOwnStoreSale(sale.value))
+const otherStore = computed(() => session.isStore && sale.value && !isOwnStore(sale.value))
 const canReturn = computed(
-  () =>
-    session.isStore &&
-    !otherStore.value &&
-    !todayClosed.value &&
-    sale.value.status !== 'VOIDED' &&
-    hasLeft.value,
+  () => canReturnRule(sale.value) && sale.value.status !== 'VOIDED' && hasLeft.value,
 )
 // 정정·기록 취소: 매장 계정은 판매한 날·마감 전, 본사는 언제나. 남은 줄이 있어야 한다 (BR-16)
 const canVoid = computed(() => changeable.value && sale.value.status !== 'VOIDED' && hasLeft.value)
@@ -157,8 +144,10 @@ async function saveVoid() {
           </el-tag>
           <div v-if="canReturn || canVoid" class="sd__btns">
             <el-button v-if="canReturn" type="primary" @click="openReturn">반품</el-button>
-            <el-button v-if="canReturn" @click="openExchange">교환</el-button>
-            <el-button v-if="canVoid" @click="router.push(`/sales/${sale.id}/edit`)"
+            <el-button v-if="canReturn && showReference" @click="openExchange">교환</el-button>
+            <el-button
+              v-if="canVoid && showReference"
+              @click="router.push(`/sales/${sale.id}/edit`)"
               >정정</el-button
             >
             <el-button v-if="canVoid" type="danger" plain @click="openVoid">기록 취소</el-button>

@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import CustomerForm from '@/components/CustomerForm.vue'
 import DevAccountSwitch from '@/components/DevAccountSwitch.vue'
+import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import { publicRegister } from '@/api/public'
 import { useSessionStore } from '@/stores/session'
 
@@ -50,6 +51,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="kiosk size-kiosk">
     <div class="kiosk__dev"><DevAccountSwitch /></div>
+    <ReferenceBanner />
 
     <section v-if="step === 'start'" class="kiosk__start">
       <p class="kiosk__store">{{ session.me.storeName }}</p>

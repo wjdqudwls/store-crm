@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { accountLabel } from '@/config/menus'
+import { isFake } from '@/api/mode'
 
 /** 개발·데모용 계정 바꾸기. 11단계(F13) 로그인을 만들면 지운다 (05 1.2, W13) */
 const session = useSessionStore()
@@ -14,7 +15,7 @@ function onChange(id) {
 </script>
 
 <template>
-  <label class="dev-switch">
+  <label v-if="isFake" class="dev-switch">
     <span class="dev-switch__label">데모 계정</span>
     <el-select
       :model-value="session.me.id"

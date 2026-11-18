@@ -7,13 +7,14 @@ import {
   createGradePolicy,
   getFollowUpRules,
   getGradePolicy,
-  nextJuneFirst,
   runPeriodic,
   saveDiscounts,
   saveFollowUpRules,
 } from '@/api/settings'
 import { useSessionStore } from '@/stores/session'
-import { clone } from '@/api/fake'
+import { showReference } from '@/config/reference'
+import { clone } from '@/utils/clone'
+import { nextJuneFirst } from '@/features/grade/june'
 import { formatWon } from '@/utils/format'
 
 /**
@@ -23,7 +24,7 @@ import { formatWon } from '@/utils/format'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const canEdit = computed(() => session.isHq)
+const canEdit = computed(() => session.isHq && showReference)
 
 const tabs = computed(() => ({
   grade: '등급 기준',

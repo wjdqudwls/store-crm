@@ -1,4 +1,6 @@
 <script setup>
+import { showReference } from '@/config/reference'
+import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProducts, importProducts } from '@/api/products'
@@ -54,7 +56,7 @@ async function upload() {
       <h1 class="page__title">상품</h1>
       <div class="page__actions">
         <el-button type="primary" plain @click="load">조회</el-button>
-        <el-button @click="importOpen = true">엑셀 올리기</el-button>
+        <el-button v-if="showReference" @click="importOpen = true">엑셀 올리기</el-button>
         <el-button type="primary" @click="router.push('/products/new')">상품 등록</el-button>
       </div>
     </header>
@@ -111,6 +113,7 @@ async function upload() {
     </section>
 
     <el-dialog v-model="importOpen" title="엑셀 올리기" width="min(560px, 94vw)" align-center>
+      <ReferenceBanner />
       <div class="imp">
         <p class="muted">
           엑셀 폼에 한 행에 상품 하나, 사이즈·색상은 쉼표로 여러 개 적습니다. 잘못된 행이 하나라도

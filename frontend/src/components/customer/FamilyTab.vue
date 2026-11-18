@@ -5,6 +5,7 @@ import ChoiceButtons from '@/components/ChoiceButtons.vue'
 import { createMember, deleteMember, getMembers, updateMember } from '@/api/customers'
 import { getSizes } from '@/api/public'
 import { useSessionStore } from '@/stores/session'
+import { showReference } from '@/config/reference'
 import { genderLabels, relationLabels } from '@/features/customer/customerDetail'
 import { sizeChoices, sizeItemType } from '@/features/customer/customerForm'
 
@@ -15,7 +16,7 @@ import { sizeChoices, sizeItemType } from '@/features/customer/customerForm'
  */
 const props = defineProps({ customerId: { type: Number, required: true } })
 const session = useSessionStore()
-const canEdit = computed(() => session.isStore)
+const canEdit = computed(() => session.isStore && showReference)
 
 const list = ref(null)
 async function load() {

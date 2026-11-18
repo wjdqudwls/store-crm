@@ -2,7 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { getPurchases } from '@/api/customers'
-import { getSale, isOwnStoreSale } from '@/api/sales'
+import { getSale } from '@/api/sales'
+import { isOwnStoreSale } from '@/features/sale/saleChange'
+import { useSessionStore } from '@/stores/session'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { leftQty, refundAmount } from '@/features/sale/returnAmount'
 import { formatWon } from '@/utils/format'
@@ -59,7 +61,8 @@ async function reload() {
 watch(() => [props.customerId, props.saleId], reload, { immediate: true })
 
 /** 다른 매장 영수증은 목록에는 보이되 환불·교환은 그 매장이 한다 (보기만) */
-const isOther = (r) => !isOwnStoreSale({ store: { id: r.storeId } })
+const session = useSessionStore()
+const isOther = (r) => !isOwnStoreSale({ store: { id: r.storeId } }, session.me.storeId)
 const keyOf = (r, l) => `${r.saleId}-${l.lineId}`
 const chosenSaleId = computed(() => selection.value?.sale.saleId ?? null)
 

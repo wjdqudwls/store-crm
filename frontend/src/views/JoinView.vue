@@ -1,4 +1,5 @@
 <script setup>
+import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import CustomerForm from '@/components/CustomerForm.vue'
@@ -31,6 +32,7 @@ function submit(body) {
 
 <template>
   <div class="join">
+    <ReferenceBanner />
     <p v-if="invalid" class="join__msg">QR 코드가 올바르지 않습니다. 직원에게 문의해 주세요.</p>
     <p v-else-if="tooMany" class="join__msg">잠시 후 다시 시도해 주세요.</p>
     <el-skeleton v-else-if="!info" animated :rows="6" class="join__card" />

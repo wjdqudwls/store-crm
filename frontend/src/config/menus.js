@@ -1,3 +1,5 @@
+import { showReference } from './reference'
+
 /**
  * 계정별 메뉴와 첫 화면 (05-screens.md 1.2).
  * 직원 직급(매니저~스태프)은 모두 같은 화면이다 (R2).
@@ -16,7 +18,7 @@ export const screens = {
   gradeView: { path: '/settings/grade', label: '기준 보기', task: 'F9' },
   settings: { path: '/settings/grade', label: '설정', task: 'F9' },
   stores: { path: '/hq/stores', label: '매장 목록', task: 'F8' },
-  kiosk: { path: '/kiosk', label: '키오스크 등록', task: 'F5' },
+  kiosk: { path: '/kiosk', label: '키오스크 등록', task: 'F5', reference: true },
   password: { path: '/me/password', label: '비밀번호 바꾸기', task: 'F13' },
   notifySettings: { path: '/me/notifications', label: '알림 설정', task: 'F10' },
 }
@@ -69,9 +71,11 @@ export function menuFor(role) {
 }
 
 /** 그 계정이 들어갈 수 있는 화면 경로. 없는 경로로 오면 첫 화면으로 보낸다 (05 1.2) */
-export function allowedPaths(role) {
+export function allowedPaths(role, withReference = showReference) {
   const m = menuFor(role)
-  const paths = [...m.pc, ...m.phoneTabs, ...m.phoneMore, ...m.extra].map((x) => x.path)
+  const paths = [...m.pc, ...m.phoneTabs, ...m.phoneMore, ...m.extra]
+    .filter((x) => withReference || !x.reference) // 참고 화면은 실서버에서 뺀다
+    .map((x) => x.path)
   if (m.phoneMore.length) paths.push('/more')
   return new Set(paths)
 }

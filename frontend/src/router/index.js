@@ -24,6 +24,7 @@ import LoginView from '@/views/LoginView.vue'
 import { screens as s, menuFor, allowedPaths } from '@/config/menus'
 import { useSessionStore } from '@/stores/session'
 import { isPhoneNow } from '@/composables/useIsPhone'
+import { showReference } from '@/config/reference'
 
 /** 메뉴의 화면 하나 = 경로 하나. 제목은 폰 위 막대에 보인다 */
 const page = (screen, component) => ({
@@ -51,7 +52,7 @@ const router = createRouter({
           path: '/sales/:id(\\d+)/edit',
           component: SaleCorrectionView,
           // 판매 기록의 정정 모드 (05 SCR-02). 본사는 마감 뒤에도 고친다
-          meta: { title: '판매 정정', allowedAs: [s.sales.path, s.stores.path] },
+          meta: { title: '판매 정정', allowedAs: [s.sales.path, s.stores.path], reference: true },
         },
         page(s.customers, CustomerListView),
         page(s.customerNew, CustomerNewView),
@@ -87,8 +88,12 @@ const router = createRouter({
       ],
     },
     // 레이아웃 밖: 키오스크는 메뉴가 없고, QR·로그인은 로그인 없이 연다
-    { path: s.kiosk.path, component: KioskView, meta: { title: s.kiosk.label } },
-    { path: '/join', component: JoinView, meta: { title: '고객 등록', public: true } },
+    { path: s.kiosk.path, component: KioskView, meta: { title: s.kiosk.label, reference: true } },
+    {
+      path: '/join',
+      component: JoinView,
+      meta: { title: '고객 등록', public: true, reference: true },
+    },
     { path: '/login', component: LoginView, meta: { title: '로그인', public: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
@@ -101,9 +106,11 @@ export function firstScreenPath(role, isPhone) {
 }
 
 router.beforeEach((to) => {
-  if (to.meta.public) return
   const { me } = useSessionStore()
   const first = firstScreenPath(me.role, isPhoneNow())
+  // 참고 화면은 실서버에서 첫 화면으로 보낸다 (QR 공개 페이지도 같다)
+  if (!showReference && to.meta.reference) return first
+  if (to.meta.public) return
   if (to.path === '/') return first
   // 그 계정의 메뉴에 없는 화면은 첫 화면으로 보낸다 (05 1.2)
   // 상세처럼 주소에 ID가 든 화면은 목록 화면의 권한을 따른다 (meta.allowedAs)
