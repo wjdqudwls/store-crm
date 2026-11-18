@@ -2,13 +2,45 @@
 
 패션 오프라인 매장용 클라이언텔링 CRM. 판매를 기록하는 순간 고객관리가 시작되고, 언제 누구에게 연락할지 알려 준다. POS·ERP 옆에 붙어 상담 기록·콜리스트·고객 등급·후속 연락을 제공한다.
 
-> 서비스 이름: CRM pos · 상태: WBS 4단계 화면설계 (2026-11-04, 마감 12/09) · 진행 순서와 상태는 `docs/wbs.md`
+> 서비스 이름: CRM pos · 1인 포트폴리오 프로젝트, 마감 2026-12-09 · 상태는 아래 "진행 상황" (2026-11-19 기준)
+
+## 진행 상황
+
+| 영역 | 된 것 | 다음 |
+| --- | --- | --- |
+| 화면 (`frontend/`) | 화면 초안 F2~F13을 가짜 데이터로 모두 만듦, 공통 에러 띠(F12) | 실제 API 연결 |
+| 백엔드 (`backend/`) | 뼈대·CI, 물리 스키마(B0-5), 공통 응답·에러(B0-2), 현재 계정 자리·테스트 기반·기본 데이터(B0-6) | B1 상품·고객 |
+| 배포 | Dockerfile(K1), k3s 매니페스트 초안(K3), 화면 데모 Pages 워크플로(공개 전) | Oracle VM·k3s 설치(K2), 배포 확인 |
+
+## 실행 방법
+
+```bash
+cp .env.example .env              # 처음 한 번, 값은 직접 바꾼다
+docker compose up -d              # 로컬 DB (MariaDB 11, 포트 3316)
+cd backend && ./gradlew bootRun   # 서버 → http://localhost:8080/actuator/health
+cd backend && ./gradlew test      # 테스트 (Docker 필요: Testcontainers MariaDB)
+cd frontend && npm run dev        # 화면 개발 서버 (가짜 데이터 모드)
+cd frontend && npm run build:demo # 화면 데모 빌드 (GitHub Pages용)
+```
+
+## 폴더 구성
+
+| 경로 | 내용 |
+| --- | --- |
+| `backend/` | Spring Boot 4, Java 21, Gradle |
+| `frontend/` | Vue 3 + Vite 화면 |
+| `deploy/k8s/` | k3s 배포 매니페스트 (kustomize) |
+| `Dockerfile` | 화면과 서버를 한 이미지로 빌드 |
+| `docker-compose.yml` | 로컬 개발용 MariaDB |
+| `.github/workflows/` | `backend-ci`, `frontend-ci`(PR 검사), `pages`(화면 데모 수동 배포) |
+
+## 배포 구조
+
+Oracle Cloud 무료 VM 1대에 k3s(가벼운 쿠버네티스) 단일 노드를 두고, Traefik Ingress로 HTTPS를 받는다. 앱은 Deployment, MariaDB는 PVC가 붙은 StatefulSet이다. 합친 뒤 배포는 호스트 Docker 컨테이너의 Jenkins가 이미지를 빌드해 Docker Hub에 올리고 롤아웃한다. PR 검사는 GitHub Actions가 한다. Oracle에서는 VM만 빌리고 DB는 그 안의 MariaDB다 (ADR-037). 단일 노드라 고가용성은 없고, 학습·포트폴리오 목적이다.
 
 ## 시스템 아키텍처
 
-(시스템 아키텍처 그림은 로컬 문서에 있다: `docs/images/architecture.png`. 레포에는 올리지 않는다.)
-
-자세한 설명은 `docs/04-architecture.md`.
+(시스템 아키텍처 그림은 로컬 문서에 있다: `docs/images/architecture.png`. 레포에는 올리지 않는다.) 자세한 설명은 `docs/04-architecture.md`.
 
 ## 문서 (읽는 순서 = 만드는 순서)
 
@@ -41,6 +73,6 @@
 - 결정 기록은 두 곳이다: 업무 규칙 결정은 01-requirements.md 8장, 기술 결정은 decisions.md.
 - 구현 뒤 최신 명세는 API는 `/swagger-ui`, DB 물리 명세는 `schema.sql`이다. 03과 02는 설계 의도와 개념·논리를 남긴다 (ADR-031).
 
-## 기술 스택 (예정)
+## 기술 스택
 
-Java 21 · Spring Boot 4 · Spring Data JPA · MyBatis · MariaDB · Vue 3 · Docker Compose
+Java 21 · Spring Boot 4 · Spring Data JPA · MyBatis · MariaDB · Vue 3 · Element Plus · Docker · k3s · Jenkins
