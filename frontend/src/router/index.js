@@ -4,6 +4,7 @@ import MoreView from '@/views/MoreView.vue'
 import SaleRecordView from '@/views/SaleRecordView.vue'
 import SalesListView from '@/views/SalesListView.vue'
 import SaleDetailView from '@/views/SaleDetailView.vue'
+import SaleCorrectionView from '@/views/SaleCorrectionView.vue'
 import CustomerNewView from '@/views/CustomerNewView.vue'
 import CustomerListView from '@/views/CustomerListView.vue'
 import CustomerDetailView from '@/views/CustomerDetailView.vue'
@@ -45,6 +46,12 @@ const router = createRouter({
           component: SaleDetailView,
           // 본사는 매장 상세의 판매 내역에서 같은 화면을 연다 (05 SCR-03)
           meta: { title: '영수증 상세', allowedAs: [s.sales.path, s.stores.path] },
+        },
+        {
+          path: '/sales/:id(\\d+)/edit',
+          component: SaleCorrectionView,
+          // 판매 기록의 정정 모드 (05 SCR-02). 본사는 마감 뒤에도 고친다
+          meta: { title: '판매 정정', allowedAs: [s.sales.path, s.stores.path] },
         },
         page(s.customers, CustomerListView),
         page(s.customerNew, CustomerNewView),

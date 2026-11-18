@@ -4,14 +4,22 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import GradeBadge from '@/components/GradeBadge.vue'
 import StaffSelect from '@/components/StaffSelect.vue'
-import { canChangeSale, getSale, returnSale, voidSale } from '@/api/sales'
+import {
+  canChangeSale,
+  getDailySummary,
+  getSale,
+  isOwnStoreSale,
+  returnSale,
+  voidSale,
+} from '@/api/sales'
 import { useSessionStore } from '@/stores/session'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
+import { leftQty, refundTotal } from '@/features/sale/returnAmount'
 import { formatWon, sizeLabel } from '@/utils/format'
 
 /**
  * 영수증 상세 `/sales/{id}` (05 SCR-03, SAL-03·06·07). 버튼은 할 수 있을 때만 보인다 (W8).
- * 교환·정정은 판매 기록의 교환·정정 모드(F6b)를 만든 뒤 연결한다.
+ * [교환]은 판매 기록의 교환 모드를 이 영수증으로, [정정]은 정정 화면(`/sales/{id}/edit`)을 연다.
  */
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +37,10 @@ async function load() {
 }
 watch(() => route.params.id, load, { immediate: true })
 
+// 반품·교환은 오늘 마감 전에만 새로 기록한다 (BR-16). 지난 날 판매도 반품할 수 있다
+const todayClosed = ref(false)
+if (session.isStore) getDailySummary().then((d) => (todayClosed.value = d.closed))
+
 const statusLabels = {
   COMPLETED: '정상',
   PARTIAL_RETURNED: '일부 반품',
@@ -42,17 +54,27 @@ const statusType = {
   VOIDED: 'info',
 }
 const returnKindLabels = { RETURN: '반품', EXCHANGE: '교환', VOID: '기록 취소' }
+const kindLabels = { EXCHANGE: '교환', CORRECTION: '정정' }
 
-const left = (l) => l.qty - l.returnedQty
+const left = leftQty
+const hasLeft = computed(() => sale.value?.lines.some((l) => left(l) > 0))
 const changeable = computed(() => sale.value && canChangeSale(sale.value, session.me.role))
+// 매장 계정은 자기 매장 판매만 고친다. 다른 매장 영수증은 보기만 한다
+const otherStore = computed(() => session.isStore && sale.value && !isOwnStoreSale(sale.value))
 const canReturn = computed(
   () =>
     session.isStore &&
-    changeable.value &&
+    !otherStore.value &&
+    !todayClosed.value &&
     sale.value.status !== 'VOIDED' &&
-    sale.value.lines.some((l) => left(l) > 0),
+    hasLeft.value,
 )
-const canVoid = computed(() => changeable.value && sale.value.status !== 'VOIDED')
+// 정정·기록 취소: 매장 계정은 판매한 날·마감 전, 본사는 언제나. 남은 줄이 있어야 한다 (BR-16)
+const canVoid = computed(() => changeable.value && sale.value.status !== 'VOIDED' && hasLeft.value)
+
+function openExchange() {
+  router.push({ path: '/sales/new', query: { mode: 'EXCHANGE', saleId: sale.value.id } })
+}
 
 // ---- 반품 창 ----
 const returnOpen = ref(false)
@@ -60,18 +82,15 @@ const returnStaff = ref(null)
 const returnQty = ref({})
 const returnError = ref('')
 const saving = ref(false)
+let returnKey = crypto.randomUUID()
 function openReturn() {
+  returnKey = crypto.randomUUID() // 반품 창을 열 때 요청 키 (BR-12)
   returnStaff.value = null
   returnQty.value = Object.fromEntries(sale.value.lines.map((l) => [l.lineId, 0]))
   returnError.value = ''
   returnOpen.value = true
 }
-const refundPreview = computed(() =>
-  (sale.value?.lines ?? []).reduce(
-    (sum, l) => sum + Math.floor((l.lineAmount * (returnQty.value[l.lineId] ?? 0)) / l.qty),
-    0,
-  ),
-)
+const refundPreview = computed(() => refundTotal(sale.value?.lines ?? [], returnQty.value))
 async function saveReturn() {
   const lines = Object.entries(returnQty.value)
     .filter(([, q]) => q > 0)
@@ -80,7 +99,7 @@ async function saveReturn() {
   if (!lines.length) return (returnError.value = '반품할 수량을 1개 이상 넣어 주세요')
   saving.value = true
   try {
-    const res = await returnSale(sale.value.id, { staffId: returnStaff.value, lines })
+    const res = await returnSale(sale.value.id, { staffId: returnStaff.value, lines }, returnKey)
     returnOpen.value = false
     ElMessage.success(`${formatWon(res.returnedAmount)} 반품했습니다`)
     load()
@@ -133,14 +152,15 @@ async function saveVoid() {
         <div class="sd__title">
           <h1 class="sd__no">{{ sale.receiptNo }}</h1>
           <el-tag :type="statusType[sale.status]">{{ statusLabels[sale.status] }}</el-tag>
+          <el-tag v-if="kindLabels[sale.kind]" type="primary" effect="plain">
+            {{ kindLabels[sale.kind] }}
+          </el-tag>
           <div v-if="canReturn || canVoid" class="sd__btns">
             <el-button v-if="canReturn" type="primary" @click="openReturn">반품</el-button>
-            <el-tooltip v-if="canReturn" content="교환 모드(F6b)는 다음 작업에서 만듭니다">
-              <el-button disabled>교환</el-button>
-            </el-tooltip>
-            <el-tooltip content="정정 모드(F6b)는 다음 작업에서 만듭니다">
-              <el-button v-if="canVoid" disabled>정정</el-button>
-            </el-tooltip>
+            <el-button v-if="canReturn" @click="openExchange">교환</el-button>
+            <el-button v-if="canVoid" @click="router.push(`/sales/${sale.id}/edit`)"
+              >정정</el-button
+            >
             <el-button v-if="canVoid" type="danger" plain @click="openVoid">기록 취소</el-button>
           </div>
         </div>
@@ -164,6 +184,14 @@ async function saveVoid() {
               <GradeBadge v-if="sale.appliedGrade" :grade="sale.appliedGrade" />
             </div>
           </div>
+          <template v-if="sale.originSaleId">
+            <div class="ft-label">원 영수증</div>
+            <div class="ft-value ft-wide">
+              <router-link :to="`/sales/${sale.originSaleId}`">{{
+                sale.originReceiptNo
+              }}</router-link>
+            </div>
+          </template>
           <div class="ft-label">수량 · 합계</div>
           <div class="ft-value ft-wide">
             <span
@@ -175,7 +203,13 @@ async function saveVoid() {
           v-if="!(canReturn || canVoid) && session.isStore && sale.status !== 'VOIDED'"
           class="muted"
         >
-          판매한 날이 지났거나 마감된 판매는 본사가 고칩니다.
+          {{
+            otherStore
+              ? `다른 매장(${sale.store.name}) 판매입니다. 그 매장에서 환불·교환·정정합니다 (보기만).`
+              : hasLeft
+                ? '판매한 날이 지났거나 마감된 판매는 본사가 고칩니다.'
+                : '전부 반품된 판매입니다.'
+          }}
         </p>
       </header>
 
@@ -222,7 +256,7 @@ async function saveVoid() {
             </el-tag>
             {{ dateTimeLabel(r.returnedAt) }} · {{ r.staffName }} · {{ formatWon(r.amount) }}
             <router-link v-if="r.newSaleId" :to="`/sales/${r.newSaleId}`">
-              새 영수증 {{ r.newReceiptNo }}
+              {{ r.kind === 'VOID' ? '정정 영수증' : '새 영수증' }} {{ r.newReceiptNo }}
             </router-link>
           </li>
         </ul>

@@ -8,6 +8,8 @@ import GradeBadge from './GradeBadge.vue'
  * 결과가 없으면 "새 고객 등록"과 "비회원으로 기록".
  */
 const emit = defineEmits(['select', 'register', 'non-member'])
+/** 환불·교환처럼 회원만 찾을 때는 결과가 없어도 등록·비회원 버튼을 숨긴다 */
+defineProps({ membersOnly: { type: Boolean, default: false } })
 
 const name = ref('')
 const results = ref(null)
@@ -101,10 +103,12 @@ defineExpose({
 
     <div v-else-if="results" class="customer-search__empty">
       <span>'{{ name }}' 고객이 없습니다</span>
-      <el-button size="small" type="primary" plain @click="emit('register', name)"
-        >새 고객 등록</el-button
-      >
-      <el-button size="small" @click="(emit('non-member'), reset())">비회원으로 기록</el-button>
+      <template v-if="!membersOnly">
+        <el-button size="small" type="primary" plain @click="emit('register', name)"
+          >새 고객 등록</el-button
+        >
+        <el-button size="small" @click="(emit('non-member'), reset())">비회원으로 기록</el-button>
+      </template>
     </div>
   </div>
 </template>

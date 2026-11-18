@@ -204,6 +204,7 @@ export function getPurchases(id, keyword = '') {
       saleId: p.id,
       receiptNo: p.receiptNo,
       soldAt: p.soldAt,
+      storeId: p.store.id,
       storeName: p.store.name,
       kind: p.kind,
       status: p.status,
