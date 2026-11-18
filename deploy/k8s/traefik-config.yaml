@@ -1,0 +1,27 @@
+# k3s 기본 Traefik에 Let's Encrypt 자동 인증서(HTTP-01)와 http→https 이동을 켠다. VM에서 한 번만 적용한다.
+# 적용: kubectl apply -f traefik-config.yaml  (kustomization에는 넣지 않았다: kube-system 소유)
+# ACME_EMAIL_PLACEHOLDER는 적용할 때 VM에서 실제 값으로 바꾼다. 실제 이메일은 레포에 올리지 않는다.
+# 확인 필요: k3s 버전의 Traefik 차트(v3) 값 이름. 안 맞으면 VM에서 `kubectl -n kube-system get helmchart traefik`로 보고 고친다.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        redirections:
+          entryPoint:
+            to: websecure
+            scheme: https
+    persistence:
+      enabled: true # 인증서 저장(acme.json)을 다시 시작해도 유지
+      size: 128Mi
+    certificatesResolvers:
+      le:
+        acme:
+          email: ACME_EMAIL_PLACEHOLDER
+          storage: /data/acme.json
+          httpChallenge:
+            entryPoint: web
