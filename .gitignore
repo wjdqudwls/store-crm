@@ -20,6 +20,9 @@ dist/
 .env
 .env.*
 !.env.example
+# 화면 빌드 모드 값(가짜/실제 API 고르기). 비밀 값이 아니다
+!frontend/.env.demo
+!frontend/.env.production
 
 # 로그
 *.log

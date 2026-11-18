@@ -3,17 +3,13 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
+import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import CustomerSearch from '@/components/CustomerSearch.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
 import SaleLines from '@/components/sale/SaleLines.vue'
-import {
-  canChangeSale,
-  correctSale,
-  getCustomerForSale,
-  getSale,
-  isOwnStoreSale,
-} from '@/api/sales'
+import { correctSale, getCustomerForSale, getSale } from '@/api/sales'
+import { useSaleChangeRules } from '@/composables/useSaleChangeRules'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { leftAmount, leftQty } from '@/features/sale/returnAmount'
 import { useIsPhone } from '@/composables/useIsPhone'
@@ -52,16 +48,17 @@ const {
   toBody,
 } = useSaleLines(discountRate)
 
+const { canChange, isOwnStore } = useSaleChangeRules()
+
 /** 고칠 수 있는지: 매장 계정은 판매한 날·마감 전, 본사는 언제나. 기록 취소·전부 반품이면 안 됨 */
 const blockedReason = computed(() => {
   const s = sale.value
   if (!s) return null
   if (s.status === 'VOIDED') return '기록 취소된 판매는 정정할 수 없습니다.'
   if (!s.lines.some((l) => leftQty(l) > 0)) return '전부 반품된 판매는 정정할 수 없습니다.'
-  if (session.isStore && !isOwnStoreSale(s))
+  if (session.isStore && !isOwnStore(s))
     return `다른 매장(${s.store.name}) 판매는 그 매장에서 고칩니다.`
-  if (!canChangeSale(s, session.me.role))
-    return '판매한 날이 지났거나 마감된 판매는 본사가 고칩니다.'
+  if (!canChange(s)) return '판매한 날이 지났거나 마감된 판매는 본사가 고칩니다.'
   return null
 })
 
@@ -172,6 +169,7 @@ useSaleShortcuts({ confirmOpen, onSave: save, onRequest: requestSave })
     </div>
 
     <template v-else>
+      <ReferenceBanner />
       <header class="sc__head">
         <h1 class="page__title">정정 · {{ sale.receiptNo }}</h1>
         <span class="sc__tag">정정</span>

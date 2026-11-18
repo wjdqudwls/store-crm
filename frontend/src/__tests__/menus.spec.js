@@ -46,3 +46,15 @@ describe('계정별 메뉴 (05 1.2)', () => {
     expect(accountLabel(hq)).toBe('최유나 · 본사')
   })
 })
+
+describe('참고 화면은 실서버에서 뺀다 (sessions D2)', () => {
+  it('실서버 빌드(withReference=false)에서는 키오스크 경로가 허용 경로에서 빠진다', () => {
+    expect(allowedPaths('KIOSK', true).has('/kiosk')).toBe(true)
+    expect(allowedPaths('KIOSK', false).has('/kiosk')).toBe(false)
+  })
+
+  it('참고 화면이 아닌 화면은 그대로다', () => {
+    expect(allowedPaths('STORE', false).has('/sales/new')).toBe(true)
+    expect(allowedPaths('SENIOR', false).has('/notifications')).toBe(true) // 알림함은 실제 기능 (D3)
+  })
+})

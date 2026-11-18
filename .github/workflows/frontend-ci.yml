@@ -47,3 +47,7 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # 실서버 빌드(.env.production)에는 가짜 데이터가 없어야 한다
+      - name: Check real build has no fake data
+        run: npm run check:real

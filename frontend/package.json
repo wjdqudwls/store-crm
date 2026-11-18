@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:demo": "vite build --mode demo",
+    "check:real": "node scripts/check-real-build.mjs",
     "preview": "vite preview",
     "test:unit": "vitest",
     "lint": "run-s \"lint:*\"",

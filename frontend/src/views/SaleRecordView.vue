@@ -14,6 +14,7 @@ import ExchangePanel from '@/components/sale/ExchangePanel.vue'
 import { getCustomerForSale, getDailySummary, getStaff, createSale } from '@/api/sales'
 import { formatWon, todayLabel } from '@/utils/format'
 import { useIsPhone } from '@/composables/useIsPhone'
+import { showReference } from '@/config/reference'
 import { useSaleLines } from '@/composables/useSaleLines'
 import { useSaleShortcuts } from '@/composables/useSaleShortcuts'
 
@@ -24,7 +25,7 @@ import { useSaleShortcuts } from '@/composables/useSaleShortcuts'
  */
 const isPhone = useIsPhone()
 const route = useRoute()
-const modes = ['PURCHASE', 'REFUND', 'EXCHANGE']
+const modes = showReference ? ['PURCHASE', 'REFUND', 'EXCHANGE'] : ['PURCHASE', 'REFUND']
 const mode = ref(modes.includes(route.query.mode) ? route.query.mode : 'PURCHASE')
 const exchangeSaleId = computed(() => Number(route.query.saleId) || null)
 
@@ -214,7 +215,7 @@ useSaleShortcuts({
       <el-radio-group v-model="mode" class="sale__mode" aria-label="판매 종류">
         <el-radio-button value="PURCHASE">구매</el-radio-button>
         <el-radio-button value="REFUND">환불</el-radio-button>
-        <el-radio-button value="EXCHANGE">교환</el-radio-button>
+        <el-radio-button v-if="showReference" value="EXCHANGE">교환</el-radio-button>
       </el-radio-group>
       <div v-if="summary" class="sale__today">
         <span>{{ todayLabel() }}</span>

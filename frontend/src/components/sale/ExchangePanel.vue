@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
+import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import CustomerSearch from '@/components/CustomerSearch.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
@@ -146,6 +147,7 @@ useSaleShortcuts({ confirmOpen, onSave: save, onRequest: requestSave })
 <template>
   <div class="sp" :class="{ 'sp--phone': phone }">
     <div class="sp__main">
+      <ReferenceBanner />
       <div class="ftable">
         <label class="ft-label is-required" for="exchange-staff">처리 직원</label>
         <div class="ft-value">
