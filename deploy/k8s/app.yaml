@@ -1,0 +1,86 @@
+# 앱(Spring Boot + Vue 빌드 파일) 한 개. 이미지 이름·태그는 kustomization.yaml의 images가 바꾼다.
+# 비밀 값은 Secret app-env에서만 받는다 (NFR-06). 값은 레포에 없다.
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+spec:
+  selector:
+    app: app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5 # 롤백(kubectl rollout undo)용 기록
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # 새 Pod가 준비된 뒤에 옛 Pod를 내린다 (잠깐 JVM 2개, 메모리 약 1.6GB)
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001 # Dockerfile의 app 사용자
+      containers:
+        - name: app
+          image: store-crm
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: prod
+            - name: TZ
+              value: Asia/Seoul
+            - name: DB_HOST
+              value: mariadb
+            - name: DB_PORT
+              value: "3306"
+            - name: DB_NAME
+              value: crm
+            - name: DB_USER
+              value: crm
+          envFrom:
+            # DB_PASSWORD, JWT_SECRET, VAPID_* 등 비밀 값 (secret.example.yaml에 키 이름만 있다)
+            - secretRef:
+                name: app-env
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          # Spring Boot는 쿠버네티스에서 실행되면 liveness/readiness 그룹을 자동으로 켠다.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36 # 최대 3분
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3

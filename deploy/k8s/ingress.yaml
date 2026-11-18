@@ -1,0 +1,61 @@
+# 주소는 DuckDNS 도메인이다. APP_HOST_PLACEHOLDER는 VM에서 적용할 때 실제 도메인으로 바꾼다 (README).
+# Traefik은 더 구체적인 경로(긴 규칙)를 먼저 고르므로 세 Ingress가 겹쳐도 된다.
+#
+# 1) PWA 파일: 인증 없이 열어야 브라우저가 가져오고 서비스 워커가 등록된다. 항상 새로 받게 no-cache.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-pwa
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+    traefik.ingress.kubernetes.io/router.middlewares: store-crm-no-cache@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [APP_HOST_PLACEHOLDER]
+  rules:
+    - host: APP_HOST_PLACEHOLDER
+      http:
+        paths:
+          - { path: /sw.js, pathType: Exact, backend: { service: { name: app, port: { number: 80 } } } }
+          - { path: /manifest.webmanifest, pathType: Exact, backend: { service: { name: app, port: { number: 80 } } } }
+          - { path: /icons, pathType: Prefix, backend: { service: { name: app, port: { number: 80 } } } }
+---
+# 2) 해시가 붙은 화면 파일: 1년 캐시
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-assets
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+    traefik.ingress.kubernetes.io/router.middlewares: store-crm-basic-auth@kubernetescrd,store-crm-immutable-cache@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [APP_HOST_PLACEHOLDER]
+  rules:
+    - host: APP_HOST_PLACEHOLDER
+      http:
+        paths:
+          - { path: /assets, pathType: Prefix, backend: { service: { name: app, port: { number: 80 } } } }
+---
+# 3) 나머지 전부(화면 주소, /api): 로그인 전에는 basicAuth, index.html은 no-cache
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+    traefik.ingress.kubernetes.io/router.middlewares: store-crm-basic-auth@kubernetescrd,store-crm-no-cache@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [APP_HOST_PLACEHOLDER]
+  rules:
+    - host: APP_HOST_PLACEHOLDER
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: app, port: { number: 80 } } } }
