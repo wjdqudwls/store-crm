@@ -60,4 +60,20 @@ public class Staff {
     /** 이 시각보다 먼저 발급된 토큰은 거절한다 (ADR-025). */
     @Column(nullable = false)
     private LocalDateTime tokensValidAfter;
+
+    /** 계정을 만든다. 만든 시각이 로그인 기준 시각이 된다 (ADR-025). */
+    public static Staff create(String loginId, String passwordHash, String name, StaffRole role,
+            ManagerSlot managerSlot, Store store, String staffCode, LocalDateTime now) {
+        Staff staff = new Staff();
+        staff.loginId = loginId;
+        staff.passwordHash = passwordHash;
+        staff.name = name;
+        staff.role = role;
+        staff.managerSlot = managerSlot;
+        staff.store = store;
+        staff.staffCode = staffCode;
+        staff.active = true;
+        staff.tokensValidAfter = now;
+        return staff;
+    }
 }

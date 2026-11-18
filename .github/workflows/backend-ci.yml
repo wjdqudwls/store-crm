@@ -1,5 +1,5 @@
 # 백엔드 테스트: PR과 main push마다 ./gradlew test를 돌린다.
-# 테스트용 MariaDB는 매번 새로 띄우고 끝나면 사라진다. 아래 비밀번호는 이 임시 DB에만 쓰는 값이다.
+# 테스트용 MariaDB는 Testcontainers가 매번 새로 띄우고 끝나면 사라진다 (ADR-017). 우분투 러너에는 Docker가 있다.
 name: backend-ci
 
 on:
@@ -16,29 +16,6 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
-    services:
-      mariadb:
-        image: mariadb:11
-        env:
-          MARIADB_ROOT_PASSWORD: ci-root
-          MARIADB_DATABASE: crm
-          MARIADB_USER: crm
-          MARIADB_PASSWORD: ci-password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
-    env:
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_NAME: crm
-      DB_USER: crm
-      DB_PASSWORD: ci-password
 
     defaults:
       run:

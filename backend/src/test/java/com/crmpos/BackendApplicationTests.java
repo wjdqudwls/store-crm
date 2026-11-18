@@ -1,9 +1,9 @@
 package com.crmpos;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import com.crmpos.support.IntegrationTest;
 
-@SpringBootTest
+@IntegrationTest
 class BackendApplicationTests {
 
   @Test
