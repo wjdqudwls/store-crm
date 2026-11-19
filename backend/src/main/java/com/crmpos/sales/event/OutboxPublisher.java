@@ -106,8 +106,15 @@ public class OutboxPublisher {
                 return;
             }
             event.recordFailure();
-            log.warn("outbox event failed eventId={} type={} attempts={} status={} cause={}", event.getEventId(),
-                    event.getEventType(), event.getAttempts(), event.getStatus(), cause.getClass().getSimpleName());
+            if (event.getStatus() == OutboxStatus.FAILED) {
+                // 이 판매의 뒤 이벤트(반품 등)가 계속 멈춘다. 사람이 원인을 고치고 PENDING으로 되돌려야 한다 (운영 메모).
+                log.error("outbox event FAILED after {} attempts, later events of the same sale are blocked eventId={} type={} aggregateId={} cause={}",
+                        event.getAttempts(), event.getEventId(), event.getEventType(), event.getAggregateId(),
+                        cause.getClass().getSimpleName());
+            } else {
+                log.warn("outbox event failed eventId={} type={} attempts={} cause={}", event.getEventId(),
+                        event.getEventType(), event.getAttempts(), cause.getClass().getSimpleName());
+            }
         }));
     }
 }
