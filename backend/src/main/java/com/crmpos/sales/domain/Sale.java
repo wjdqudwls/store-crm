@@ -1,5 +1,6 @@
 package com.crmpos.sales.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,9 +11,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.crmpos.common.type.GradeCode;
 import lombok.AccessLevel;
@@ -97,4 +101,48 @@ public class Sale {
     /** 기록한 시각. 판매 시각(soldAt)과 다를 수 있다. */
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL)
+    private List<SaleLine> lines = new ArrayList<>();
+
+    /**
+     * 일반 판매를 기록한다 (SAL-01). 합계는 라인에서 더한다. 결제 금액은 계산하지 않고 받은 값 그대로다 (BR-10, ADR-014).
+     * 처음 판매(rootSale)는 ID가 생긴 뒤 {@link #assignRootToSelf()}로 자기 자신을 가리키게 한다.
+     */
+    public static Sale record(Long storeId, String receiptNo, String idempotencyKey, String requestHash, Long staffId,
+            Long recordedBy, Long customerId, GradeCode appliedGrade, LocalDateTime soldAt, LocalDateTime now,
+            List<SaleLine> lines) {
+        if (lines == null || lines.isEmpty()) {
+            throw new IllegalArgumentException("판매에는 라인이 하나 이상 필요합니다.");
+        }
+        Sale sale = new Sale();
+        sale.storeId = storeId;
+        sale.receiptNo = receiptNo;
+        sale.idempotencyKey = idempotencyKey;
+        sale.requestHash = requestHash;
+        sale.staffId = staffId;
+        sale.recordedBy = recordedBy;
+        sale.customerId = customerId;
+        sale.appliedGrade = appliedGrade;
+        sale.soldAt = soldAt;
+        sale.kind = SaleKind.NORMAL;
+        sale.status = SaleStatus.COMPLETED;
+        sale.createdAt = now;
+        long amount = 0;
+        int qty = 0;
+        for (SaleLine line : lines) {
+            line.attachTo(sale);
+            sale.lines.add(line);
+            amount += line.getLineAmount();
+            qty += line.getQty();
+        }
+        sale.totalAmount = amount;
+        sale.totalQty = qty;
+        return sale;
+    }
+
+    /** 일반 판매의 처음 판매는 자기 자신이다 (ADR-022). */
+    public void assignRootToSelf() {
+        this.rootSale = this;
+    }
 }

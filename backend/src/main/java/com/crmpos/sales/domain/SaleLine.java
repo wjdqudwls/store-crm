@@ -79,4 +79,34 @@ public class SaleLine {
 
     @Column(length = 30)
     private String wearerLabel;
+
+    /** 라인 하나. 등록 상품이면 skuId·productCode·listPrice를 채우고, 직접 입력이면 null이다. */
+    public static SaleLine of(Long skuId, String productCode, String productName, Target target, ItemType itemType,
+            String color, String size, Long listPrice, int qty, long lineAmount, Long wearerMemberId,
+            String wearerLabel) {
+        if (qty < 1) {
+            throw new IllegalArgumentException("수량은 1 이상이어야 합니다.");
+        }
+        if (lineAmount < 0) {
+            throw new IllegalArgumentException("결제 금액은 0 이상이어야 합니다.");
+        }
+        SaleLine line = new SaleLine();
+        line.skuId = skuId;
+        line.productCode = productCode;
+        line.productName = productName;
+        line.target = target;
+        line.itemType = itemType;
+        line.color = color;
+        line.size = size;
+        line.listPrice = listPrice;
+        line.qty = qty;
+        line.lineAmount = lineAmount;
+        line.wearerMemberId = wearerMemberId;
+        line.wearerLabel = wearerLabel;
+        return line;
+    }
+
+    void attachTo(Sale sale) {
+        this.sale = sale;
+    }
 }

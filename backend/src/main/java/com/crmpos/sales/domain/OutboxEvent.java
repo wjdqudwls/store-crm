@@ -52,4 +52,18 @@ public class OutboxEvent {
 
     @Column
     private LocalDateTime publishedAt;
+
+    /** 판매·반품과 같은 트랜잭션에서 남기는 보낼 이벤트 (발행은 B2-4). */
+    public static OutboxEvent pending(String eventId, SaleEventType type, Long aggregateId, String payload,
+            LocalDateTime now) {
+        OutboxEvent event = new OutboxEvent();
+        event.eventId = eventId;
+        event.eventType = type;
+        event.aggregateId = aggregateId;
+        event.payload = payload;
+        event.status = OutboxStatus.PENDING;
+        event.attempts = 0;
+        event.createdAt = now;
+        return event;
+    }
 }
