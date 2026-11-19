@@ -50,7 +50,7 @@ Oracle Cloud 무료 VM 1대에 k3s(가벼운 쿠버네티스) 단일 노드를 �
 | --- | --- | --- | --- |
 | 0 | `docs/00-idea.md` | 왜 만드는가, 문제, 대상, 범위 | 확정 |
 | 1 | `docs/01-requirements.md` | 기능·비기능 요구사항, 비즈니스 규칙, 8주 일정 | 확정 |
-| 2 | `docs/02-erd.md` | 데이터 모델 개념·논리 (ERD 그림은 문서 안 mermaid). 구현 뒤 물리 명세는 `schema.sql` | 확정 |
+| 2 | `docs/02-erd.md` | 데이터 모델 개념·논리 (ERD 그림은 문서 안 mermaid). 구현 뒤 물리 명세는 Flyway 마이그레이션(`backend/src/main/resources/db/migration`) | 확정 |
 | 3 | `docs/03-api.md` | API 명세, 에러 코드, 모듈 간 이벤트 계약 | 확정 |
 | 4 | `docs/04-architecture.md` | 시스템 구성, 모듈 의존 방향, 패키지 구조, 이벤트 흐름, 보안, 실행 환경 | 초안 |
 | 5 | `docs/05-screens.md` | 화면설계: 계정별 화면·메뉴, 화면 흐름, 화면별 칸·검증·버튼·쓰는 API (그림은 피그마) | 정함 |
@@ -71,7 +71,7 @@ Oracle Cloud 무료 VM 1대에 k3s(가벼운 쿠버네티스) 단일 노드를 �
 - 앞 단계 문서의 핵심(범위, 규칙)이 정해지면 다음 단계를 시작한다. 다음 단계를 쓰다 드러난 문제는 앞 문서에 반영하고, 1주 차 안에 01~03을 모두 확정한다.
 - 확정된 문서를 바꾸면 그 문서 상단에 변경을 적고, 기술 결정이면 `docs/decisions.md`에 ADR로 남긴다.
 - 결정 기록은 두 곳이다: 업무 규칙 결정은 01-requirements.md 8장, 기술 결정은 decisions.md.
-- 구현 뒤 최신 명세는 API는 `/swagger-ui`, DB 물리 명세는 `schema.sql`이다. 03과 02는 설계 의도와 개념·논리를 남긴다 (ADR-031).
+- 구현 뒤 최신 명세는 API는 `/swagger-ui`, DB 물리 명세는 Flyway 마이그레이션(`db/migration`)이다. 03과 02는 설계 의도와 개념·논리를 남긴다 (ADR-039).
 
 ## 기술 스택
 

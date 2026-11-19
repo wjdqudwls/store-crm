@@ -9,7 +9,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 커밋과 push는 사용자에게 확인받고 한다.
 - 기획 문서(`docs/`)는 레포에 올리지 않는다(`.gitignore`). 기본 폴더 `/Users/jeongbyeongjin/Documents/store-crm/docs`에만 있고 커밋하지 않으며, 다른 세션은 이 절대 경로에서 읽는다. `README.md`와 `CLAUDE.md`만 바꿀 때는 `main`에 바로 커밋한다.
 - 코드와 설정은 기능 단위 브랜치(`feat/…`, `fix/…`, `refactor/…`, `chore/…`, `test/…`)에서 작업하고 PR로 `main`에 합친다. 브랜치 이름에는 dev-plan.md의 작업 ID를 넣는다 (예: `feat/B0-2-common-error`). PR 설명은 `.github/pull_request_template.md` 양식대로 쓰고 요구사항 ID(예: SAL-01, BR-10)를 적는다. PR의 검사(`backend/`는 `backend-ci`, `frontend/`는 `frontend-ci`)가 통과해야 합친다.
-- 코드와 함께 바뀌는 문서는 같은 PR에 넣는다.
+- 코드와 함께 바뀌는 문서는 원본 docs에 고치고 PR 설명에 '문서 반영: …(로컬)'로 적는다.
 - 커밋 메시지는 `docs: …`, `feat: …`, `fix: …`, `refactor: …`, `chore: …`, `test: …` 형식으로 쓴다.
 
 ## 세션 운영
@@ -44,7 +44,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 - 한 결정이 여러 문서에 걸치면 01·02·03·ADR을 함께 고쳐 용어와 값을 맞춘다.
 - 문서는 한국어로 쓴다.
 - 구현 후에는 `/swagger-ui`가 최신 API 명세다. 03은 설계 의도를 남기는 문서다.
-- 구현 후에는 `schema.sql`이 최신 물리 명세(타입·길이·기본값·성능 인덱스)다. 02는 개념·논리(테이블, 컬럼의 뜻, 관계, 키, enum 값, 중복 이유)를 남긴다. 테이블·컬럼·관계·키·enum 값·중복 이유가 바뀌면 02와 `schema.sql`을 같은 PR에서 고치고, 타입·길이·성능 인덱스·기본값만 바뀌면 `schema.sql`만 고친다 (ADR-031).
+- 구현 후에는 Flyway 마이그레이션(`db/migration`)이 최신 물리 명세다. 테이블을 바꾸면 새 V 파일을 더하고 이미 적용된 파일은 고치지 않는다 (ADR-039). 02는 개념·논리(테이블, 컬럼의 뜻, 관계, 키, enum 값, 중복 이유)를 남긴다. 테이블·컬럼·관계·키·enum 값·중복 이유가 바뀌면 02도 같이 고친다.
 
 ## 코드 구조
 
@@ -75,7 +75,7 @@ CRM pos (레포 `store-crm`): 패션 오프라인 매장용 클라이언텔링 C
 
 ## 의존성
 
-- 새 의존성은 필요할 때 추가한다. 예정: Spring Security + jjwt(로그인), springdoc-openapi(NFR-12), Testcontainers MariaDB(테스트 DB, ADR-017), Apache POI(상품 엑셀, ADR-015), MyBatis(조회, ADR-018), ArchUnit(모듈 경계 테스트, ADR-018), ZXing(QR, ADR-019).
+- 새 의존성은 필요할 때 추가한다. 예정: Flyway(DB 마이그레이션, ADR-039), Spring Security + jjwt(로그인), springdoc-openapi(NFR-12), Testcontainers MariaDB(테스트 DB, ADR-017), Apache POI(상품 엑셀, ADR-015), MyBatis(조회, ADR-018), ArchUnit(모듈 경계 테스트, ADR-018), ZXing(QR, ADR-019).
 - 쓰지 않는다: OpenFeign, Kafka, Redis, ModelMapper, H2. 테스트 DB는 H2 대신 Testcontainers MariaDB를 쓴다 (`FOR UPDATE`, JSON 컬럼, UNIQUE 제약을 실제 DB로 확인해야 하므로, ADR-017).
 
 ## 테스트 규칙
