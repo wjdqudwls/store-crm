@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 고객 검색 (CUS-01). 고객 모듈 테이블(customer, customer_summary)만 쓴다 (ADR-018). -->
+<mapper namespace="com.crmpos.customer.repository.CustomerQueryMapper">
+
+  <resultMap id="listRow" type="com.crmpos.customer.repository.CustomerListRow">
+    <constructor>
+      <idArg column="id" javaType="java.lang.Long"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="phone_last4" javaType="java.lang.String"/>
+      <arg column="current_grade" javaType="com.crmpos.common.type.GradeCode"/>
+      <arg column="last_visit_at" javaType="java.time.LocalDateTime"/>
+      <arg column="staff_id" javaType="java.lang.Long"/>
+    </constructor>
+  </resultMap>
+
+  <select id="searchByName" resultMap="listRow">
+    SELECT c.id, c.name, c.phone_last4, s.current_grade, s.last_visit_at, c.staff_id
+    FROM customer c
+    JOIN customer_summary s ON s.customer_id = c.id
+    WHERE c.name LIKE CONCAT('%', #{name}, '%') ESCAPE '!'
+    ORDER BY c.name, c.id
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="countByName" resultType="long">
+    SELECT COUNT(*)
+    FROM customer c
+    WHERE c.name LIKE CONCAT('%', #{name}, '%') ESCAPE '!'
+  </select>
+
+</mapper>

@@ -131,6 +131,37 @@ public class Customer {
         if (!draft.privacyAgreed() || !draft.age14Confirmed()) {
             throw new IllegalArgumentException("개인정보 수집·이용 동의와 만 14세 이상 확인이 필요합니다.");
         }
+        Customer customer = new Customer();
+        customer.applyProfile(draft);
+        customer.homeStoreId = draft.homeStoreId();
+        customer.source = draft.source();
+        customer.privacyAgreedAt = now;
+        customer.age14ConfirmedAt = now;
+        customer.marketingSmsAgreedAt = draft.marketingSms() ? now : null;
+        customer.marketingKakaoAgreedAt = draft.marketingKakao() ? now : null;
+        customer.createdAt = now;
+        return customer;
+    }
+
+    /**
+     * 프로필을 고친다 (CUS-04). 등록과 같은 이름 규칙을 쓴다. 가입매장·등록 경로·동의 시각·가입일은 그대로 두고,
+     * 마케팅 수신은 새로 동의할 때만 시각을 남기고 철회하면 지운다.
+     */
+    public void updateProfile(CustomerDraft draft, LocalDateTime now) {
+        applyProfile(draft);
+        this.marketingSmsAgreedAt = marketingTime(draft.marketingSms(), this.marketingSmsAgreedAt, now);
+        this.marketingKakaoAgreedAt = marketingTime(draft.marketingKakao(), this.marketingKakaoAgreedAt, now);
+    }
+
+    private static LocalDateTime marketingTime(boolean agreed, LocalDateTime before, LocalDateTime now) {
+        if (!agreed) {
+            return null;
+        }
+        return before != null ? before : now;
+    }
+
+    /** 외국인은 영문 이름이 필수이고 한글 이름을 비우면 영문 이름을 이름 칸에도 넣는다 (REG-06). 내국인은 이름이 필수다. */
+    private void applyProfile(CustomerDraft draft) {
         boolean foreign = draft.nationality() == Nationality.FOREIGN;
         String nameEn = blankToNull(draft.nameEn());
         String name = blankToNull(draft.name());
@@ -149,34 +180,25 @@ public class Customer {
                 throw new IllegalArgumentException("내국인은 영문 이름을 쓰지 않습니다.");
             }
         }
-        Customer customer = new Customer();
-        customer.name = name;
-        customer.nameEn = nameEn;
-        customer.phoneEnc = draft.phoneEnc();
-        customer.phoneHash = draft.phoneHash();
-        customer.phoneLast4 = draft.phoneLast4();
-        customer.nationality = draft.nationality();
-        customer.birthYear = draft.birthYear();
-        customer.birthMd = draft.birthMd();
-        customer.regionSido = draft.regionSido();
-        customer.regionGu = draft.regionGu();
-        customer.addressDetailEnc = draft.addressDetailEnc();
-        customer.gender = draft.gender();
-        customer.preferredItemTypes = draft.preferredItemTypes();
-        customer.sizeTop = draft.sizeTop();
-        customer.sizeOuter = draft.sizeOuter();
-        customer.sizeBottom = draft.sizeBottom();
-        customer.sizeShoes = draft.sizeShoes();
-        customer.contactChannel = draft.contactChannel();
-        customer.homeStoreId = draft.homeStoreId();
-        customer.staffId = draft.staffId();
-        customer.source = draft.source();
-        customer.privacyAgreedAt = now;
-        customer.age14ConfirmedAt = now;
-        customer.marketingSmsAgreedAt = draft.marketingSms() ? now : null;
-        customer.marketingKakaoAgreedAt = draft.marketingKakao() ? now : null;
-        customer.createdAt = now;
-        return customer;
+        this.name = name;
+        this.nameEn = nameEn;
+        this.phoneEnc = draft.phoneEnc();
+        this.phoneHash = draft.phoneHash();
+        this.phoneLast4 = draft.phoneLast4();
+        this.nationality = draft.nationality();
+        this.birthYear = draft.birthYear();
+        this.birthMd = draft.birthMd();
+        this.regionSido = draft.regionSido();
+        this.regionGu = draft.regionGu();
+        this.addressDetailEnc = draft.addressDetailEnc();
+        this.gender = draft.gender();
+        this.preferredItemTypes = draft.preferredItemTypes();
+        this.sizeTop = draft.sizeTop();
+        this.sizeOuter = draft.sizeOuter();
+        this.sizeBottom = draft.sizeBottom();
+        this.sizeShoes = draft.sizeShoes();
+        this.contactChannel = draft.contactChannel();
+        this.staffId = draft.staffId();
     }
 
     private static String blankToNull(String value) {

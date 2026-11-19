@@ -29,7 +29,17 @@ public class CustomerWriter {
                 .map(GradePolicy::getVersion)
                 .orElseThrow(() -> new IllegalStateException("적용 중인 등급 기준이 없습니다."));
         Customer customer = customerRepository.saveAndFlush(Customer.register(draft, now));
-        summaryRepository.save(CustomerSummary.initial(customer.getId(), policyVersion, now));
+        summaryRepository.saveAndFlush(CustomerSummary.initial(customer.getId(), policyVersion, now));
         return customer;
+    }
+
+    /** 프로필을 고친다. 번호가 겹치면 flush에서 UNIQUE가 막고 호출한 쪽이 409로 바꾼다. */
+    @Transactional
+    public Customer update(Long customerId, CustomerDraft draft, LocalDateTime now) {
+        Customer customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new com.crmpos.common.error.BusinessException(
+                        com.crmpos.common.error.ErrorCode.CUSTOMER_NOT_FOUND));
+        customer.updateProfile(draft, now);
+        return customerRepository.saveAndFlush(customer);
     }
 }
