@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -51,10 +50,6 @@ public class SaleRecordingService {
     public record Result(SaleResponse sale, boolean created) {
     }
 
-    private static final Pattern UUID_FORMAT =
-            Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
-    private static final Set<StaffRole> STAFF_RANKS =
-            Set.of(StaffRole.MANAGER, StaffRole.SENIOR, StaffRole.JUNIOR, StaffRole.STAFF);
     /** 화면 시계와 서버 시계의 차이를 받아 주는 시간 (미래 시각 거절 기준). */
     private static final long CLOCK_SKEW_SECONDS = 60;
 
@@ -84,11 +79,7 @@ public class SaleRecordingService {
         if (account.role() != StaffRole.STORE || account.storeId() == null) {
             throw new BusinessException(ErrorCode.STORE_REQUIRED);
         }
-        if (idempotencyKey == null || !UUID_FORMAT.matcher(idempotencyKey).matches()) {
-            throw new ValidationFailedException(
-                    List.of(new FieldError("Idempotency-Key", "UUID 형식의 요청 키가 필요합니다.")));
-        }
-        String key = idempotencyKey.toLowerCase();
+        String key = SalesInputRules.requireKey(idempotencyKey);
         String requestHash = requestHash(request, account.storeId());
 
         Result replay = replayIfStored(key, requestHash);
@@ -103,7 +94,8 @@ public class SaleRecordingService {
         if (request.customerId() == null && request.memo() != null && !request.memo().isBlank()) {
             errors.add(new FieldError("memo", "비회원 판매에는 메모를 남길 수 없습니다."));
         }
-        Staff seller = findSeller(request.sellerStaffId(), account.storeId(), errors);
+        Staff seller = SalesInputRules.checkStoreStaff(staffRepository, request.sellerStaffId(), account.storeId(),
+                "sellerStaffId", errors);
         if (!errors.isEmpty()) {
             throw new ValidationFailedException(errors);
         }
@@ -201,16 +193,6 @@ public class SaleRecordingService {
         if (!invalid.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_SIZE, Map.of("invalidSizes", invalid));
         }
-    }
-
-    private Staff findSeller(Long sellerStaffId, Long storeId, List<FieldError> errors) {
-        Staff staff = staffRepository.findById(sellerStaffId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.STAFF_NOT_FOUND));
-        boolean sameStore = staff.getStore() != null && staff.getStore().getId().equals(storeId);
-        if (!staff.isActive() || !sameStore || !STAFF_RANKS.contains(staff.getRole())) {
-            errors.add(new FieldError("sellerStaffId", "이 매장의 활성 직원이 아닙니다."));
-        }
-        return staff;
     }
 
     private List<SaleLine> buildLines(SaleRequest request, SaleCustomer customer) {

@@ -1,5 +1,6 @@
 package com.crmpos.sales.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -10,9 +11,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -65,4 +69,39 @@ public class SaleReturn {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "new_sale_id")
     private Sale newSale;
+
+    @OneToMany(mappedBy = "saleReturn", cascade = CascadeType.ALL)
+    private List<SaleReturnLine> lines = new ArrayList<>();
+
+    /** 반품할 라인과 수량 한 줄. */
+    public record Item(SaleLine line, int qty) {
+        public static Item of(SaleLine line, int qty) {
+            return new Item(line, qty);
+        }
+    }
+
+    /**
+     * 반품을 기록한다 (SAL-03, BR-11). 라인마다 반품 수량·환불 금액을 올리고 판매 상태를 바꾼다.
+     * 호출하기 전에 판매 행을 잠그고 남은 수량을 확인해야 한다 (ADR-030). 원 판매의 금액·수량은 고치지 않는다.
+     */
+    public static SaleReturn recordReturn(Sale sale, String idempotencyKey, String requestHash, Long staffId,
+            Long recordedBy, LocalDateTime returnedAt, List<Item> items) {
+        SaleReturn ret = new SaleReturn();
+        ret.sale = sale;
+        ret.idempotencyKey = idempotencyKey;
+        ret.requestHash = requestHash;
+        ret.kind = ReturnKind.RETURN;
+        ret.staffId = staffId;
+        ret.recordedBy = recordedBy;
+        ret.returnedAt = returnedAt;
+        long total = 0;
+        for (Item item : items) {
+            long refund = item.line().processReturn(item.qty());
+            ret.lines.add(SaleReturnLine.of(ret, item.line(), item.qty(), refund));
+            total += refund;
+        }
+        ret.amount = total;
+        sale.refreshReturnStatus();
+        return ret;
+    }
 }

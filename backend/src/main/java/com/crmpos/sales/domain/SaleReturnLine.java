@@ -37,4 +37,13 @@ public class SaleReturnLine {
 
     @Column(nullable = false)
     private long amount;
+
+    static SaleReturnLine of(SaleReturn saleReturn, SaleLine saleLine, int qty, long amount) {
+        SaleReturnLine line = new SaleReturnLine();
+        line.saleReturn = saleReturn;
+        line.saleLine = saleLine;
+        line.qty = qty;
+        line.amount = amount;
+        return line;
+    }
 }
