@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChoiceButtons from '@/components/ChoiceButtons.vue'
 import { createMember, deleteMember, getMembers, updateMember } from '@/api/customers'
@@ -19,13 +21,15 @@ const session = useSessionStore()
 const canEdit = computed(() => session.isStore && showReference)
 
 const list = ref(null)
-async function load() {
-  list.value = await getMembers(props.customerId)
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = await getMembers(props.customerId)
+  })
 const sizeTable = ref([])
 onMounted(async () => {
   load()
-  sizeTable.value = await getSizes()
+  sizeTable.value = await getSizes().catch(() => []) // 사이즈표가 없어도 목록은 보인다
 })
 
 const sizeKeys = [
@@ -127,9 +131,10 @@ async function remove(m) {
     <div v-if="canEdit" class="fam__bar">
       <el-button size="small" type="primary" plain @click="openNew">구성원 추가</el-button>
     </div>
-    <el-skeleton v-if="!list" animated :rows="2" />
-    <p v-else-if="!list.length" class="empty">등록한 가족 구성원이 없습니다.</p>
-    <ul v-else class="fam">
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="2" />
+    <p v-else-if="list && !list.length" class="empty">등록한 가족 구성원이 없습니다.</p>
+    <ul v-else-if="list" class="fam">
       <li v-for="m in list" :key="m.id" class="member">
         <div class="member__head">
           <strong>{{ m.nickname }}</strong>

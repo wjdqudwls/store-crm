@@ -54,15 +54,25 @@ async function toggleHistory() {
     </div>
 
     <div class="gsum__box gsum__box--muted">
-      <h3 class="gsum__box-title">
-        {{ provisional ? '임시 등급' : '확정 등급' }} ({{ g.confirmedBasis.season }} 시즌)
-        <template v-if="provisional"> · 7/1 확정</template>
-      </h3>
-      <p class="gsum__confirmed">
-        <GradeBadge :grade="g.confirmed" :provisional="provisional" />
-        티켓 {{ g.confirmedBasis.ticketCount }}건 · {{ formatWon(g.confirmedBasis.netAmount) }} ·
-        {{ g.confirmedBasis.totalScore }}점
-      </p>
+      <!-- confirmedBasis는 정기 산정·임시 재계산 이력이 없는 새 고객이면 null (03 4.4) -->
+      <template v-if="g.confirmedBasis">
+        <h3 class="gsum__box-title">
+          {{ provisional ? '임시 등급' : '확정 등급' }} ({{ g.confirmedBasis.season }} 시즌)
+          <template v-if="provisional"> · 7/1 확정</template>
+        </h3>
+        <p class="gsum__confirmed">
+          <GradeBadge :grade="g.confirmed" :provisional="provisional" />
+          티켓 {{ g.confirmedBasis.ticketCount }}건 · {{ formatWon(g.confirmedBasis.netAmount) }} ·
+          {{ g.confirmedBasis.totalScore }}점
+        </p>
+      </template>
+      <template v-else>
+        <h3 class="gsum__box-title">{{ provisional ? '임시 등급' : '확정 등급' }}</h3>
+        <p class="gsum__confirmed">
+          <GradeBadge :grade="g.confirmed" :provisional="provisional" />
+          아직 확정된 실적 기록이 없습니다
+        </p>
+      </template>
     </div>
 
     <p v-for="n in notes" :key="n" class="gsum__note">{{ n }}</p>

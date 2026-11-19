@@ -122,6 +122,29 @@ export function validateRegistration(f) {
   return e
 }
 
+const sizeNames = { top: '상의', outer: '아우터', bottom: '하의', shoes: '신발' }
+
+/**
+ * 서버 400의 `fieldErrors`(03 3.2: `agreements.privacy`, `sizes.top` …)를 폼의 칸 이름으로 바꾼다.
+ * 사이즈 오류는 한 칸(`sizes`)에 모아 보인다.
+ * @param {{ field: string, reason: string }[]} [fieldErrors]
+ * @returns {Record<string, string>}
+ */
+export function fromServerFieldErrors(fieldErrors = []) {
+  const e = {}
+  const sizeReasons = {}
+  for (const { field, reason } of fieldErrors) {
+    if (field.startsWith('agreements.')) e[field.slice('agreements.'.length)] = reason
+    else if (field.startsWith('sizes.')) {
+      const key = field.slice('sizes.'.length)
+      ;(sizeReasons[reason] ??= []).push(sizeNames[key] ?? key)
+    } else e[field] = reason
+  }
+  const sizeText = Object.entries(sizeReasons).map(([r, names]) => `${names.join('·')}: ${r}`)
+  if (sizeText.length) e.sizes = sizeText.join(' / ')
+  return e
+}
+
 const blank = (v) => v == null || String(v).trim() === ''
 
 /** 폼 → `POST /customers` 본문. 빈 선택 항목은 보내지 않는다 */

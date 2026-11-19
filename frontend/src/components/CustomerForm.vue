@@ -14,6 +14,7 @@ import {
   sizeItemType,
   visibleSizeFields,
   validateRegistration,
+  fromServerFieldErrors,
   toRegistrationBody,
   toProfilePatch,
   daysInMonth,
@@ -126,7 +127,7 @@ watch(
 
 const consentsOk = computed(() => form.privacy && form.age14)
 
-const optionalFields = new Set(['birthYear', 'birthMd'])
+const optionalFields = new Set(['birthYear', 'birthMd', 'sizes'])
 async function focusFirstError() {
   const first = Object.keys(errors.value)[0]
   if (!first) return
@@ -160,7 +161,7 @@ async function submit() {
     if (e?.status === 409 && body?.code === 'CUSTOMER_PHONE_DUPLICATED') {
       duplicate.value = body.details
     } else if (e?.status === 400 && body?.fieldErrors?.length) {
-      errors.value = Object.fromEntries(body.fieldErrors.map((f) => [f.field, f.reason]))
+      errors.value = fromServerFieldErrors(body.fieldErrors)
       focusFirstError()
     } else {
       ElMessage.error(body?.message ?? '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요')
@@ -385,7 +386,7 @@ defineExpose({ isDirty, submit, saving, consentsOk })
       </div>
 
       <div class="ft-label">사이즈</div>
-      <div class="ft-value ft-wide">
+      <div class="ft-value ft-wide" data-field="sizes">
         <p v-if="!form.gender" class="cform__hint">
           성별을 고르면 아우터·하의 사이즈도 고를 수 있어요
         </p>
@@ -393,6 +394,7 @@ defineExpose({ isDirty, submit, saving, consentsOk })
           <span class="cform__size-label">{{ f.label }}</span>
           <ChoiceButtons v-model="form.sizes[f.key]" :options="f.options" size="small" />
         </div>
+        <p v-if="errors.sizes" class="cfield__error">{{ errors.sizes }}</p>
       </div>
     </div>
 

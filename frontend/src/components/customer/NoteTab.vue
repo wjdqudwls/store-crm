@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
 import ChoiceButtons from '@/components/ChoiceButtons.vue'
@@ -23,9 +25,11 @@ const session = useSessionStore()
 const canWrite = computed(() => !session.isHq)
 
 const list = ref(null)
-async function load() {
-  list.value = (await getNotes(props.customerId)).content
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = (await getNotes(props.customerId)).content
+  })
 onMounted(load)
 
 const typeOptions = [
@@ -101,7 +105,7 @@ const writerName = computed(() =>
 )
 const staffList = ref([])
 onMounted(async () => {
-  staffList.value = await getStaff()
+  staffList.value = await getStaff().catch(() => []) // 직원 목록이 없어도 메모 목록은 보인다
 })
 function shortDate(ymd) {
   const [, m, d] = ymd.split('-').map(Number)
@@ -226,9 +230,10 @@ const typeTag = {
       </div>
     </form>
 
-    <el-skeleton v-if="!list" animated :rows="3" />
-    <p v-else-if="!list.length" class="ntab__empty">메모가 없습니다.</p>
-    <ul v-else class="nlist">
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="3" />
+    <p v-else-if="list && !list.length" class="ntab__empty">메모가 없습니다.</p>
+    <ul v-else-if="list" class="nlist">
       <li v-for="n in list" :key="n.id" class="note">
         <div class="note__head">
           <el-tag size="small" :type="typeTag[n.type]" effect="light">

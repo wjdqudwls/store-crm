@@ -13,7 +13,7 @@ const recent = useSaleRecentStore()
 const staff = ref([])
 
 onMounted(async () => {
-  staff.value = await getStaff()
+  staff.value = await getStaff().catch(() => []) // 직원 API 연결 전에도 화면은 열린다
 })
 
 const options = computed(() => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  fromServerFieldErrors,
   emptyForm,
   formatDomesticPhone,
   sizeChoices,
@@ -195,5 +196,38 @@ describe('프로필 수정 (CUS-04)', () => {
     const f = formFromCustomer(detail, null)
     f.staffId = null
     expect(toProfilePatch(f).staffId).toBeNull()
+  })
+})
+
+describe('fromServerFieldErrors (서버 400 fieldErrors → 폼 칸, 03 3.2)', () => {
+  it('should_접두어를_떼서_폼_칸_이름으로_when_agreements', () => {
+    const e = fromServerFieldErrors([
+      { field: 'agreements.privacy', reason: '개인정보 수집·이용에 동의해야 합니다.' },
+      { field: 'agreements.age14', reason: '만 14세 이상임을 확인해야 합니다.' },
+    ])
+    expect(e).toEqual({
+      privacy: '개인정보 수집·이용에 동의해야 합니다.',
+      age14: '만 14세 이상임을 확인해야 합니다.',
+    })
+  })
+
+  it('should_사이즈_오류는_sizes_칸으로_모음_when_sizes_top_등', () => {
+    const e = fromServerFieldErrors([
+      { field: 'sizes.top', reason: '허용값이 아닙니다.' },
+      { field: 'sizes.shoes', reason: '허용값이 아닙니다.' },
+    ])
+    expect(e.sizes).toBe('상의·신발: 허용값이 아닙니다.')
+  })
+
+  it('should_그대로_when_name_phone_birthMd_staffId', () => {
+    const e = fromServerFieldErrors([
+      { field: 'phone', reason: '전화번호 형식이 올바르지 않습니다.' },
+      { field: 'birthMd', reason: '날짜가 올바르지 않습니다.' },
+    ])
+    expect(Object.keys(e)).toEqual(['phone', 'birthMd'])
+  })
+
+  it('should_빈_객체_when_fieldErrors가_없음', () => {
+    expect(fromServerFieldErrors(undefined)).toEqual({})
   })
 })

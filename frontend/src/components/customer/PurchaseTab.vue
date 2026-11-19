@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { getPurchases } from '@/api/customers'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { formatWon } from '@/utils/format'
@@ -13,10 +15,12 @@ const props = defineProps({ customerId: { type: Number, required: true } })
 const keyword = ref('')
 const list = ref(null)
 
-async function load() {
-  list.value = null
-  list.value = (await getPurchases(props.customerId, keyword.value)).content
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = null
+    list.value = (await getPurchases(props.customerId, keyword.value)).content
+  })
 onMounted(load)
 
 const statusLabels = {
@@ -32,12 +36,13 @@ const statusLabels = {
       <el-button native-type="submit">찾기</el-button>
     </form>
 
-    <el-skeleton v-if="!list" animated :rows="4" />
-    <p v-else-if="!list.length" class="ptab__empty">
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="4" />
+    <p v-else-if="list && !list.length" class="ptab__empty">
       {{ keyword ? `'${keyword}' 상품을 산 기록이 없습니다.` : '구매 기록이 없습니다.' }}
     </p>
 
-    <article v-for="p in list" v-else :key="p.saleId" class="receipt">
+    <article v-for="p in list ?? []" v-else-if="list" :key="p.saleId" class="receipt">
       <header class="receipt__head">
         <span class="receipt__date">{{ dateTimeLabel(p.soldAt) }}</span>
         <span class="receipt__no">{{ p.receiptNo }}</span>

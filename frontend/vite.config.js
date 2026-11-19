@@ -13,6 +13,10 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  // 개발 서버: /api 요청을 로컬 백엔드(8080)로 보낸다. 운영에서는 Spring Boot가 화면과 API를 같이 내보낸다 (ADR-013)
+  server: {
+    proxy: { '/api': 'http://localhost:8080' },
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
