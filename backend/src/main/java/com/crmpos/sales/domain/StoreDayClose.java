@@ -19,10 +19,14 @@ import lombok.NoArgsConstructor;
 @Table(name = "store_day_close")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class StoreDayClose {
+public class StoreDayClose implements org.springframework.data.domain.Persistable<StoreDayCloseId> {
 
     @EmbeddedId
     private StoreDayCloseId id;
+
+    /** 방금 만든 행인지. 키를 직접 정해서 Spring Data가 새 행인지 알 수 없으니 알려 준다(아니면 merge가 되어 동시 마감이 덮어쓴다). */
+    @jakarta.persistence.Transient
+    private boolean newRow;
 
     /** 마감한 계정. common 모듈의 ID (ADR-003). */
     @Column(nullable = false)
@@ -51,6 +55,7 @@ public class StoreDayClose {
         close.id = new StoreDayCloseId(storeId, businessDate);
         close.closedBy = closedBy;
         close.closedAt = closedAt;
+        close.newRow = true;
         return close;
     }
 
@@ -68,5 +73,16 @@ public class StoreDayClose {
         this.closedAt = closedAt;
         this.reopenedBy = null;
         this.reopenedAt = null;
+    }
+
+    @Override
+    public boolean isNew() {
+        return newRow;
+    }
+
+    @jakarta.persistence.PostPersist
+    @jakarta.persistence.PostLoad
+    void markNotNew() {
+        this.newRow = false;
     }
 }

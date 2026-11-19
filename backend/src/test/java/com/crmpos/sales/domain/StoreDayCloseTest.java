@@ -63,4 +63,10 @@ class StoreDayCloseTest {
         assertThat(close.getReopenedBy()).isNull();
         assertThat(close.getReopenedAt()).isNull();
     }
+
+    @Test
+    @DisplayName("새로 만든 마감 행은 새 행이다 (키를 직접 정하는 엔티티라 INSERT로 저장해 동시 마감이 서로 덮어쓰지 않는다)")
+    void should_beNew_whenJustCreated() {
+        assertThat(StoreDayClose.close(1L, DAY, 3L, EVENING).isNew()).isTrue();
+    }
 }
