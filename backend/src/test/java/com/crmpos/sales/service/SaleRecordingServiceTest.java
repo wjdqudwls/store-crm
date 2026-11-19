@@ -411,4 +411,19 @@ class SaleRecordingServiceTest {
     void should_maskMemo_inToString() {
         assertThat(request(1024L, "개인적인 응대 메모", direct()).toString()).doesNotContain("응대 메모");
     }
+
+    @Test
+    @DisplayName("판매 시각은 DB(마이크로초)가 저장하는 정밀도로 맞춘다 (리눅스는 나노초라 처음 응답과 재전송 응답이 달라지는 것을 막는다)")
+    void should_truncateSoldAtToMicros() {
+        List<FieldError> errors = new ArrayList<>();
+        LocalDateTime nowWithNanos = LocalDateTime.of(2026, 11, 19, 14, 3, 0, 123_456_789);
+        LocalDateTime requested = LocalDateTime.of(2026, 11, 19, 13, 0, 0, 987_654_321);
+
+        LocalDateTime fromNow = SaleRecordingService.resolveSoldAt(null, nowWithNanos, false, errors);
+        LocalDateTime fromRequest = SaleRecordingService.resolveSoldAt(kst(requested), nowWithNanos, false, errors);
+
+        assertThat(fromNow.getNano()).isEqualTo(123_456_000);
+        assertThat(fromRequest.getNano()).isEqualTo(987_654_000);
+        assertThat(errors).isEmpty();
+    }
 }

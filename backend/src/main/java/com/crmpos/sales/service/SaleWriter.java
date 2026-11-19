@@ -43,7 +43,7 @@ public class SaleWriter {
         String receiptNo = ReceiptNumber.format(newSale.storeCode(), saleDate,
                 nextSequence(newSale.storeId(), saleDate));
 
-        LocalDateTime now = LocalDateTime.now(KstTime.ZONE);
+        LocalDateTime now = LocalDateTime.now(KstTime.ZONE).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         Sale sale = Sale.record(newSale.storeId(), receiptNo, newSale.idempotencyKey(), newSale.requestHash(),
                 newSale.sellerStaffId(), newSale.recordedBy(), newSale.customerId(), newSale.appliedGrade(),
                 newSale.soldAt(), now, newSale.lines());

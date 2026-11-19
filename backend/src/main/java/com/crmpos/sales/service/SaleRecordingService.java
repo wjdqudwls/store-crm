@@ -26,6 +26,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -95,7 +96,7 @@ public class SaleRecordingService {
             return replay;
         }
 
-        LocalDateTime now = LocalDateTime.now(KstTime.ZONE);
+        LocalDateTime now = LocalDateTime.now(KstTime.ZONE).truncatedTo(ChronoUnit.MICROS);
         List<FieldError> errors = new ArrayList<>();
         LocalDateTime soldAt = resolveSoldAt(request.soldAt(), now, allowPastSoldAt, errors);
         checkLineShapes(request, errors);
@@ -148,17 +149,19 @@ public class SaleRecordingService {
      */
     static LocalDateTime resolveSoldAt(OffsetDateTime requested, LocalDateTime now, boolean allowPast,
             List<FieldError> errors) {
+        // DB(DATETIME(6))는 마이크로초까지만 저장한다. 나노초를 남기면 처음 응답과 DB에서 다시 읽은 응답이 달라진다.
+        LocalDateTime exactNow = now.truncatedTo(ChronoUnit.MICROS);
         if (requested == null) {
-            return now;
+            return exactNow;
         }
-        LocalDateTime soldAt = KstTime.toLocal(requested);
+        LocalDateTime soldAt = KstTime.toLocal(requested).truncatedTo(ChronoUnit.MICROS);
         boolean future = soldAt.isAfter(now.plusSeconds(CLOCK_SKEW_SECONDS));
         boolean beforeToday = soldAt.isBefore(now.toLocalDate().atStartOfDay());
         if (future || (beforeToday && !allowPast)) {
             errors.add(new FieldError("soldAt", "판매 시각은 오늘 0시부터 지금까지만 고를 수 있습니다."));
-            return now;
+            return exactNow;
         }
-        return soldAt.isAfter(now) ? now : soldAt;
+        return soldAt.isAfter(exactNow) ? exactNow : soldAt;
     }
 
     private static void checkLineShapes(SaleRequest request, List<FieldError> errors) {
