@@ -18,6 +18,9 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -30,6 +33,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * 트랜잭션 없이 실제로 커밋하고, 끝나면 만든 행을 지운다.
  */
 @IntegrationTest
+@ExtendWith(OutputCaptureExtension.class)
 @Import(OutboxPublisherTest.ListenerConfig.class)
 class OutboxPublisherTest {
 
@@ -244,5 +248,23 @@ class OutboxPublisherTest {
         OutboxMessage message = new OutboxMessage("e1", "SALE_COMPLETED", 1L, "{\"memo\":\"고객 메모\"}");
 
         assertThat(message.toString()).doesNotContain("고객 메모");
+    }
+
+    @Test
+    @DisplayName("10번 실패해 FAILED가 되면 ERROR 로그에 eventId가 남고, 9번째까지는 ERROR가 아니며, payload(고객 메모)는 남지 않는다")
+    void should_logErrorWithEventId_whenFailed(CapturedOutput output) {
+        save("bad-event-id", 100L, 0);
+        listener.failing.add("bad-event-id");
+
+        for (int i = 0; i < 9; i++) {
+            publisher.publishPending();
+        }
+        assertThat(output.getAll()).doesNotContain("FAILED after");
+
+        publisher.publishPending();
+
+        assertThat(output.getAll()).contains("ERROR").contains("outbox event FAILED after 10 attempts")
+                .contains("eventId=bad-event-id").contains("aggregateId=100");
+        assertThat(output.getAll()).doesNotContain("고객 메모");
     }
 }
