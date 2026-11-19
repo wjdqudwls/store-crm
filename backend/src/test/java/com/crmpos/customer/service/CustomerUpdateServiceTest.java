@@ -67,7 +67,7 @@ class CustomerUpdateServiceTest {
     @BeforeEach
     void setUp() {
         service = new CustomerUpdateService(customerRepository, customerWriter, queryService, staffRepository,
-                cipher, hasher);
+                cipher, hasher, jakarta.validation.Validation.buildDefaultValidatorFactory().getValidator());
         existing = customer(1024L, "김하늘", "+821029434821", 3L);
         lenient().when(customerRepository.findById(1024L)).thenReturn(Optional.of(existing));
         lenient().when(queryService.get(1024L, false)).thenReturn(mock(CustomerDetailResponse.class));
@@ -209,5 +209,18 @@ class CustomerUpdateServiceTest {
                 .isInstanceOfSatisfying(ValidationFailedException.class, e ->
                         assertThat(e.getFieldErrors()).extracting(FieldError::field)
                                 .containsExactlyInAnyOrder("name", "nameEn", "birthYear", "birthMd", "sizes.outer"));
+    }
+
+    @Test
+    @DisplayName("마케팅 수신이 없고 전화번호도 틀리면 두 오류를 한 번에 돌려준다")
+    void should_reportAllErrorsAtOnce_when_marketingMissingAndPhoneWrong() {
+        CustomerUpdateRequest body = new CustomerUpdateRequest("김하늘", null, "abc", Nationality.DOMESTIC, null, null,
+                null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> service.update(1024L, body, STORE))
+                .isInstanceOfSatisfying(ValidationFailedException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(FieldError::field)
+                                .containsExactlyInAnyOrder("marketing", "phone"));
+        verify(customerWriter, never()).update(any(), any(), any());
     }
 }

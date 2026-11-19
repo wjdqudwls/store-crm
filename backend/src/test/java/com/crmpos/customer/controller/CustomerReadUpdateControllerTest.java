@@ -151,16 +151,6 @@ class CustomerReadUpdateControllerTest {
     }
 
     @Test
-    @DisplayName("수정 본문에 번호나 마케팅 수신이 없으면 400")
-    void should_return400_when_requiredMissing() throws Exception {
-        mockMvc.perform(patch("/api/v1/customers/1024").contentType(MediaType.APPLICATION_JSON).content("""
-                        {"name":"김하늘","phone":""}"""))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='phone')]").exists())
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='marketing')]").exists());
-    }
-
-    @Test
     @DisplayName("바꾼 번호가 다른 고객 것이면 409와 그 고객 정보")
     void should_return409_when_phoneBelongsToOther() throws Exception {
         given(updateService.update(eq(1024L), any(), any())).willThrow(new BusinessException(

@@ -64,7 +64,8 @@ class CustomerRegistrationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new CustomerRegistrationService(customerRepository, customerWriter, staffRepository, cipher, hasher);
+        service = new CustomerRegistrationService(customerRepository, customerWriter, staffRepository, cipher, hasher,
+                jakarta.validation.Validation.buildDefaultValidatorFactory().getValidator());
     }
 
     private static Agreements agreed() {
@@ -293,5 +294,43 @@ class CustomerRegistrationServiceTest {
         verify(customerWriter).insert(captor.capture(), any());
         assertThat(captor.getValue().marketingSms()).isTrue();
         assertThat(captor.getValue().marketingKakao()).isFalse();
+    }
+
+    @Test
+    @DisplayName("동의를 안 하고 전화번호도 틀리면 두 오류를 한 번에 돌려준다")
+    void should_reportAllErrorsAtOnce_when_consentAndPhoneBothWrong() {
+        CustomerRegisterRequest body = request().phone("abc")
+                .agreements(new Agreements(false, false, false, false)).build();
+
+        assertThatThrownBy(() -> service.register(body, STORE))
+                .isInstanceOfSatisfying(ValidationFailedException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(FieldError::field)
+                                .containsExactlyInAnyOrder("agreements.privacy", "agreements.age14", "phone"));
+        verify(customerWriter, never()).insert(any(), any());
+    }
+
+    @Test
+    @DisplayName("동의 항목이 없고 전화번호가 비어도 오류가 칸마다 하나씩이다 (전화번호가 두 번 나오지 않는다)")
+    void should_reportOncePerField_when_agreementsMissingAndPhoneBlank() {
+        CustomerRegisterRequest body = request().phone("").agreements(null).build();
+
+        assertThatThrownBy(() -> service.register(body, STORE))
+                .isInstanceOfSatisfying(ValidationFailedException.class, e ->
+                        assertThat(e.getFieldErrors()).extracting(FieldError::field)
+                                .containsExactlyInAnyOrder("agreements", "phone"));
+    }
+
+    @Test
+    @DisplayName("형식 오류, 이름 규칙, 전화번호, 사이즈 오류를 모두 모아서 준다")
+    void should_collectFormatAndBusinessErrors() {
+        CustomerRegisterRequest body = request().name(" ").phone("abc").gender(Gender.F)
+                .sizes(new Sizes(null, "110", null, null)).agreements(new Agreements(false, true, false, false)).build();
+
+        assertThatThrownBy(() -> service.register(body, STORE))
+                .isInstanceOfSatisfying(ValidationFailedException.class, e -> {
+                    assertThat(e.getFieldErrors()).extracting(FieldError::field)
+                            .containsExactlyInAnyOrder("agreements.privacy", "name", "phone", "sizes.outer");
+                    assertThat(e.getFieldErrors().toString()).doesNotContain("abc").doesNotContain("110");
+                });
     }
 }

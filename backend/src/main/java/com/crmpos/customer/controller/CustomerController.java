@@ -6,7 +6,6 @@ import com.crmpos.common.web.PageResponse;
 import com.crmpos.customer.service.CustomerQueryService;
 import com.crmpos.customer.service.CustomerRegistrationService;
 import com.crmpos.customer.service.CustomerUpdateService;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** 고객 등록·검색·상세·수정 (REG-04, CUS-01·02·04). 조회는 키오스크를 뺀 로그인한 누구나, 등록은 매장, 수정은 매장·본사. */
+/**
+ * 고객 등록·검색·상세·수정 (REG-04, CUS-01·02·04). 조회는 키오스크를 뺀 로그인한 누구나, 등록은 매장, 수정은 매장·본사.
+ * 등록·수정 본문은 {@code @Valid}를 쓰지 않는다: 서비스가 형식 오류와 업무 검사 오류를 한 번에 모아 400으로 돌려준다.
+ */
 @RestController
 @RequestMapping("/customers")
 @RequiredArgsConstructor
@@ -36,7 +38,7 @@ public class CustomerController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CustomerCreatedResponse register(CurrentAccount account, @Valid @RequestBody CustomerRegisterRequest request) {
+    public CustomerCreatedResponse register(CurrentAccount account, @RequestBody CustomerRegisterRequest request) {
         account.requireRole(StaffRole.STORE);
         return registrationService.register(request, account);
     }
@@ -59,7 +61,7 @@ public class CustomerController {
 
     @PatchMapping("/{id}")
     public CustomerDetailResponse update(CurrentAccount account, @PathVariable Long id,
-            @Valid @RequestBody CustomerUpdateRequest request) {
+            @RequestBody CustomerUpdateRequest request) {
         account.requireRole(StaffRole.STORE, StaffRole.HQ);
         return updateService.update(id, request, account);
     }

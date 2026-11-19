@@ -10,6 +10,7 @@ import com.crmpos.common.error.FieldError;
 import com.crmpos.common.error.ValidationFailedException;
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.security.CurrentAccount;
+import com.crmpos.common.web.BodyValidation;
 import com.crmpos.common.web.KstTime;
 import com.crmpos.customer.controller.CustomerCreatedResponse;
 import com.crmpos.customer.controller.CustomerRegisterRequest;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -44,16 +46,18 @@ public class CustomerRegistrationService {
     private final StaffRepository staffRepository;
     private final AesGcmCipher cipher;
     private final HmacHasher hasher;
+    private final Validator validator;
 
     /** 이 메서드는 트랜잭션 밖이다. 저장({@link CustomerWriter})이 끝난 뒤에 중복 오류를 다시 조회해 응답한다. */
     public CustomerCreatedResponse register(CustomerRegisterRequest request, CurrentAccount account) {
-        List<FieldError> errors = new ArrayList<>();
+        // 형식 오류(Bean Validation)와 업무 검사 오류를 한 번에 모아서 돌려준다
+        List<FieldError> errors = new ArrayList<>(BodyValidation.violations(validator, request));
         Nationality nationality = request.nationality() == null ? Nationality.DOMESTIC : request.nationality();
 
         CustomerInputRules.checkNames(request.name(), request.nameEn(), nationality, errors);
         String phone = PhoneNumber.normalize(request.phone(), nationality);
         if (phone == null) {
-            errors.add(new FieldError("phone", "전화번호 형식이 올바르지 않습니다."));
+            BodyValidation.addIfAbsent(errors, new FieldError("phone", "전화번호 형식이 올바르지 않습니다."));
         }
         CustomerInputRules.checkBirth(request.birthYear(), request.birthMd(), errors);
         CustomerRegisterRequest.Sizes sz = request.sizes();
