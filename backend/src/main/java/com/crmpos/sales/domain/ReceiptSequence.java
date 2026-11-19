@@ -20,4 +20,10 @@ public class ReceiptSequence {
 
     @Column(nullable = false)
     private int lastNo;
+
+    /** 다음 순번을 하나 올려 돌려준다. 호출하기 전에 이 행을 잠가야 한다. */
+    public int next() {
+        this.lastNo += 1;
+        return this.lastNo;
+    }
 }
