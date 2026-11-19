@@ -90,28 +90,6 @@ class CustomerControllerTest {
     }
 
     @Test
-    @DisplayName("개인정보 동의와 만 14세 확인이 true가 아니면 400 + fieldErrors")
-    void should_return400_when_consentFalse() throws Exception {
-        String body = BODY.replace("\"privacy\":true,\"age14\":true", "\"privacy\":false,\"age14\":false");
-
-        register(body)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='agreements.privacy')]").exists())
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='agreements.age14')]").exists());
-    }
-
-    @Test
-    @DisplayName("동의 항목이 아예 없거나 전화번호가 비어 있어도 400")
-    void should_return400_when_agreementsOrPhoneMissing() throws Exception {
-        register("""
-                {"name":"김하늘","phone":""}""")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='agreements')]").exists())
-                .andExpect(jsonPath("$.fieldErrors[?(@.field=='phone')]").exists());
-    }
-
-    @Test
     @DisplayName("같은 번호가 있으면 409와 기존 고객 details")
     void should_return409_when_phoneDuplicated() throws Exception {
         given(service.register(any(), any())).willThrow(new BusinessException(ErrorCode.CUSTOMER_PHONE_DUPLICATED,

@@ -174,4 +174,17 @@ class CustomerRegisterIntegrationTest {
         assertThat(output.getAll()).doesNotContain("2943").doesNotContain("김하늘").doesNotContain("테헤란로")
                 .doesNotContain("1029434821").doesNotContain("010-XXXX");
     }
+
+    @Test
+    @DisplayName("동의를 안 하고 전화번호도 틀리게 보내면 두 오류가 한 응답에 함께 온다")
+    void should_returnAllFieldErrorsTogether() throws Exception {
+        register(BODY.replace("\"privacy\":true", "\"privacy\":false").replace("010-2943-4821", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors.length()").value(2))
+                .andExpect(jsonPath("$.fieldErrors[?(@.field=='agreements.privacy')]").exists())
+                .andExpect(jsonPath("$.fieldErrors[?(@.field=='phone')]").exists());
+
+        assertThat(customerRepository.count()).isZero();
+    }
 }
