@@ -143,4 +143,33 @@ class SaleReturnRulesTest {
         assertThat(sale.getStatus()).isEqualTo(SaleStatus.PARTIAL_RETURNED);
         assertThat(ret.getNewSale()).isNull();
     }
+
+    @Test
+    @DisplayName("기록 취소는 남은 라인을 모두 돌리고 판매를 VOIDED로 바꾼다 (VOID 종류, 환불은 남은 금액 전부)")
+    void should_voidRemainingLines() {
+        SaleLine a = line(3, 100);
+        SaleLine b = line(1, 500);
+        Sale sale = sale(a, b);
+        a.processReturn(1);
+
+        SaleReturn ret = SaleReturn.recordVoid(sale, "key", "h".repeat(64), 17L, 3L, NOW);
+
+        assertThat(ret.getKind()).isEqualTo(ReturnKind.VOID);
+        assertThat(ret.getAmount()).isEqualTo(67 + 500);
+        assertThat(ret.getLines()).extracting(SaleReturnLine::getQty).containsExactly(2, 1);
+        assertThat(a.remainingQty()).isZero();
+        assertThat(a.getReturnedAmount()).isEqualTo(100);
+        assertThat(sale.getStatus()).isEqualTo(SaleStatus.VOIDED);
+    }
+
+    @Test
+    @DisplayName("이미 전부 반품해 남은 라인이 없으면 기록 취소를 만들 수 없다")
+    void should_notVoid_whenNothingRemains() {
+        SaleLine a = line(1, 500);
+        Sale sale = sale(a);
+        a.processReturn(1);
+
+        assertThatThrownBy(() -> SaleReturn.recordVoid(sale, "key", "h".repeat(64), 17L, 3L, NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
