@@ -7,6 +7,8 @@ import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -85,6 +87,22 @@ public class GlobalExceptionHandler {
         log.info("method not allowed method={}", e.getMethod());
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getStatus())
                 .body(ErrorResponse.from(ErrorCode.METHOD_NOT_ALLOWED, traceId()));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException e) {
+        log.info("unsupported media type");
+        return ResponseEntity.status(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
+                .body(ErrorResponse.from(ErrorCode.UNSUPPORTED_MEDIA_TYPE, traceId()));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<ErrorResponse> handleNotAcceptable(HttpMediaTypeNotAcceptableException e) {
+        log.info("not acceptable");
+        // Accept가 JSON을 못 받는 값이라 오류 본문도 협상에 실패한다. JSON으로 직접 지정해 같은 형식을 준다.
+        return ResponseEntity.status(ErrorCode.NOT_ACCEPTABLE.getStatus())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(ErrorResponse.from(ErrorCode.NOT_ACCEPTABLE, traceId()));
     }
 
     @ExceptionHandler(Exception.class)

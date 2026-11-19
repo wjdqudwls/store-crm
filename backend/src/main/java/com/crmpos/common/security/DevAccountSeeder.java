@@ -47,6 +47,7 @@ public class DevAccountSeeder implements ApplicationRunner {
         staffRepository.save(account("gn01-senior", "강남 시니어", StaffRole.SENIOR, null, gangnam, "S002", now));
         staffRepository.save(account("gn01-junior", "강남 주니어", StaffRole.JUNIOR, null, gangnam, "S003", now));
         staffRepository.save(account("gn01-staff", "강남 스태프", StaffRole.STAFF, null, gangnam, "S004", now));
+        staffRepository.save(account("hd01-senior", "홍대 시니어", StaffRole.SENIOR, null, hongdae, "S101", now));
         log.info("dev accounts created count={}", staffRepository.count());
     }
 
