@@ -151,4 +151,9 @@ public class Sale {
         boolean allReturned = lines.stream().allMatch(line -> line.remainingQty() == 0);
         this.status = allReturned ? SaleStatus.RETURNED : SaleStatus.PARTIAL_RETURNED;
     }
+
+    /** 기록 취소했다: 없던 판매로 본다 (BR-16, ADR-026). */
+    public void markVoided() {
+        this.status = SaleStatus.VOIDED;
+    }
 }

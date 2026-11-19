@@ -44,4 +44,19 @@ public class CustomerApiService implements CustomerApi {
         }
         return result;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, String> findNames(Collection<Long> customerIds) {
+        Map<Long, String> result = new LinkedHashMap<>();
+        if (customerIds == null || customerIds.isEmpty()) {
+            return result;
+        }
+        List<Object[]> rows = em.createQuery("select c.id, c.name from Customer c where c.id in :ids", Object[].class)
+                .setParameter("ids", customerIds).getResultList();
+        for (Object[] row : rows) {
+            result.put((Long) row[0], (String) row[1]);
+        }
+        return result;
+    }
 }
