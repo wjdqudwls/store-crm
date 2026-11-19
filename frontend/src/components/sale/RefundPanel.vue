@@ -25,7 +25,9 @@ const router = useRouter()
 
 const staffId = ref(null)
 const staffList = ref([])
-getStaff().then((v) => (staffList.value = v))
+getStaff()
+  .then((v) => (staffList.value = v))
+  .catch(() => {})
 const staffName = computed(() => staffList.value.find((s) => s.id === staffId.value)?.name)
 
 const customer = ref(null)
