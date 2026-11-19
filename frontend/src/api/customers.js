@@ -23,8 +23,11 @@ export const getCustomer = (id, { includeAddress = false } = {}) =>
     ? fake().then((m) => m.getCustomer(id, { includeAddress }))
     : http.get(`/customers/${id}`, { params: includeAddress ? { include: 'address' } : {} })
 
-export const getPurchases = (...args) =>
-  fake ? fake().then((m) => m.getPurchases(...args)) : notConnected('getPurchases')
+/** GET /customers/{id}/purchases?keyword= (03 4.12). 기록 취소된 판매는 서버가 뺀다 */
+export const getPurchases = (id, keyword = '') =>
+  fake
+    ? fake().then((m) => m.getPurchases(id, keyword))
+    : http.get(`/customers/${id}/purchases`, { params: { keyword, size: 100 } })
 
 export const getGradeHistory = (...args) =>
   fake ? fake().then((m) => m.getGradeHistory(...args)) : notConnected('getGradeHistory')

@@ -33,6 +33,13 @@ describe('실서버 연결: 고객 (03 3.2·4.3·4.3a·4.4)', () => {
     expect(http.get).toHaveBeenLastCalledWith('/customers/1024', { params: {} })
   })
 
+  it('should_구매이력_주소와_검색어_when_고객_상세_구매_탭', async () => {
+    await api.getPurchases(5, '코트')
+    expect(http.get).toHaveBeenCalledWith('/customers/5/purchases', {
+      params: { keyword: '코트', size: 100 },
+    })
+  })
+
   it('should_PATCH_when_고객_수정', async () => {
     await api.updateCustomer(7, { phone: '010-1' })
     expect(http.patch).toHaveBeenCalledWith('/customers/7', { phone: '010-1' })
