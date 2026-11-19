@@ -1,6 +1,6 @@
--- CRM pos 테이블 정의 (02-erd.md 기준, ADR-010)
--- 앱이 켜질 때마다 실행된다. 여러 번 실행해도 안전하도록 CREATE TABLE IF NOT EXISTS로 쓴다.
--- 그래서 이미 만든 표는 다시 만들지 않는다. 표를 바꾼 뒤 로컬에서는 DB를 비우고 다시 띄운다 (docker compose down -v → up -d).
+-- CRM pos 테이블 정의 (02-erd.md 기준, ADR-010·039)
+-- Flyway가 빈 DB에서 한 번만 실행한다. 한 번 적용한 파일은 고치지 않는다(체크섬이 달라져 시작이 막힌다).
+-- 칸·표를 바꾸려면 새 번호의 V 파일을 더한다 (예: V3__add_xxx.sql). 로컬 DB는 이미 만든 표가 있으면 V1을 건너뛴다(baseline).
 --
 -- 옮기는 규칙
 -- - id: BIGINT AUTO_INCREMENT PRIMARY KEY
@@ -14,7 +14,7 @@
 -- common: store, staff, staff_notification
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS store (
+CREATE TABLE store (
     id     BIGINT      NOT NULL AUTO_INCREMENT,
     code   VARCHAR(20) NOT NULL COMMENT 'QR에 쓰는 매장 코드 (예: GN01)',
     name   VARCHAR(50) NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS store (
     CONSTRAINT uk_store_code UNIQUE (code)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS staff (
+CREATE TABLE staff (
     id                 BIGINT       NOT NULL AUTO_INCREMENT,
     login_id           VARCHAR(50)  NOT NULL,
     password_hash      VARCHAR(100) NOT NULL COMMENT 'BCrypt',
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS staff (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 직원 알림함 (CAL-09). 문구는 알림을 만들 때 고객 모듈이 정해 넘긴다 (ADR-029)
-CREATE TABLE IF NOT EXISTS staff_notification (
+CREATE TABLE staff_notification (
     id          BIGINT       NOT NULL AUTO_INCREMENT,
     staff_id    BIGINT       NOT NULL COMMENT '받는 직원',
     type        VARCHAR(20)  NOT NULL COMMENT 'FOLLOW_UP, NOTE',
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS staff_notification (
 -- product: product, product_sku
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS product (
+CREATE TABLE product (
     id           BIGINT       NOT NULL AUTO_INCREMENT,
     product_code VARCHAR(20)  NULL     COMMENT '품번 (예: D2110), 선택. NULL은 여러 개여도 UNIQUE에 걸리지 않는다',
     name         VARCHAR(100) NOT NULL COMMENT '품명',
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS product (
     CONSTRAINT uk_product_product_code UNIQUE (product_code)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS product_sku (
+CREATE TABLE product_sku (
     id         BIGINT      NOT NULL AUTO_INCREMENT,
     product_id BIGINT      NOT NULL,
     color      VARCHAR(30) NOT NULL COMMENT '선택. 색상이 없으면 빈 문자열로 저장해 UNIQUE가 동작하게 한다',
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS product_sku (
 -- store_id, staff_id, recorded_by, customer_id, sku_id, wearer_member_id는 다른 모듈의 ID라 FK를 걸지 않는다 (ADR-003)
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS sale (
+CREATE TABLE sale (
     id              BIGINT      NOT NULL AUTO_INCREMENT,
     store_id        BIGINT      NOT NULL COMMENT '판매 매장 = 로그인한 계정의 소속 매장',
     receipt_no      VARCHAR(30) NOT NULL COMMENT '매장코드-판매일자-순번 (예: GN01-20261015-0012)',
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS sale (
     CONSTRAINT fk_sale_root_sale FOREIGN KEY (root_sale_id) REFERENCES sale (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS sale_line (
+CREATE TABLE sale_line (
     id               BIGINT       NOT NULL AUTO_INCREMENT,
     sale_id          BIGINT       NOT NULL,
     sku_id           BIGINT       NULL     COMMENT 'NULL이면 직접 입력 (등록 상품 아님)',
@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS sale_line (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 반품·교환·기록 취소. 원 판매를 고치지 않고 따로 남긴다 (BR-16, ADR-026)
-CREATE TABLE IF NOT EXISTS sale_return (
+CREATE TABLE sale_return (
     id              BIGINT      NOT NULL AUTO_INCREMENT,
     sale_id         BIGINT      NOT NULL,
     idempotency_key CHAR(36)    NOT NULL COMMENT 'UUID, 중복 요청 방지 (ADR-006)',
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS sale_return (
     CONSTRAINT fk_sale_return_new_sale FOREIGN KEY (new_sale_id) REFERENCES sale (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS sale_return_line (
+CREATE TABLE sale_return_line (
     id           BIGINT NOT NULL AUTO_INCREMENT,
     return_id    BIGINT NOT NULL,
     sale_line_id BIGINT NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS sale_return_line (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 영수증 순번: (매장, 날짜) 행을 SELECT ... FOR UPDATE로 잠그고 1 올린다
-CREATE TABLE IF NOT EXISTS receipt_sequence (
+CREATE TABLE receipt_sequence (
     store_id  BIGINT NOT NULL,
     sale_date DATE   NOT NULL,
     last_no   INT    NOT NULL DEFAULT 0,
@@ -175,7 +175,7 @@ CREATE TABLE IF NOT EXISTS receipt_sequence (
 
 -- 하루 마감. 그날 판매는 날짜가 지났거나, 마감 행이 있고 reopened_at이 NULL이면 잠긴다 (02-erd.md 3.3)
 -- 다시 연 날을 다시 마감하면 같은 행의 closed_*를 새로 쓰고 reopened_*를 비운다
-CREATE TABLE IF NOT EXISTS store_day_close (
+CREATE TABLE store_day_close (
     store_id      BIGINT      NOT NULL,
     business_date DATE        NOT NULL,
     closed_by     BIGINT      NOT NULL COMMENT '마감한 계정',
@@ -186,7 +186,7 @@ CREATE TABLE IF NOT EXISTS store_day_close (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 판매·반품과 같은 트랜잭션에서 기록하고, 발행기가 고객 모듈에 전달한다 (ADR-002, ADR-007)
-CREATE TABLE IF NOT EXISTS outbox_event (
+CREATE TABLE outbox_event (
     event_id     CHAR(36)    NOT NULL COMMENT 'UUID',
     event_type   VARCHAR(30) NOT NULL COMMENT 'SALE_COMPLETED, SALE_RETURNED',
     aggregate_id BIGINT      NOT NULL COMMENT '처음 판매 ID = sale.root_sale_id. 교환·정정이 이어져도 한 순서 묶음 (ADR-022)',
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS outbox_event (
 -- home_store_id, staff_id, recorded_by, sale_id, sale_line_id, store_id는 다른 모듈의 ID라 FK를 걸지 않는다 (ADR-003)
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS customer (
+CREATE TABLE customer (
     id                        BIGINT          NOT NULL AUTO_INCREMENT COMMENT '고객번호 = 식별 키 (BR-01)',
     name                      VARCHAR(50)     NOT NULL COMMENT '검색용 이름. 외국인은 한글 이름이 없으면 영문 이름 (REG-06)',
     name_en                   VARCHAR(100)    NULL     COMMENT '영문 이름 (외국인 필수)',
@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS customer (
     INDEX idx_customer_staff (staff_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS customer_member (
+CREATE TABLE customer_member (
     id          BIGINT      NOT NULL AUTO_INCREMENT,
     customer_id BIGINT      NOT NULL COMMENT '대표 고객',
     nickname    VARCHAR(30) NOT NULL COMMENT '호칭, 실명 아님 (예: 첫째 딸)',
@@ -261,7 +261,7 @@ CREATE TABLE IF NOT EXISTS customer_member (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 판매 이벤트로 받은 라인 단위 구매 기록 (판매 테이블 사본, ADR-003). 행은 지우지 않는다
-CREATE TABLE IF NOT EXISTS customer_purchase (
+CREATE TABLE customer_purchase (
     id                BIGINT      NOT NULL AUTO_INCREMENT,
     customer_id       BIGINT      NOT NULL,
     sale_id           BIGINT      NOT NULL,
@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS customer_purchase (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 고객당 1행의 조회용 요약. 고객을 등록하는 같은 트랜잭션에서 만든다. 등급 3컬럼은 02-erd.md 3.4, ADR-004
-CREATE TABLE IF NOT EXISTS customer_summary (
+CREATE TABLE customer_summary (
     customer_id         BIGINT      NOT NULL,
     season_ticket_count INT         NOT NULL DEFAULT 0 COMMENT '이번 시즌(6월 1일 0시부터) 누적',
     season_qty          INT         NOT NULL DEFAULT 0 COMMENT '이번 시즌 누적',
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS customer_summary (
 
 -- 등급 기준. 수정하면 기존 행을 고치지 않고 새 버전을 만든다.
 -- 적용 중인 기준은 applies_from이 오늘 이전인 것 중 가장 최근 버전이다 (ADR-027)
-CREATE TABLE IF NOT EXISTS grade_policy (
+CREATE TABLE grade_policy (
     id            BIGINT      NOT NULL AUTO_INCREMENT,
     version       INT         NOT NULL,
     period_months INT         NOT NULL DEFAULT 12 COMMENT '시즌 길이. 시작일은 6월 1일 고정',
@@ -321,7 +321,7 @@ CREATE TABLE IF NOT EXISTS grade_policy (
     CONSTRAINT uk_grade_policy_version UNIQUE (version)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS grade_rule (
+CREATE TABLE grade_rule (
     id         BIGINT      NOT NULL AUTO_INCREMENT,
     policy_id  BIGINT      NOT NULL,
     kind       VARCHAR(20) NOT NULL COMMENT 'AMOUNT, TICKET, GRADE',
@@ -333,7 +333,7 @@ CREATE TABLE IF NOT EXISTS grade_rule (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 등급별 할인율 (안내용, BR-10). 등급 기준 버전과 따로 두고, 바꾸면 바로 적용한다 (ADR-027)
-CREATE TABLE IF NOT EXISTS grade_discount (
+CREATE TABLE grade_discount (
     grade_code VARCHAR(20) NOT NULL COMMENT 'NORMAL, D, C, B, A',
     rate       INT         NOT NULL COMMENT '할인율 %',
     updated_by BIGINT      NULL     COMMENT '바꾼 본사 계정. 시드 데이터는 NULL',
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS grade_discount (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 등급이 바뀔 때, 그리고 정기 산정·임시 재계산 때는 등급이 그대로여도 고객마다 1행 (GRD-03·06, ADR-021)
-CREATE TABLE IF NOT EXISTS grade_history (
+CREATE TABLE grade_history (
     id             BIGINT      NOT NULL AUTO_INCREMENT,
     customer_id    BIGINT      NOT NULL,
     from_grade     VARCHAR(20) NOT NULL,
@@ -359,7 +359,7 @@ CREATE TABLE IF NOT EXISTS grade_history (
     CONSTRAINT fk_grade_history_customer FOREIGN KEY (customer_id) REFERENCES customer (id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS consult_note (
+CREATE TABLE consult_note (
     id          BIGINT        NOT NULL AUTO_INCREMENT,
     customer_id BIGINT        NOT NULL,
     staff_id    BIGINT        NOT NULL COMMENT '작성 직원 (매장 계정에서 쓰면 고른 직원)',
@@ -377,7 +377,7 @@ CREATE TABLE IF NOT EXISTS consult_note (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- 후속 연락 단계 설정. 브랜드 공통, 본사(HQ)가 바꾼다. 지우지 않고 끄기(active = false)만 한다 (BR-14, CAL-07)
-CREATE TABLE IF NOT EXISTS follow_up_rule (
+CREATE TABLE follow_up_rule (
     id            BIGINT      NOT NULL AUTO_INCREMENT,
     name          VARCHAR(50) NOT NULL COMMENT '단계 이름 (예: 감사 인사)',
     offset_amount INT         NOT NULL COMMENT '판매일로부터 (예: 2)',
@@ -391,7 +391,7 @@ CREATE TABLE IF NOT EXISTS follow_up_rule (
 
 -- 후속 연락 할 일. 회원 판매 이벤트 처리 때 활성 단계마다 1행 (ADR-016, CAL-06)
 -- staff_id: 고객의 담당 직원, 없으면 판매를 기록한 직원 (BR-14)
-CREATE TABLE IF NOT EXISTS follow_up_task (
+CREATE TABLE follow_up_task (
     id          BIGINT      NOT NULL AUTO_INCREMENT,
     customer_id BIGINT      NOT NULL,
     staff_id    BIGINT      NOT NULL COMMENT '받는 직원',
@@ -420,7 +420,7 @@ FROM (SELECT '감사 인사' AS name, 2 AS offset_amount, 'DAY' AS offset_unit, 
 WHERE NOT EXISTS (SELECT 1 FROM follow_up_rule);
 
 -- 처리한 이벤트 ID. 같은 이벤트가 다시 오면 건너뛴다 (멱등, NFR-03)
-CREATE TABLE IF NOT EXISTS processed_event (
+CREATE TABLE processed_event (
     event_id     CHAR(36)    NOT NULL COMMENT 'UUID',
     event_type   VARCHAR(30) NOT NULL,
     processed_at DATETIME(6) NOT NULL,
