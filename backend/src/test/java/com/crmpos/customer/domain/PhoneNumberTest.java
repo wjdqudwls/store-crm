@@ -75,4 +75,23 @@ class PhoneNumberTest {
         assertThat(PhoneNumber.last4("+821029434821")).isEqualTo("4821");
         assertThat(PhoneNumber.masked("4821")).isEqualTo("****-4821");
     }
+
+    @ParameterizedTest(name = "{0} → {1}")
+    @CsvSource({
+            "+821029434821, 010-2943-4821",
+            "+82101234567, 010-123-4567",
+            "+82212345678, 02-1234-5678",
+            "+8221234567, 02-123-4567",
+            "+82311234567, 031-123-4567",
+    })
+    @DisplayName("한국 번호는 읽기 쉬운 하이픈 모양으로 보여준다")
+    void should_displayKoreanNumber(String e164, String expected) {
+        assertThat(PhoneNumber.display(e164)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("외국 번호는 +로 시작하는 저장 형식 그대로 보여준다")
+    void should_displayForeignAsStored() {
+        assertThat(PhoneNumber.display("+14155552671")).isEqualTo("+14155552671");
+    }
 }

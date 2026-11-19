@@ -40,4 +40,24 @@ public final class PhoneNumber {
     public static String masked(String last4) {
         return "****-" + last4;
     }
+
+    /** 상세 화면에 보이는 모양. 한국 번호(+82)는 하이픈을 넣고, 외국 번호는 저장 형식 그대로다. */
+    public static String display(String e164) {
+        if (!e164.startsWith("+82")) {
+            return e164;
+        }
+        String national = "0" + e164.substring(3);
+        if (national.startsWith("02")) {
+            return switch (national.length()) {
+                case 9 -> national.substring(0, 2) + "-" + national.substring(2, 5) + "-" + national.substring(5);
+                case 10 -> national.substring(0, 2) + "-" + national.substring(2, 6) + "-" + national.substring(6);
+                default -> national;
+            };
+        }
+        return switch (national.length()) {
+            case 10 -> national.substring(0, 3) + "-" + national.substring(3, 6) + "-" + national.substring(6);
+            case 11 -> national.substring(0, 3) + "-" + national.substring(3, 7) + "-" + national.substring(7);
+            default -> national;
+        };
+    }
 }

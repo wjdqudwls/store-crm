@@ -120,4 +120,61 @@ class CustomerTest {
 
         assertThat(text).doesNotContain("김하늘").doesNotContain("4821").doesNotContain("서울");
     }
+
+    @Test
+    @DisplayName("수정: 가입매장·등록 경로·동의 시각·가입일은 그대로이고 프로필만 바뀐다")
+    void should_changeProfileOnly_when_update() {
+        Customer customer = Customer.register(draft().build(), NOW);
+        LocalDateTime later = NOW.plusDays(3);
+
+        customer.updateProfile(draft().name("김하나").phoneLast4("0937").phoneHash("b".repeat(64))
+                .sizeOuter("95").staffId(9L).build(), later);
+
+        assertThat(customer.getName()).isEqualTo("김하나");
+        assertThat(customer.getPhoneLast4()).isEqualTo("0937");
+        assertThat(customer.getSizeOuter()).isEqualTo("95");
+        assertThat(customer.getStaffId()).isEqualTo(9L);
+        assertThat(customer.getHomeStoreId()).isEqualTo(3L);
+        assertThat(customer.getSource()).isEqualTo(CustomerSource.STORE);
+        assertThat(customer.getPrivacyAgreedAt()).isEqualTo(NOW);
+        assertThat(customer.getCreatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    @DisplayName("수정: 담당 직원을 비우면 담당이 해제된다")
+    void should_clearStaff_when_staffIdNull() {
+        Customer customer = Customer.register(draft().staffId(9L).build(), NOW);
+
+        customer.updateProfile(draft().staffId(null).build(), NOW.plusDays(1));
+
+        assertThat(customer.getStaffId()).isNull();
+    }
+
+    @Test
+    @DisplayName("수정: 마케팅 수신은 새로 동의할 때만 시각을 남기고, 계속 동의면 처음 시각을 유지하고, 철회하면 지운다")
+    void should_trackMarketingConsentChanges() {
+        Customer customer = Customer.register(draft().marketingSms(true).build(), NOW);
+        LocalDateTime later = NOW.plusDays(5);
+
+        customer.updateProfile(draft().marketingSms(true).marketingKakao(true).build(), later);
+
+        assertThat(customer.getMarketingSmsAgreedAt()).isEqualTo(NOW);
+        assertThat(customer.getMarketingKakaoAgreedAt()).isEqualTo(later);
+
+        customer.updateProfile(draft().marketingSms(false).marketingKakao(true).build(), later.plusDays(1));
+
+        assertThat(customer.getMarketingSmsAgreedAt()).isNull();
+        assertThat(customer.getMarketingKakaoAgreedAt()).isEqualTo(later);
+    }
+
+    @Test
+    @DisplayName("수정에도 이름 규칙이 같다: 외국인 영문 이름 필수, 내국인 이름 필수")
+    void should_applyNameRules_when_update() {
+        Customer customer = Customer.register(draft().build(), NOW);
+
+        assertThatThrownBy(() -> customer.updateProfile(draft().nationality(Nationality.FOREIGN).build(), NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> customer.updateProfile(draft().name(null).build(), NOW))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
