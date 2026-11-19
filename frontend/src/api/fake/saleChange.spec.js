@@ -105,3 +105,12 @@ describe('반품·교환·정정 (SAL-03·06·07, 가짜 API)', () => {
     expect(res.receiptNo).toMatch(/^GN01-20260921-/)
   })
 })
+
+describe('가짜 API: 마감·기록 취소 요청 키 (03 4.10, BR-12)', () => {
+  it('should_200_같은_항목_when_이미_마감한_날_다시_마감', async () => {
+    const { closeDay } = await import('./sales')
+    const first = await closeDay()
+    const second = await closeDay()
+    expect(second.closedAt).toBe(first.closedAt)
+  })
+})
