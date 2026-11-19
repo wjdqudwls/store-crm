@@ -81,4 +81,43 @@ public class CustomerPurchase {
 
     @Column(nullable = false)
     private long returnedAmount;
+
+    /** 판매 이벤트의 라인 하나를 구매 기록으로 만든다 (처음엔 나간 수량이 없다). */
+    public static CustomerPurchase record(Customer customer, Long saleId, Long saleLineId, Long storeId,
+            LocalDateTime soldAt, Long purchaseGroupId, LocalDateTime countedAt, Target target, ItemType itemType,
+            int qty, long amount) {
+        CustomerPurchase purchase = new CustomerPurchase();
+        purchase.customer = customer;
+        purchase.saleId = saleId;
+        purchase.saleLineId = saleLineId;
+        purchase.storeId = storeId;
+        purchase.soldAt = soldAt;
+        purchase.purchaseGroupId = purchaseGroupId;
+        purchase.countedAt = countedAt;
+        purchase.target = target;
+        purchase.itemType = itemType;
+        purchase.qty = qty;
+        purchase.amount = amount;
+        return purchase;
+    }
+
+    /**
+     * 반품·교환·기록 취소로 나간 수량을 더한다. 남은 수량보다 많이 나갈 수는 없다.
+     * 기록 취소(voided)면 같은 수량을 voidedQty에도 더해 없던 구매로 센다 (BR-16).
+     */
+    public void applyReturn(int returnQty, long returnAmount, boolean voided) {
+        if (returnQty <= 0 || returnQty > qty - returnedQty) {
+            throw new IllegalStateException("나간 수량이 남은 수량을 넘는다 saleLineId=" + saleLineId);
+        }
+        returnedQty += returnQty;
+        returnedAmount += returnAmount;
+        if (voided) {
+            voidedQty += returnQty;
+        }
+    }
+
+    /** 기록 취소된 수량을 뺀 수량. 0이면 없던 구매다. */
+    public int effectiveQty() {
+        return qty - voidedQty;
+    }
 }

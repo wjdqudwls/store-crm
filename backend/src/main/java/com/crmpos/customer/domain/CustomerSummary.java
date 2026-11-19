@@ -87,4 +87,10 @@ public class CustomerSummary {
         summary.calculatedAt = now;
         return summary;
     }
+
+    /** 구매 기록에서 다시 계산한 첫·마지막 방문일. 방문이 없으면 둘 다 null (BR-09). */
+    public void updateVisits(LocalDateTime firstVisitAt, LocalDateTime lastVisitAt) {
+        this.firstVisitAt = firstVisitAt;
+        this.lastVisitAt = lastVisitAt;
+    }
 }
