@@ -1,5 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ContactResultDialog from '@/components/ContactResultDialog.vue'
 import { completeVisit, getFollowUps, skipFollowUp } from '@/api/customers'
@@ -17,9 +19,11 @@ const props = defineProps({
 const session = useSessionStore()
 
 const list = ref(null)
-async function load() {
-  list.value = (await getFollowUps(props.customerId)).content
-}
+const { error, retrying, run } = useLoadError()
+const load = () =>
+  run(async () => {
+    list.value = (await getFollowUps(props.customerId)).content
+  })
 onMounted(load)
 
 function canAct(t) {
@@ -75,9 +79,10 @@ const statusType = {
 
 <template>
   <div class="ftab">
-    <el-skeleton v-if="!list" animated :rows="3" />
-    <p v-else-if="!list.length" class="empty">후속 연락 할 일이 없습니다.</p>
-    <ul v-else class="flist">
+    <LoadError :error="error" :busy="retrying" @retry="load" />
+    <el-skeleton v-if="!list && !error" animated :rows="3" />
+    <p v-else-if="list && !list.length" class="empty">후속 연락 할 일이 없습니다.</p>
+    <ul v-else-if="list" class="flist">
       <li
         v-for="t in list"
         :key="t.id"

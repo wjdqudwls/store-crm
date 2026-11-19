@@ -1,4 +1,4 @@
-import { notConnected } from './http'
+import { http, notConnected } from './http'
 
 /**
  * 고객·가족·메모·후속 연락 API 겉껍데기. 화면은 이 파일만 부른다.
@@ -7,17 +7,21 @@ import { notConnected } from './http'
  */
 const fake = import.meta.env.VITE_API_MODE !== 'real' ? () => import('./fake/customers') : null
 
-export const createCustomer = (...args) =>
-  fake ? fake().then((m) => m.createCustomer(...args)) : notConnected('createCustomer')
+export const createCustomer = (body) =>
+  fake ? fake().then((m) => m.createCustomer(body)) : http.post('/customers', body)
 
-export const updateCustomer = (...args) =>
-  fake ? fake().then((m) => m.updateCustomer(...args)) : notConnected('updateCustomer')
+export const updateCustomer = (id, body) =>
+  fake ? fake().then((m) => m.updateCustomer(id, body)) : http.patch(`/customers/${id}`, body)
 
-export const searchCustomers = (...args) =>
-  fake ? fake().then((m) => m.searchCustomers(...args)) : notConnected('searchCustomers')
+export const searchCustomers = (name, page = 0, size = 20) =>
+  fake
+    ? fake().then((m) => m.searchCustomers(name))
+    : http.get('/customers', { params: { name, page, size } })
 
-export const getCustomer = (...args) =>
-  fake ? fake().then((m) => m.getCustomer(...args)) : notConnected('getCustomer')
+export const getCustomer = (id, { includeAddress = false } = {}) =>
+  fake
+    ? fake().then((m) => m.getCustomer(id, { includeAddress }))
+    : http.get(`/customers/${id}`, { params: includeAddress ? { include: 'address' } : {} })
 
 export const getPurchases = (...args) =>
   fake ? fake().then((m) => m.getPurchases(...args)) : notConnected('getPurchases')

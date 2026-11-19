@@ -149,7 +149,7 @@ const emptyGrade = {
   totalScore: 0,
   discountRate: 0,
   policyVersion: 2,
-  confirmedBasis: { season: '25/26', ticketCount: 0, netAmount: 0, totalScore: 0 },
+  confirmedBasis: null, // 새 고객은 정기 산정 이력이 없다 (03 4.4)
 }
 
 /**

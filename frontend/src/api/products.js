@@ -10,14 +10,14 @@ const fake = import.meta.env.VITE_API_MODE !== 'real' ? () => import('./fake/pro
 export const getProducts = (keyword = '') =>
   fake ? fake().then((m) => m.getProducts(keyword)) : http.get('/products', { params: { keyword } })
 
-export const getProduct = (...args) =>
-  fake ? fake().then((m) => m.getProduct(...args)) : notConnected('getProduct')
+export const getProduct = (id) =>
+  fake ? fake().then((m) => m.getProduct(id)) : http.get(`/products/${id}`)
 
-export const createProduct = (...args) =>
-  fake ? fake().then((m) => m.createProduct(...args)) : notConnected('createProduct')
+export const createProduct = (body) =>
+  fake ? fake().then((m) => m.createProduct(body)) : http.post('/products', body)
 
-export const updateProduct = (...args) =>
-  fake ? fake().then((m) => m.updateProduct(...args)) : notConnected('updateProduct')
+export const updateProduct = (id, body) =>
+  fake ? fake().then((m) => m.updateProduct(id, body)) : http.patch(`/products/${id}`, body)
 
 export const importProducts = (...args) =>
   fake ? fake().then((m) => m.importProducts(...args)) : notConnected('importProducts')
