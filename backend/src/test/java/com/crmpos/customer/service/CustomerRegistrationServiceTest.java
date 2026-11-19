@@ -205,12 +205,12 @@ class CustomerRegistrationServiceTest {
     @Test
     @DisplayName("생일은 월일 4자리, 실제 달력이어야 한다 (0229는 허용, 0230·1301은 거절)")
     void should_checkBirthMonthDay() {
-        assertThat(CustomerRegistrationService.validMonthDay("0229")).isTrue();
-        assertThat(CustomerRegistrationService.validMonthDay("1231")).isTrue();
-        assertThat(CustomerRegistrationService.validMonthDay("0230")).isFalse();
-        assertThat(CustomerRegistrationService.validMonthDay("1301")).isFalse();
-        assertThat(CustomerRegistrationService.validMonthDay("0000")).isFalse();
-        assertThat(CustomerRegistrationService.validMonthDay("314")).isFalse();
+        assertThat(CustomerInputRules.validMonthDay("0229")).isTrue();
+        assertThat(CustomerInputRules.validMonthDay("1231")).isTrue();
+        assertThat(CustomerInputRules.validMonthDay("0230")).isFalse();
+        assertThat(CustomerInputRules.validMonthDay("1301")).isFalse();
+        assertThat(CustomerInputRules.validMonthDay("0000")).isFalse();
+        assertThat(CustomerInputRules.validMonthDay("314")).isFalse();
     }
 
     @Test

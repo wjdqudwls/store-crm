@@ -14,7 +14,9 @@ import com.crmpos.common.error.FieldError;
 import com.crmpos.common.error.ValidationFailedException;
 import com.crmpos.common.security.CurrentAccount;
 import com.crmpos.common.security.CurrentAccountProvider;
+import com.crmpos.customer.service.CustomerQueryService;
 import com.crmpos.customer.service.CustomerRegistrationService;
+import com.crmpos.customer.service.CustomerUpdateService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +46,12 @@ class CustomerControllerTest {
 
     @MockitoBean
     CustomerRegistrationService service;
+
+    @MockitoBean
+    CustomerQueryService queryService;
+
+    @MockitoBean
+    CustomerUpdateService updateService;
 
     @MockitoBean
     CurrentAccountProvider accountProvider;
