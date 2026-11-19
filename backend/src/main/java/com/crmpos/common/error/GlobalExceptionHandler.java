@@ -33,6 +33,12 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.from(code, e.getDetails(), traceId()));
     }
 
+    @ExceptionHandler(ValidationFailedException.class)
+    public ResponseEntity<ErrorResponse> handleValidationFailed(ValidationFailedException e) {
+        log.warn("validation failed fields={}", e.getFieldErrors().stream().map(FieldError::field).toList());
+        return validationResponse(e.getFieldErrors());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
         List<FieldError> fieldErrors = e.getBindingResult().getFieldErrors().stream()

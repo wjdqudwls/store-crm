@@ -75,4 +75,16 @@ public class CustomerSummary {
 
     @Column(nullable = false)
     private LocalDateTime calculatedAt;
+
+    /** 고객을 등록할 때 같이 만든다: NORMAL 등급, 0점·0원 (02-erd.md 3.4). */
+    public static CustomerSummary initial(Long customerId, int policyVersion, LocalDateTime now) {
+        CustomerSummary summary = new CustomerSummary();
+        summary.customerId = customerId;
+        summary.computedGrade = GradeCode.NORMAL;
+        summary.currentGrade = GradeCode.NORMAL;
+        summary.confirmedGrade = GradeCode.NORMAL;
+        summary.policyVersion = policyVersion;
+        summary.calculatedAt = now;
+        return summary;
+    }
 }
