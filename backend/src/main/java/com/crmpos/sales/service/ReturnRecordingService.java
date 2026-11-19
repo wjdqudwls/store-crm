@@ -9,6 +9,7 @@ import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.security.CurrentAccount;
 import com.crmpos.sales.controller.ReturnRequest;
 import com.crmpos.sales.controller.ReturnResponse;
+import com.crmpos.sales.repository.SaleRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -36,6 +37,7 @@ public class ReturnRecordingService {
 
     private final ReturnWriter returnWriter;
     private final StaffRepository staffRepository;
+    private final SaleRepository saleRepository;
     private final ObjectMapper objectMapper;
 
     public Result record(Long saleId, String idempotencyKey, ReturnRequest request, CurrentAccount account) {
@@ -43,6 +45,12 @@ public class ReturnRecordingService {
             throw new BusinessException(ErrorCode.STORE_REQUIRED);
         }
         String key = SalesInputRules.requireKey(idempotencyKey);
+        // 권한을 입력 검사보다 먼저: 없는 판매는 404, 다른 매장의 판매는 입력이 틀려도 403 (03 4.2)
+        Long saleStoreId = saleRepository.findStoreId(saleId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SALE_NOT_FOUND));
+        if (!saleStoreId.equals(account.storeId())) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
 
         List<FieldError> errors = new ArrayList<>();
         Set<Long> seen = new HashSet<>();

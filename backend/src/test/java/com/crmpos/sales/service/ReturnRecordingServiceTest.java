@@ -23,6 +23,7 @@ import com.crmpos.common.security.CurrentAccount;
 import com.crmpos.sales.controller.ReturnRequest;
 import com.crmpos.sales.controller.ReturnResponse;
 import com.crmpos.sales.domain.SaleStatus;
+import com.crmpos.sales.repository.SaleRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,12 +45,15 @@ class ReturnRecordingServiceTest {
     ReturnWriter returnWriter;
     @Mock
     StaffRepository staffRepository;
+    @Mock
+    SaleRepository saleRepository;
 
     ReturnRecordingService service;
 
     @BeforeEach
     void setUp() {
-        service = new ReturnRecordingService(returnWriter, staffRepository, JsonMapper.builder().build());
+        service = new ReturnRecordingService(returnWriter, staffRepository, saleRepository, JsonMapper.builder().build());
+        lenient().when(saleRepository.findStoreId(88231L)).thenReturn(Optional.of(1L));
         Staff staff = mock(Staff.class);
         Store store = mock(Store.class);
         lenient().when(store.getId()).thenReturn(1L);
@@ -185,5 +189,20 @@ class ReturnRecordingServiceTest {
 
         assertThatThrownBy(() -> service.record(88231L, KEY, request(17L, line(2, 1)), STORE))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("권한이 입력 검사보다 먼저다: 다른 매장의 판매는 요청 키·직원이 틀려도 403, 없는 판매는 404")
+    void should_checkPermissionBeforeInput() {
+        given(saleRepository.findStoreId(777L)).willReturn(Optional.of(99L));
+        given(saleRepository.findStoreId(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.record(777L, KEY, request(5L, line(2, 1), line(2, 1)), STORE))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+        assertThatThrownBy(() -> service.record(404L, KEY, request(17L, line(2, 1)), STORE))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.SALE_NOT_FOUND));
+        verify(returnWriter, never()).record(any(), any(), any(), anyString(), anyString(), any());
     }
 }

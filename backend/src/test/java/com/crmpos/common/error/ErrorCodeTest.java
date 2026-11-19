@@ -45,6 +45,9 @@ class ErrorCodeTest {
             // B0-2에서 03 5장에 더한 코드
             Map.entry("NOT_FOUND", 404),
             Map.entry("METHOD_NOT_ALLOWED", 405),
+            Map.entry("UNSUPPORTED_MEDIA_TYPE", 415),
+            Map.entry("NOT_ACCEPTABLE", 406),
+            Map.entry("DAY_CLOSE_NOT_FOUND", 404),
             Map.entry("INTERNAL_ERROR", 500));
 
     @Test

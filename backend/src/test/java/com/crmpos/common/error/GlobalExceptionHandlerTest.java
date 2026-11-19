@@ -91,6 +91,24 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("JSON이 아닌 본문(Content-Type)은 415 UNSUPPORTED_MEDIA_TYPE을 같은 형식으로 준다")
+    void should_return415_when_contentTypeNotSupported() throws Exception {
+        mockMvc.perform(post("/api/v1/test/validate").contentType(org.springframework.http.MediaType.TEXT_PLAIN)
+                        .content("phone=010"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("JSON을 줄 수 없는 Accept는 406 NOT_ACCEPTABLE을 같은 형식으로 준다")
+    void should_return406_when_acceptNotSupported() throws Exception {
+        mockMvc.perform(get("/api/v1/test/ok").accept(org.springframework.http.MediaType.APPLICATION_XML))
+                .andExpect(status().isNotAcceptable())
+                .andExpect(jsonPath("$.code").value("NOT_ACCEPTABLE"));
+    }
+
+    @Test
     @DisplayName("예상하지 못한 예외는 500 INTERNAL_ERROR이고 예외 메시지·스택이 응답에 없다")
     void should_hideInternals_when_unexpectedException() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/test/boom"))

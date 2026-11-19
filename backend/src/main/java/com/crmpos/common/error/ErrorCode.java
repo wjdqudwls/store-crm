@@ -40,6 +40,9 @@ public enum ErrorCode {
     // B0-2에서 03 5장에 더한 코드
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 주소를 찾을 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용하지 않는 요청 방식입니다."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 요청 형식입니다. JSON으로 보내 주세요."),
+    NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "요청한 응답 형식을 줄 수 없습니다. JSON만 지원합니다."),
+    DAY_CLOSE_NOT_FOUND(HttpStatus.NOT_FOUND, "마감 기록이 없습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버에 문제가 생겼습니다. 잠시 뒤에 다시 시도해 주세요.");
 
     private final HttpStatus status;

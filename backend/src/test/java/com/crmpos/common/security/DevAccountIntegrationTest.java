@@ -72,6 +72,6 @@ class DevAccountIntegrationTest {
         seeder.run(new DefaultApplicationArguments());
 
         assertThat(staffRepository.count()).isEqualTo(before);
-        assertThat(before).isEqualTo(7);
+        assertThat(before).isEqualTo(8);
     }
 }

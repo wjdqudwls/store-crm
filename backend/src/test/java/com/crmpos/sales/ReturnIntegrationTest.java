@@ -70,7 +70,6 @@ class ReturnIntegrationTest {
         jdbc.update("DELETE FROM sale");
         jdbc.update("DELETE FROM receipt_sequence");
         jdbc.update("DELETE FROM store_day_close");
-        jdbc.update("DELETE FROM staff WHERE login_id = 'hd-test-staff'");
     }
 
     private long staffId(String loginId) {
@@ -203,17 +202,20 @@ class ReturnIntegrationTest {
     }
 
     @Test
-    @DisplayName("다른 매장의 판매는 반품할 수 없고(403), 그 매장 직원이 아닌 직원을 고르면 400")
-    void should_return403_whenOtherStoreSale() throws Exception {
+    @DisplayName("다른 매장의 판매는 입력이 맞아도 틀려도 403(권한이 먼저)이고, 같은 매장 계정이 다른 매장 직원을 고르면 400")
+    void should_checkPermissionFirst_thenInput() throws Exception {
         long[] sale = createSale(1, 1000);
-        long hongdaeStore = storeRepository.findByCode("HD01").orElseThrow().getId();
-        Staff hdStaff = staffRepository.save(Staff.create("hd-test-staff", "!x", "홍대 직원", StaffRole.STAFF, null,
-                storeRepository.findById(hongdaeStore).orElseThrow(), "S901", LocalDateTime.now()));
         long hongdaeAccount = staffId("store-hd01");
+        long hongdaeStaff = staffId("hd01-senior");
 
-        mockMvc.perform(returnRequest(sale[0], newKey(), sale[1], 1, hongdaeAccount, hdStaff.getId()))
+        // 홍대점 계정 + 홍대점 직원(입력은 맞음) → 강남점 판매라서 403
+        mockMvc.perform(returnRequest(sale[0], newKey(), sale[1], 1, hongdaeAccount, hongdaeStaff))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        // 홍대점 계정 + 강남점 직원(입력도 틀림) → 그래도 403이 먼저
         mockMvc.perform(returnRequest(sale[0], newKey(), sale[1], 1, hongdaeAccount, senior()))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        // 강남점 계정 + 홍대점 직원 → 판매는 자기 매장이지만 직원이 다른 매장이라 400
+        mockMvc.perform(returnRequest(sale[0], newKey(), sale[1], 1, null, hongdaeStaff))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors[0].field").value("staffId"));
 
         assertThat(count("SELECT COUNT(*) FROM sale_return")).isZero();
