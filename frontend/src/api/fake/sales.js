@@ -360,7 +360,10 @@ export function correctSale(id, body, idempotencyKey) {
 }
 
 /** POST /sales/{id}/void (03 4.9) */
-export function voidSale(id, body) {
+export function voidSale(id, body, idempotencyKey) {
+  if (idempotencyKey && savedKeys.has(idempotencyKey)) {
+    return fakeResponse(savedKeys.get(idempotencyKey), 300)
+  }
   const s = sales.find((x) => x.id === id)
   if (!s) return fakeError(404, 'SALE_NOT_FOUND', '판매를 찾을 수 없습니다.')
   if (!canChangeSale(s)) return denied()
@@ -383,13 +386,15 @@ export function voidSale(id, body) {
     newSaleId: null,
     newReceiptNo: null,
   })
+  if (idempotencyKey) savedKeys.set(idempotencyKey, s)
   return fakeResponse(s, 300)
 }
 
 /** POST /day-closes (03 4.10): 오늘 판매 마감 */
 export function closeDay() {
   const storeId = me().storeId ?? 1
-  if (closeRow(storeId)) return fakeError(409, 'DAY_ALREADY_CLOSED', '이미 마감했습니다.')
+  const already = closeRow(storeId)
+  if (already) return fakeResponse(already, 300) // 이미 마감이면 200 + 같은 항목 (03 4.10)
   const row = {
     storeId,
     date: todayKey(),

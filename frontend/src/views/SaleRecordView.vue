@@ -33,7 +33,10 @@ const exchangeSaleId = computed(() => Number(route.query.saleId) || null)
 const summary = ref(null)
 const staffList = ref([])
 onMounted(async () => {
-  ;[summary.value, staffList.value] = await Promise.all([getDailySummary(), getStaff()])
+  ;[summary.value, staffList.value] = await Promise.all([
+    getDailySummary(),
+    getStaff().catch(() => []), // 직원 API 연결 전에도 화면은 열린다
+  ])
 })
 const dayClosed = computed(() => summary.value?.closed === true)
 function markClosed() {

@@ -107,7 +107,9 @@ async function saveReturn() {
 const voidOpen = ref(false)
 const voidStaff = ref(null)
 const voidError = ref('')
+let voidKey = crypto.randomUUID()
 function openVoid() {
+  voidKey = crypto.randomUUID() // 기록 취소 창을 열 때 요청 키. 실패 뒤 다시 누르면 같은 키 (BR-12)
   voidStaff.value = null
   voidError.value = ''
   voidOpen.value = true
@@ -116,7 +118,7 @@ async function saveVoid() {
   if (session.isStore && !voidStaff.value) return (voidError.value = '처리 직원을 골라 주세요')
   saving.value = true
   try {
-    await voidSale(sale.value.id, { staffId: voidStaff.value })
+    await voidSale(sale.value.id, voidStaff.value ? { staffId: voidStaff.value } : {}, voidKey)
     voidOpen.value = false
     ElMessage.success('기록 취소했습니다')
     load()
