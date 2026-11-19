@@ -66,4 +66,21 @@ public class OutboxEvent {
         event.createdAt = now;
         return event;
     }
+
+    /** 최대 시도 횟수. 이만큼 실패하면 FAILED로 두고 더 보내지 않는다 (ADR-007). */
+    public static final int MAX_ATTEMPTS = 10;
+
+    /** 받는 쪽이 처리에 성공했다. */
+    public void markPublished(LocalDateTime now) {
+        this.status = OutboxStatus.PUBLISHED;
+        this.publishedAt = now;
+    }
+
+    /** 처리에 실패했다. 시도 횟수를 하나 올리고, 최대 횟수에 닿으면 FAILED로 둔다. */
+    public void recordFailure() {
+        this.attempts += 1;
+        if (this.attempts >= MAX_ATTEMPTS) {
+            this.status = OutboxStatus.FAILED;
+        }
+    }
 }
