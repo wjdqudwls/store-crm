@@ -30,4 +30,12 @@ public class ProcessedEvent {
 
     @Column(nullable = false)
     private LocalDateTime processedAt;
+
+    public static ProcessedEvent of(String eventId, String eventType, LocalDateTime processedAt) {
+        ProcessedEvent event = new ProcessedEvent();
+        event.eventId = eventId;
+        event.eventType = eventType;
+        event.processedAt = processedAt;
+        return event;
+    }
 }

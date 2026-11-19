@@ -66,4 +66,25 @@ public class ConsultNote {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    /** 판매 이벤트로 받은 응대(구매) 메모 (SAL-04). 작성 직원은 판매 사원, 기록한 계정은 이벤트의 recordedBy. */
+    public static ConsultNote purchaseMemo(Customer customer, Long staffId, Long recordedBy, String content,
+            Long saleId, LocalDateTime at) {
+        ConsultNote note = new ConsultNote();
+        note.customer = customer;
+        note.staffId = staffId;
+        note.type = NoteType.PURCHASE;
+        note.recordedBy = recordedBy;
+        note.content = content;
+        note.saleId = saleId;
+        note.createdAt = at;
+        note.updatedAt = at;
+        return note;
+    }
+
+    /** 정정으로 메모를 새 판매와 (바뀐) 고객으로 옮긴다 (BR-16). 내용·작성 직원은 그대로다. */
+    public void moveTo(Customer newCustomer, Long newSaleId) {
+        this.customer = newCustomer;
+        this.saleId = newSaleId;
+    }
 }
