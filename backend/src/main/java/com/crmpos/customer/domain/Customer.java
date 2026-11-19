@@ -121,4 +121,65 @@ public class Customer {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * 고객을 등록한다 (REG-01·06). 외국인은 영문 이름이 필수이고 한글 이름을 비우면 영문 이름을 이름 칸에도 넣는다.
+     * 내국인은 이름이 필수이고 영문 이름을 쓰지 않는다. 개인정보 동의와 만 14세 확인이 없으면 만들 수 없다.
+     * 마케팅 동의는 동의한 것만 시각을 남긴다.
+     */
+    public static Customer register(CustomerDraft draft, LocalDateTime now) {
+        if (!draft.privacyAgreed() || !draft.age14Confirmed()) {
+            throw new IllegalArgumentException("개인정보 수집·이용 동의와 만 14세 이상 확인이 필요합니다.");
+        }
+        boolean foreign = draft.nationality() == Nationality.FOREIGN;
+        String nameEn = blankToNull(draft.nameEn());
+        String name = blankToNull(draft.name());
+        if (foreign) {
+            if (nameEn == null) {
+                throw new IllegalArgumentException("외국인은 영문 이름이 필요합니다.");
+            }
+            if (name == null) {
+                name = nameEn;
+            }
+        } else {
+            if (name == null) {
+                throw new IllegalArgumentException("이름이 필요합니다.");
+            }
+            if (nameEn != null) {
+                throw new IllegalArgumentException("내국인은 영문 이름을 쓰지 않습니다.");
+            }
+        }
+        Customer customer = new Customer();
+        customer.name = name;
+        customer.nameEn = nameEn;
+        customer.phoneEnc = draft.phoneEnc();
+        customer.phoneHash = draft.phoneHash();
+        customer.phoneLast4 = draft.phoneLast4();
+        customer.nationality = draft.nationality();
+        customer.birthYear = draft.birthYear();
+        customer.birthMd = draft.birthMd();
+        customer.regionSido = draft.regionSido();
+        customer.regionGu = draft.regionGu();
+        customer.addressDetailEnc = draft.addressDetailEnc();
+        customer.gender = draft.gender();
+        customer.preferredItemTypes = draft.preferredItemTypes();
+        customer.sizeTop = draft.sizeTop();
+        customer.sizeOuter = draft.sizeOuter();
+        customer.sizeBottom = draft.sizeBottom();
+        customer.sizeShoes = draft.sizeShoes();
+        customer.contactChannel = draft.contactChannel();
+        customer.homeStoreId = draft.homeStoreId();
+        customer.staffId = draft.staffId();
+        customer.source = draft.source();
+        customer.privacyAgreedAt = now;
+        customer.age14ConfirmedAt = now;
+        customer.marketingSmsAgreedAt = draft.marketingSms() ? now : null;
+        customer.marketingKakaoAgreedAt = draft.marketingKakao() ? now : null;
+        customer.createdAt = now;
+        return customer;
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
 }
