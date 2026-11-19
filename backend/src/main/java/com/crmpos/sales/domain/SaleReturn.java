@@ -86,11 +86,33 @@ public class SaleReturn {
      */
     public static SaleReturn recordReturn(Sale sale, String idempotencyKey, String requestHash, Long staffId,
             Long recordedBy, LocalDateTime returnedAt, List<Item> items) {
+        return record(ReturnKind.RETURN, sale, idempotencyKey, requestHash, staffId, recordedBy, returnedAt, items);
+    }
+
+    /**
+     * 기록 취소를 기록한다 (BR-16, ADR-026): 아직 반품하지 않은 남은 라인을 모두 돌리고 판매를 VOIDED로 바꾼다.
+     * 남은 라인이 없으면(전부 반품) 취소할 것이 없어 거절한다. 호출하기 전에 판매 행을 잠가야 한다.
+     */
+    public static SaleReturn recordVoid(Sale sale, String idempotencyKey, String requestHash, Long staffId,
+            Long recordedBy, LocalDateTime returnedAt) {
+        List<Item> remaining = sale.getLines().stream().filter(l -> l.remainingQty() > 0)
+                .map(l -> Item.of(l, l.remainingQty())).toList();
+        if (remaining.isEmpty()) {
+            throw new IllegalArgumentException("취소할 남은 라인이 없습니다.");
+        }
+        SaleReturn ret = record(ReturnKind.VOID, sale, idempotencyKey, requestHash, staffId, recordedBy, returnedAt,
+                remaining);
+        sale.markVoided();
+        return ret;
+    }
+
+    private static SaleReturn record(ReturnKind kind, Sale sale, String idempotencyKey, String requestHash,
+            Long staffId, Long recordedBy, LocalDateTime returnedAt, List<Item> items) {
         SaleReturn ret = new SaleReturn();
         ret.sale = sale;
         ret.idempotencyKey = idempotencyKey;
         ret.requestHash = requestHash;
-        ret.kind = ReturnKind.RETURN;
+        ret.kind = kind;
         ret.staffId = staffId;
         ret.recordedBy = recordedBy;
         ret.returnedAt = returnedAt;
@@ -101,7 +123,9 @@ public class SaleReturn {
             total += refund;
         }
         ret.amount = total;
-        sale.refreshReturnStatus();
+        if (kind == ReturnKind.RETURN) {
+            sale.refreshReturnStatus();
+        }
         return ret;
     }
 }
