@@ -109,4 +109,29 @@ public class SaleLine {
     void attachTo(Sale sale) {
         this.sale = sale;
     }
+
+    /** 아직 반품하지 않은 수량. */
+    public int remainingQty() {
+        return qty - returnedQty;
+    }
+
+    /**
+     * 이 라인을 qty개 반품하고 환불 금액을 돌려준다 (BR-11). 남은 수량 전부를 반품하면 남은 결제 금액 전부이고,
+     * 아니면 결제 금액 × 반품 수량 ÷ 판매 수량의 원 미만 버림이다. 그래서 나눠 반품해도 환불 합계가 결제 금액과 같다.
+     * 호출하기 전에 판매 행을 잠가야 한다 (ADR-030).
+     */
+    public long processReturn(int returnQty) {
+        if (returnQty < 1) {
+            throw new IllegalArgumentException("반품 수량은 1 이상이어야 합니다.");
+        }
+        if (returnQty > remainingQty()) {
+            throw new IllegalArgumentException("남은 수량보다 많이 반품할 수 없습니다.");
+        }
+        long refund = returnQty == remainingQty()
+                ? lineAmount - returnedAmount
+                : lineAmount * returnQty / qty;
+        this.returnedQty += returnQty;
+        this.returnedAmount += refund;
+        return refund;
+    }
 }

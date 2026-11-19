@@ -145,4 +145,10 @@ public class Sale {
     public void assignRootToSelf() {
         this.rootSale = this;
     }
+
+    /** 반품한 뒤 판매 상태를 맞춘다: 모든 라인을 다 반품하면 RETURNED, 아니면 PARTIAL_RETURNED. */
+    public void refreshReturnStatus() {
+        boolean allReturned = lines.stream().allMatch(line -> line.remainingQty() == 0);
+        this.status = allReturned ? SaleStatus.RETURNED : SaleStatus.PARTIAL_RETURNED;
+    }
 }

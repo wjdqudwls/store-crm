@@ -3,6 +3,7 @@ package com.crmpos.sales.service;
 import com.crmpos.sales.domain.OutboxEvent;
 import com.crmpos.sales.domain.Sale;
 import com.crmpos.sales.domain.SaleEventType;
+import com.crmpos.sales.domain.SaleReturn;
 import com.crmpos.common.web.KstTime;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -30,6 +31,19 @@ public class SaleEventFactory {
                 sale.getReceiptNo(), sale.getStoreId(), sale.getCustomerId(), sale.getStaffId(), sale.getRecordedBy(),
                 sale.getKind().name(), null, sale.getRootSale().getId(), null, memo, lines);
         return OutboxEvent.pending(eventId, SaleEventType.SALE_COMPLETED, sale.getRootSale().getId(),
+                objectMapper.writeValueAsString(payload), now);
+    }
+
+    /** 반품을 03-api.md 6장의 SALE_RETURNED 이벤트로 만든다. 묶음 키는 처음 판매 ID라 판매 완료 이벤트 다음에 처리된다. */
+    public OutboxEvent returned(Sale sale, SaleReturn saleReturn, LocalDateTime now) {
+        String eventId = UUID.randomUUID().toString();
+        List<SaleReturnedPayload.Line> lines = saleReturn.getLines().stream()
+                .map(l -> new SaleReturnedPayload.Line(l.getSaleLine().getId(), l.getQty(), l.getAmount()))
+                .toList();
+        SaleReturnedPayload payload = new SaleReturnedPayload(eventId, SaleEventType.SALE_RETURNED.name(), 1,
+                DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(KstTime.toOffset(saleReturn.getReturnedAt())),
+                sale.getId(), saleReturn.getId(), saleReturn.getKind().name(), sale.getCustomerId(), lines);
+        return OutboxEvent.pending(eventId, SaleEventType.SALE_RETURNED, sale.getRootSale().getId(),
                 objectMapper.writeValueAsString(payload), now);
     }
 }
