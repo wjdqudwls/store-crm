@@ -14,7 +14,7 @@ import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 import javax.sql.DataSource;
 
-/** 기본 데이터 SQL(data.sql)이 앱을 켤 때 들어가고, 다시 실행해도 중복되지 않는지 확인한다 (ADR-019, B0-6). */
+/** 기본 데이터 SQL(V2__base_data.sql)이 앱을 켤 때 들어가고, 다시 실행해도 중복되지 않는지 확인한다 (ADR-019, B0-6). */
 @IntegrationTest
 class BaseDataTest {
 
@@ -74,10 +74,10 @@ class BaseDataTest {
 
     @Test
     @DisplayName("기본 데이터 SQL을 다시 실행해도 행이 늘지 않는다")
-    void should_notDuplicate_when_dataSqlRunsAgain() {
+    void should_notDuplicate_when_baseDataSqlRunsAgain() {
         int before = countAll();
 
-        new ResourceDatabasePopulator(new ClassPathResource("data.sql")).execute(dataSource);
+        new ResourceDatabasePopulator(new ClassPathResource("db/migration/V2__base_data.sql")).execute(dataSource);
 
         assertThat(countAll()).isEqualTo(before);
     }
