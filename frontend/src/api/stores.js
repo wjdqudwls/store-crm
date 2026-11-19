@@ -1,4 +1,4 @@
-import { notConnected } from './http'
+import { http, notConnected } from './http'
 
 /**
  * 매장·직원 계정 API 겉껍데기. 화면은 이 파일만 부른다.
@@ -7,14 +7,15 @@ import { notConnected } from './http'
  */
 const fake = import.meta.env.VITE_API_MODE !== 'real' ? () => import('./fake/stores') : null
 
-export const getStores = (...args) =>
-  fake ? fake().then((m) => m.getStores(...args)) : notConnected('getStores')
+/** GET /stores (본사만, 03 3.7). 매장 상세 `GET /stores/{id}`는 서버에 아직 없다 */
+export const getStores = () => (fake ? fake().then((m) => m.getStores()) : http.get('/stores'))
 
 export const getStore = (...args) =>
   fake ? fake().then((m) => m.getStore(...args)) : notConnected('getStore')
 
-export const getStoreAccounts = (...args) =>
-  fake ? fake().then((m) => m.getStoreAccounts(...args)) : notConnected('getStoreAccounts')
+/** GET /stores/{storeId}/staff: 본사는 매장 계정·직원·키오스크 모두 (03 3.7) */
+export const getStoreAccounts = (storeId) =>
+  fake ? fake().then((m) => m.getStoreAccounts(storeId)) : http.get(`/stores/${storeId}/staff`)
 
 export const createAccount = (...args) =>
   fake ? fake().then((m) => m.createAccount(...args)) : notConnected('createAccount')

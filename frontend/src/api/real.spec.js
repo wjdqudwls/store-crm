@@ -33,6 +33,13 @@ describe('실서버 연결: 고객 (03 3.2·4.3·4.3a·4.4)', () => {
     expect(http.get).toHaveBeenLastCalledWith('/customers/1024', { params: {} })
   })
 
+  it('should_구매이력_주소와_검색어_when_고객_상세_구매_탭', async () => {
+    await api.getPurchases(5, '코트')
+    expect(http.get).toHaveBeenCalledWith('/customers/5/purchases', {
+      params: { keyword: '코트', size: 100 },
+    })
+  })
+
   it('should_PATCH_when_고객_수정', async () => {
     await api.updateCustomer(7, { phone: '010-1' })
     expect(http.patch).toHaveBeenCalledWith('/customers/7', { phone: '010-1' })
@@ -129,5 +136,32 @@ describe('실서버 연결: 판매·반품·마감 (03 4.1·4.2·4.9·4.10·4.12
     expect(http.get).toHaveBeenCalledWith('/stores/2/day-closes')
     await api.reopenDay(2, '2026-11-19')
     expect(http.delete).toHaveBeenCalledWith('/stores/2/day-closes/2026-11-19')
+  })
+})
+
+describe('실서버 연결: 매장·직원 목록 (03 3.7)', () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_MODE', 'real')
+    Object.values(http).forEach((f) => f.mockReset().mockResolvedValue([]))
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('should_GET_stores와_stores_id_staff_when_본사_화면', async () => {
+    const api = await import('./stores')
+    await api.getStores()
+    expect(http.get).toHaveBeenLastCalledWith('/stores')
+    await api.getStoreAccounts(2)
+    expect(http.get).toHaveBeenLastCalledWith('/stores/2/staff')
+  })
+
+  it('should_내_매장_직원을_받음_when_판매_사원_고르기', async () => {
+    const { createPinia, setActivePinia } = await import('pinia')
+    setActivePinia(createPinia())
+    const { useSessionStore } = await import('@/stores/session')
+    useSessionStore().me = { id: 2, role: 'STORE', storeId: 1 }
+    const { getStaff } = await import('./sales')
+    await getStaff()
+    expect(http.get).toHaveBeenLastCalledWith('/stores/1/staff')
   })
 })
