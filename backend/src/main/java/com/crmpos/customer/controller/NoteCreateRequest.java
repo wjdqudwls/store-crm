@@ -17,7 +17,12 @@ public record NoteCreateRequest(
         @NotBlank @Size(max = 1000) String content,
         Long staffId,
         CallResult callResult,
-        ContactChannel channel) {
+        ContactChannel channel,
+        Reminder reminder) {
+
+    /** 방문 날짜·재연락 날짜로 할 일을 만드는 값 (CAL-10·11). 후속 연락 작업(B4-3) 전까지는 보내면 400이다. */
+    public record Reminder(java.time.LocalDate date, Long staffId) {
+    }
 
     @Override
     public String toString() {

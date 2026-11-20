@@ -63,6 +63,10 @@ public class NoteService {
             // 방문 예약은 날짜로 할 일을 만들어야 해서 후속 연락 작업(B4-3)에서 연다
             BodyValidation.addIfAbsent(errors, new FieldError("type", "방문 예약 메모는 아직 쓸 수 없습니다."));
         }
+        if (request.reminder() != null) {
+            // 조용히 버리면 직원이 알림이 걸린 줄 안다. 할 일 만들기는 B4-3에서 한다
+            BodyValidation.addIfAbsent(errors, new FieldError("reminder", "재연락 날짜는 아직 쓸 수 없습니다."));
+        }
         if (request.type() == NoteType.CALL) {
             if (request.callResult() == null) {
                 BodyValidation.addIfAbsent(errors, new FieldError("callResult", "연락 결과를 골라 주세요."));

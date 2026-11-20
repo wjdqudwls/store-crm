@@ -158,6 +158,16 @@ class NoteIntegrationTest {
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"));
     }
 
+    @Test
+    @DisplayName("reminder(재연락·예약 날짜)를 보내면 조용히 버리지 않고 400 fieldErrors[reminder]다 (B4-3 전까지)")
+    void should_rejectReminder_untilFollowUpTasks() throws Exception {
+        write("gn01-junior", "{\"type\":\"CALL\",\"content\":\"재연락\",\"callResult\":\"RECALL\",\"channel\":\"CALL\","
+                + "\"reminder\":{\"date\":\"2026-12-01\"}}").andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("reminder"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("재연락 날짜는 아직 쓸 수 없습니다."));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM consult_note", Integer.class)).isZero();
+    }
+
     // --- 목록 ---
 
     @Test
