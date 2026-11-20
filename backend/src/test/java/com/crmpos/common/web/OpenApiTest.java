@@ -35,4 +35,20 @@ class OpenApiTest {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    @DisplayName("모든 API에 한글 요약(@Operation)이 있다: 설명이 빠진 새 API를 막는다")
+    void should_describeEveryOperation_when_docsOpen() throws Exception {
+        String json = mockMvc.perform(get("/v3/api-docs")).andReturn().getResponse().getContentAsString();
+        var paths = tools.jackson.databind.json.JsonMapper.builder().build().readTree(json).get("paths");
+        java.util.List<String> missing = new java.util.ArrayList<>();
+        // 오류 형식 테스트용 가짜 컨트롤러(/api/v1/test/**)는 제외한다
+        paths.properties().stream().filter(path -> !path.getKey().startsWith("/api/v1/test/")).forEach(path -> path.getValue().properties().forEach(op -> {
+            var summary = op.getValue().get("summary");
+            if (summary == null || summary.asString().isBlank()) {
+                missing.add(op.getKey().toUpperCase() + " " + path.getKey());
+            }
+        }));
+        org.assertj.core.api.Assertions.assertThat(missing).as("@Operation(summary)가 없는 API").isEmpty();
+    }
 }
