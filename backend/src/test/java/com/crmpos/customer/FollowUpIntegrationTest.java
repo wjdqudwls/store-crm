@@ -501,6 +501,36 @@ class FollowUpIntegrationTest {
         assertThat(tasks(c)).hasSize(1);
     }
 
+    @Test
+    @DisplayName("방문 예약·재연락 메모를 지우면 아직 열린 그 할 일은 CANCELLED, 이미 끝난 것은 그대로다")
+    void should_cancelOpenTask_whenSourceNoteDeleted() throws Exception {
+        long c = newCustomer(null, true);
+        long junior = id("gn01-junior");
+        String reminder = "\"reminder\":{\"date\":\"%s\"}".formatted(today.plusDays(2));
+        long openNote = noteId(note("gn01-junior", c, "{\"type\":\"RESERVATION\",\"content\":\"열린 예약\"," + reminder + "}"));
+        long doneNote = noteId(note("gn01-junior", c, "{\"type\":\"RESERVATION\",\"content\":\"끝난 예약\"," + reminder + "}"));
+        em.flush();
+        jdbc.update("UPDATE follow_up_task SET status = 'DONE', closed_at = NOW(6) WHERE source_note_id = ?", doneNote);
+        em.clear();
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/notes/" + openNote)
+                .header(HttpHeaders.AUTHORIZATION, as("gn01-junior"))).andExpect(status().isNoContent());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/notes/" + doneNote)
+                .header(HttpHeaders.AUTHORIZATION, as("gn01-junior"))).andExpect(status().isNoContent());
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT status FROM follow_up_task WHERE source_note_id = ?", String.class, openNote))
+                .isEqualTo("CANCELLED");
+        assertThat(jdbc.queryForObject("SELECT status FROM follow_up_task WHERE source_note_id = ?", String.class, doneNote))
+                .isEqualTo("DONE");
+        assertThat(junior).isPositive();
+    }
+
+    private long noteId(ResultActions created) throws Exception {
+        return mapper.readTree(created.andExpect(status().isCreated()).andReturn().getResponse().getContentAsString())
+                .get("id").asLong();
+    }
+
     // ===== 단계 설정 =====
 
     @Test

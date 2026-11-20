@@ -176,9 +176,17 @@ public class NoteService {
         return NoteItem.from(note, author == null ? null : author.getName(), true, reminderDate, followUpId);
     }
 
+    /**
+     * 메모를 지운다. 이 메모로 만든 방문 예약·재연락 할 일 중 아직 열린 것은 취소한다(이미 끝난 것은 그대로, CAL-10·11).
+     * 날짜만 남은 할 일이 계속 알림을 내지 않게 하기 위해서다.
+     */
     @Transactional
     public void delete(Long noteId, CurrentAccount account) {
-        noteRepository.delete(findEditable(noteId, account));
+        ConsultNote note = findEditable(noteId, account);
+        LocalDateTime now = LocalDateTime.now(KstTime.ZONE).truncatedTo(ChronoUnit.MICROS);
+        taskRepository.findBySourceNoteIdIn(List.of(noteId)).stream().filter(FollowUpTask::isOpen)
+                .forEach(task -> task.cancel(now));
+        noteRepository.delete(note);
     }
 
     private ConsultNote findEditable(Long noteId, CurrentAccount account) {
