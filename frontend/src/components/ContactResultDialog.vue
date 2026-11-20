@@ -6,6 +6,8 @@ import ChoiceButtons from '@/components/ChoiceButtons.vue'
 import ReminderFields from '@/components/ReminderFields.vue'
 import { completeFollowUp, createNote } from '@/api/customers'
 import { useSessionStore } from '@/stores/session'
+import { isFake } from '@/api/mode'
+import { apiMessage } from '@/utils/apiMessage'
 import { useIsPhone } from '@/composables/useIsPhone'
 import { callResultLabels, channelLabels } from '@/features/customer/customerDetail'
 
@@ -52,10 +54,15 @@ const title = computed(() => {
   return name ? `연락 결과 · ${name}` : '연락 결과'
 })
 
+// 할 일을 연락 결과로 완료할 때 서버는 다시 연락 날짜(reminder)를 받지 않는다 (03 complete 본문). 실서버에서는 숨겨서
+// 정한 날짜가 조용히 사라지지 않게 한다. 할 일 없는 연락 메모(POST notes)는 날짜를 받는다.
+const showReminder = computed(() => !props.task || isFake)
+
 async function save() {
   const e = {}
   if (session.isStore && !form.staffId) e.staffId = '연락한 직원을 골라 주세요'
   if (!form.callResult) e.callResult = '연락 결과를 골라 주세요'
+  if (!form.channel) e.channel = '연락 방법을 골라 주세요'
   // 할 일 완료는 내용이 선택, 할 일 없는 연락 메모는 내용이 필요하다
   if (!props.task && !form.content.trim()) e.content = '내용을 입력해 주세요'
   if (form.callResult === 'RECALL' && form.reminderOn && !form.reminderDate)
@@ -70,7 +77,7 @@ async function save() {
       content: form.content.trim() || callResultLabels[form.callResult],
     }
     if (session.isStore) body.staffId = form.staffId
-    if (form.callResult === 'RECALL' && form.reminderOn) {
+    if (form.callResult === 'RECALL' && form.reminderOn && showReminder.value) {
       body.reminder = { date: form.reminderDate, staffId: form.reminderStaffId ?? undefined }
     }
     if (props.task) await completeFollowUp(props.task.id, body)
@@ -84,7 +91,7 @@ async function save() {
       ElMessage.warning('이미 처리된 할 일입니다')
       emit('saved')
     } else {
-      ElMessage.error(err?.body?.message ?? '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요')
+      ElMessage.error(apiMessage(err, '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요'))
     }
   } finally {
     saving.value = false
@@ -113,8 +120,9 @@ async function save() {
         <p v-if="errors.callResult" class="field-error">{{ errors.callResult }}</p>
       </div>
       <ChoiceButtons v-model="form.channel" :options="channelOptions" size="small" />
+      <p v-if="errors.channel" class="field-error">{{ errors.channel }}</p>
       <ReminderFields
-        v-if="form.callResult === 'RECALL'"
+        v-if="form.callResult === 'RECALL' && showReminder"
         v-model:enabled="form.reminderOn"
         v-model:date="form.reminderDate"
         v-model:staff-id="form.reminderStaffId"
@@ -149,8 +157,9 @@ async function save() {
         <p v-if="errors.callResult" class="field-error">{{ errors.callResult }}</p>
       </div>
       <ChoiceButtons v-model="form.channel" :options="channelOptions" size="small" />
+      <p v-if="errors.channel" class="field-error">{{ errors.channel }}</p>
       <ReminderFields
-        v-if="form.callResult === 'RECALL'"
+        v-if="form.callResult === 'RECALL' && showReminder"
         v-model:enabled="form.reminderOn"
         v-model:date="form.reminderDate"
         v-model:staff-id="form.reminderStaffId"
