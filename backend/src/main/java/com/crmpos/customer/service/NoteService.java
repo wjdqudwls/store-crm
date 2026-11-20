@@ -16,10 +16,14 @@ import com.crmpos.customer.controller.NoteItem;
 import com.crmpos.customer.controller.NoteUpdateRequest;
 import com.crmpos.customer.domain.ConsultNote;
 import com.crmpos.customer.domain.Customer;
+import com.crmpos.customer.domain.FollowUpKind;
+import com.crmpos.customer.domain.FollowUpTask;
 import com.crmpos.customer.domain.NoteType;
 import com.crmpos.customer.repository.ConsultNoteRepository;
 import com.crmpos.customer.repository.CustomerRepository;
+import com.crmpos.customer.repository.FollowUpTaskRepository;
 import jakarta.validation.Validator;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -50,6 +54,7 @@ public class NoteService {
     private final ConsultNoteRepository noteRepository;
     private final CustomerRepository customerRepository;
     private final StaffRepository staffRepository;
+    private final FollowUpTaskRepository taskRepository;
     private final Validator validator;
 
     @Transactional
@@ -59,14 +64,6 @@ public class NoteService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CUSTOMER_NOT_FOUND));
 
         List<FieldError> errors = new ArrayList<>(BodyValidation.violations(validator, request));
-        if (request.type() == NoteType.RESERVATION) {
-            // 방문 예약은 날짜로 할 일을 만들어야 해서 후속 연락 작업(B4-3)에서 연다
-            BodyValidation.addIfAbsent(errors, new FieldError("type", "방문 예약 메모는 아직 쓸 수 없습니다."));
-        }
-        if (request.reminder() != null) {
-            // 조용히 버리면 직원이 알림이 걸린 줄 안다. 할 일 만들기는 B4-3에서 한다
-            BodyValidation.addIfAbsent(errors, new FieldError("reminder", "재연락 날짜는 아직 쓸 수 없습니다."));
-        }
         if (request.type() == NoteType.CALL) {
             if (request.callResult() == null) {
                 BodyValidation.addIfAbsent(errors, new FieldError("callResult", "연락 결과를 골라 주세요."));
@@ -76,6 +73,8 @@ public class NoteService {
             }
         }
         Staff author = findAuthor(request.staffId(), account, errors);
+        FollowUpKind reminderKind = reminderKind(request, errors);
+        Staff receiver = reminderKind == null ? null : findReceiver(request.reminder(), author, errors);
         if (!errors.isEmpty()) {
             throw new ValidationFailedException(errors);
         }
@@ -83,7 +82,56 @@ public class NoteService {
         LocalDateTime now = LocalDateTime.now(KstTime.ZONE).truncatedTo(ChronoUnit.MICROS);
         ConsultNote note = noteRepository.save(ConsultNote.write(customer, author.getId(), account.id(),
                 request.type(), request.callResult(), request.channel(), request.content(), now));
-        return NoteItem.from(note, author.getName(), canEdit(note, account, author));
+        LocalDate reminderDate = null;
+        if (reminderKind != null) {
+            // 날짜를 정하면 그날의 할 일이 생긴다 (CAL-10·11). 받는 사람은 고른 직원, 기본은 쓴 직원이다
+            reminderDate = request.reminder().date();
+            taskRepository.save(FollowUpTask.manual(customer, receiver.getId(), reminderKind, note.getId(),
+                    reminderDate, now));
+        }
+        return NoteItem.from(note, author.getName(), canEdit(note, account, author), reminderDate, null);
+    }
+
+    /**
+     * 메모의 날짜(reminder)가 어떤 할 일이 되는지 정한다 (CAL-10·11). 방문 예약(RESERVATION)은 날짜가 필수이고 방문 예정(VISIT)이 된다.
+     * 연락(CALL) 결과가 재연락(RECALL)이면 날짜는 선택이고 다시 연락(RECALL) 할 일이 된다. 그 밖의 메모에는 날짜를 정할 수 없다.
+     * 날짜는 오늘 이후여야 한다. 해당이 없으면 null.
+     */
+    private FollowUpKind reminderKind(NoteCreateRequest request, List<FieldError> errors) {
+        NoteCreateRequest.Reminder reminder = request.reminder();
+        boolean reservation = request.type() == NoteType.RESERVATION;
+        boolean recall = request.type() == NoteType.CALL && request.callResult() == com.crmpos.customer.domain.CallResult.RECALL;
+        if (reservation && (reminder == null || reminder.date() == null)) {
+            errors.add(new FieldError("reminderDate", "방문 날짜를 골라 주세요."));
+            return null;
+        }
+        if (reminder == null || reminder.date() == null) {
+            return null;
+        }
+        if (!reservation && !recall) {
+            errors.add(new FieldError("reminderDate", "방문 예약이나 재연락 메모에만 날짜를 정할 수 있습니다."));
+            return null;
+        }
+        if (reminder.date().isBefore(LocalDate.now(KstTime.ZONE))) {
+            errors.add(new FieldError("reminderDate", "오늘 이후 날짜를 골라 주세요."));
+            return null;
+        }
+        return reservation ? FollowUpKind.VISIT : FollowUpKind.RECALL;
+    }
+
+    /** 할 일을 받을 직원: 고른 직원(작성 직원과 같은 매장의 활성 직원), 안 골랐으면 작성 직원. */
+    private Staff findReceiver(NoteCreateRequest.Reminder reminder, Staff author, List<FieldError> errors) {
+        if (reminder.staffId() == null || author == null || reminder.staffId().equals(author.getId())) {
+            return author;
+        }
+        Staff staff = staffRepository.findById(reminder.staffId()).orElse(null);
+        boolean sameStore = staff != null && staff.getStore() != null && author.getStore() != null
+                && staff.getStore().getId().equals(author.getStore().getId());
+        if (staff == null || !staff.isActive() || !sameStore || !EMPLOYEE_RANKS.contains(staff.getRole())) {
+            errors.add(new FieldError("reminder.staffId", "이 매장의 활성 직원이 아닙니다."));
+            return null;
+        }
+        return staff;
     }
 
     @Transactional(readOnly = true)
@@ -96,9 +144,17 @@ public class NoteService {
         Map<Long, Staff> authors = staffRepository
                 .findAllById(result.getContent().stream().map(ConsultNote::getStaffId).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(Staff::getId, s -> s));
+        List<Long> noteIds = result.getContent().stream().map(ConsultNote::getId).toList();
+        Map<Long, LocalDate> reminderDates = new HashMap<>();
+        Map<Long, Long> followUpIds = new HashMap<>();
+        if (!noteIds.isEmpty()) {
+            taskRepository.findBySourceNoteIdIn(noteIds).forEach(t -> reminderDates.put(t.getSourceNoteId(), t.getDueDate()));
+            taskRepository.findByNoteIdIn(noteIds).forEach(t -> followUpIds.put(t.getNoteId(), t.getId()));
+        }
         List<NoteItem> items = result.getContent().stream().map(n -> {
             Staff author = authors.get(n.getStaffId());
-            return NoteItem.from(n, author == null ? null : author.getName(), canEdit(n, account, author));
+            return NoteItem.from(n, author == null ? null : author.getName(), canEdit(n, account, author),
+                    reminderDates.get(n.getId()), followUpIds.get(n.getId()));
         }).toList();
         return PageResponse.of(items, page, size, result.getTotalElements());
     }
@@ -113,7 +169,11 @@ public class NoteService {
         }
         note.edit(request.content(), LocalDateTime.now(KstTime.ZONE).truncatedTo(ChronoUnit.MICROS));
         Staff author = staffRepository.findById(note.getStaffId()).orElse(null);
-        return NoteItem.from(note, author == null ? null : author.getName(), true);
+        LocalDate reminderDate = taskRepository.findBySourceNoteIdIn(List.of(noteId)).stream().findFirst()
+                .map(FollowUpTask::getDueDate).orElse(null);
+        Long followUpId = taskRepository.findByNoteIdIn(List.of(noteId)).stream().findFirst()
+                .map(FollowUpTask::getId).orElse(null);
+        return NoteItem.from(note, author == null ? null : author.getName(), true, reminderDate, followUpId);
     }
 
     @Transactional

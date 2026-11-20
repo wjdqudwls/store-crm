@@ -16,6 +16,8 @@ import com.crmpos.customer.repository.CustomerSummaryRepository;
 import com.crmpos.customer.repository.ProcessedEventRepository;
 import com.crmpos.customer.repository.VisitRange;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class SaleEventService {
     private final CustomerSummaryRepository summaryRepository;
     private final CustomerPurchaseRepository purchaseRepository;
     private final ConsultNoteRepository noteRepository;
+    private final FollowUpPlanService followUpPlanService;
 
     @Transactional
     public void handleCompleted(String eventId, String eventType, SaleCompletedEvent event) {
@@ -74,7 +77,8 @@ public class SaleEventService {
             noteRepository.findBySaleIdAndType(event.originSaleId(), NoteType.PURCHASE)
                     .forEach(note -> note.moveTo(customer, event.saleId()));
         }
-        refreshVisits(customer.getId());
+        VisitRange visits = refreshVisits(customer.getId());
+        followUpPlanService.onSaleCompleted(customer, event, soldAt, countedAt, visits.last());
     }
 
     @Transactional
@@ -86,13 +90,17 @@ public class SaleEventService {
             return;
         }
         boolean voided = RETURN_KIND_VOID.equals(event.kind());
+        Set<Long> groups = new LinkedHashSet<>();
         for (SaleReturnedEvent.Line line : event.lines()) {
             CustomerPurchase purchase = purchaseRepository.findBySaleLineId(line.saleLineId())
                     .orElseThrow(() -> new IllegalStateException(
                             "반품한 구매 기록이 없다 saleLineId=" + line.saleLineId()));
             purchase.applyReturn(line.qty(), line.amount(), voided);
+            groups.add(purchase.getPurchaseGroupId());
         }
         refreshVisits(event.customerId());
+        purchaseRepository.flush();
+        followUpPlanService.onPurchaseGroupsReduced(event.customerId(), groups);
     }
 
     /** 처음 보는 이벤트면 기록하고 true, 이미 처리했으면 false. */
@@ -105,12 +113,13 @@ public class SaleEventService {
     }
 
     /** 첫·마지막 방문일을 구매 기록에서 다시 계산한다 (BR-09). */
-    private void refreshVisits(Long customerId) {
+    private VisitRange refreshVisits(Long customerId) {
         CustomerSummary summary = summaryRepository.findById(customerId)
                 .orElseThrow(() -> new IllegalStateException("고객 요약이 없다 customerId=" + customerId));
         purchaseRepository.flush();
         VisitRange range = purchaseRepository.findVisitRange(customerId);
         summary.updateVisits(range.first(), range.last());
+        return range;
     }
 
     private Customer findCustomer(Long customerId) {
