@@ -87,4 +87,22 @@ public class ConsultNote {
         this.customer = newCustomer;
         this.saleId = newSaleId;
     }
+
+    /** 사람이 쓴 메모를 만든다 (MEM-01). 연락(CALL)이 아니면 결과·채널은 비운다. */
+    public static ConsultNote write(Customer customer, Long staffId, Long recordedBy, NoteType type,
+            CallResult callResult, ContactChannel channel, String content, LocalDateTime at) {
+        ConsultNote note = purchaseMemo(customer, staffId, recordedBy, content, null, at);
+        note.type = type;
+        if (type == NoteType.CALL) {
+            note.callResult = callResult;
+            note.channel = channel;
+        }
+        return note;
+    }
+
+    /** 내용을 고친다 (MEM-03). 유형·작성 직원·연락 결과는 그대로다. */
+    public void edit(String newContent, LocalDateTime at) {
+        this.content = newContent;
+        this.updatedAt = at;
+    }
 }
