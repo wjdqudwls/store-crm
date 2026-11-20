@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface StaffRepository extends JpaRepository<Staff, Long> {
 
+    Optional<Staff> findByLoginId(String loginId);
+
     Optional<Staff> findFirstByRoleAndActiveTrueOrderByIdAsc(StaffRole role);
 
     /** 매장의 모든 계정(매장 계정·직원·키오스크), 등록 순서대로. */

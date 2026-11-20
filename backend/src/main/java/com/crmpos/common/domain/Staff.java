@@ -76,4 +76,15 @@ public class Staff {
         staff.tokensValidAfter = now;
         return staff;
     }
+
+    /** 비밀번호를 바꾼다. 이전에 발급한 모든 토큰이 끊기도록 로그인 기준 시각도 지금으로 올린다 (AUTH-04, ADR-025). */
+    public void changePassword(String newPasswordHash, LocalDateTime now) {
+        this.passwordHash = newPasswordHash;
+        this.tokensValidAfter = now;
+    }
+
+    /** 모든 기기에서 로그아웃: 지금 이전에 발급한 토큰을 거절한다 (AUTH-03, ADR-025). */
+    public void invalidateTokens(LocalDateTime now) {
+        this.tokensValidAfter = now;
+    }
 }
