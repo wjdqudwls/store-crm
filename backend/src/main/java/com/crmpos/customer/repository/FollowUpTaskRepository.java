@@ -21,6 +21,12 @@ public interface FollowUpTaskRepository extends JpaRepository<FollowUpTask, Long
     List<FollowUpTask> findByCustomerIdAndSaleIdInAndStatus(Long customerId, Collection<Long> saleIds,
             FollowUpTaskStatus status);
 
+    /** 그날 만기인 열린 할 일 (알림에 쓴다). 고객 이름과 단계를 함께 읽는다. */
+    @Query("select t from FollowUpTask t join fetch t.customer left join fetch t.rule where t.kind in :kinds and t.status = :status "
+            + "and t.dueDate = :date order by t.id")
+    List<FollowUpTask> findDueOn(@Param("kinds") Collection<FollowUpKind> kinds,
+            @Param("status") FollowUpTaskStatus status, @Param("date") LocalDate date);
+
     List<FollowUpTask> findBySourceNoteIdIn(Collection<Long> noteIds);
 
     List<FollowUpTask> findByNoteIdIn(Collection<Long> noteIds);

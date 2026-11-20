@@ -65,6 +65,11 @@ public class Staff {
     @Column
     private LocalDateTime lockedUntil;
 
+    /** 방문 예약·재연락 알림 시점 (CAL-12). 기본은 전날. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private NotifyTiming notifyTiming = NotifyTiming.DAY_BEFORE;
+
     /** 이 시각보다 먼저 발급된 토큰은 거절한다 (ADR-025). */
     @Column(nullable = false)
     private LocalDateTime tokensValidAfter;
@@ -105,5 +110,9 @@ public class Staff {
     public void clearLoginFailures() {
         this.failedLoginCount = 0;
         this.lockedUntil = null;
+    }
+
+    public void changeNotifyTiming(NotifyTiming timing) {
+        this.notifyTiming = timing;
     }
 }
