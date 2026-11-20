@@ -61,4 +61,16 @@ class AccountSeederTest {
         assertThat(hash).isNotEqualTo(AccountSeeder.NO_LOGIN);
         jdbc.update("UPDATE staff SET password_hash = ? WHERE login_id = 'hd01-senior'", original);
     }
+
+    @Test
+    @DisplayName("비밀번호 값이 비었거나 규칙에 안 맞으면 시작하지 않는다 (prod에서 비어 있으면 실패)")
+    void should_failToStart_whenPasswordBlankOrWeak() {
+        AccountSeeder weak = new AccountSeeder(staffRepository, null, passwordEncoder);
+        org.springframework.test.util.ReflectionTestUtils.setField(weak, "hqPassword", "");
+        org.springframework.test.util.ReflectionTestUtils.setField(weak, "storePassword", "storePass1234");
+        org.springframework.test.util.ReflectionTestUtils.setField(weak, "staffPassword", "staffPass1234");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> weak.run(null))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }

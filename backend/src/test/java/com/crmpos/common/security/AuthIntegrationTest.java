@@ -301,7 +301,8 @@ class AuthIntegrationTest {
     @DisplayName("기본 계정(본사·매장 계정)은 환경변수 비밀번호로 로그인된다")
     void should_loginSeededAccounts() throws Exception {
         login("hq", "hqPass1234").andExpect(status().isOk());
-        login("store-gn01", "storeGn01Pass1").andExpect(status().isOk());
+        login("store-gn01", "storePass1234").andExpect(status().isOk());
+        login("store-hd01", "storePass1234").andExpect(status().isOk());
         login("gn01-senior", "staffPass1234").andExpect(status().isOk());
         login("hq", "wrongPass1").andExpect(status().isUnauthorized());
     }
