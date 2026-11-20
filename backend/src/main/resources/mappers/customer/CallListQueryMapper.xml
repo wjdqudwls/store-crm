@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 콜리스트 (CAL-01, BR-09). 고객 모듈 테이블(customer, customer_summary, customer_purchase, customer_member)만 쓴다 (ADR-018). -->
+<mapper namespace="com.crmpos.customer.repository.CallListQueryMapper">
+
+  <resultMap id="row" type="com.crmpos.customer.repository.CallListRow">
+    <constructor>
+      <idArg column="id" javaType="java.lang.Long"/>
+      <arg column="name" javaType="java.lang.String"/>
+      <arg column="phone_last4" javaType="java.lang.String"/>
+      <arg column="current_grade" javaType="com.crmpos.common.type.GradeCode"/>
+      <arg column="last_visit_at" javaType="java.time.LocalDateTime"/>
+      <arg column="created_at" javaType="java.time.LocalDateTime"/>
+      <arg column="staff_id" javaType="java.lang.Long"/>
+      <arg column="marketing_allowed" javaType="_boolean"/>
+    </constructor>
+  </resultMap>
+
+  <sql id="conditions">
+    <where>
+      <if test="staffId != null">
+        AND c.staff_id = #{staffId}
+      </if>
+      <if test="storeId != null">
+        <!-- 이 매장 고객: 이 매장에서 가입했거나 이 매장에서 산 적이 있거나(기록 취소 제외) 매장 계정이 맡은 고객 -->
+        AND (
+          c.home_store_id = #{storeId}
+          OR EXISTS (SELECT 1 FROM customer_purchase sp
+                     WHERE sp.customer_id = c.id AND sp.store_id = #{storeId} AND sp.qty &gt; sp.voided_qty)
+          <if test="storeAccountIds != null and !storeAccountIds.isEmpty()">
+            OR c.staff_id IN
+            <foreach collection="storeAccountIds" item="accountId" open="(" separator="," close=")">#{accountId}</foreach>
+          </if>
+        )
+      </if>
+      <if test="promoOnly">
+        AND (c.marketing_sms_agreed_at IS NOT NULL OR c.marketing_kakao_agreed_at IS NOT NULL)
+      </if>
+      <if test="grades != null">
+        AND s.current_grade IN
+        <foreach collection="grades" item="grade" open="(" separator="," close=")">#{grade}</foreach>
+      </if>
+      <if test="inactiveBefore != null">
+        <!-- 구매가 없으면 가입일로 센다 (BR-09) -->
+        AND COALESCE(s.last_visit_at, c.created_at) &lt;= #{inactiveBefore}
+      </if>
+      <if test="target != null">
+        AND EXISTS (SELECT 1 FROM customer_purchase tp
+                    WHERE tp.customer_id = c.id AND tp.target = #{target} AND tp.qty &gt; tp.voided_qty)
+      </if>
+      <if test="itemType != null">
+        AND EXISTS (SELECT 1 FROM customer_purchase ip
+                    WHERE ip.customer_id = c.id AND ip.item_type = #{itemType} AND ip.qty &gt; ip.voided_qty)
+      </if>
+      <if test="relation != null">
+        AND EXISTS (SELECT 1 FROM customer_member m WHERE m.customer_id = c.id AND m.relation = #{relation})
+      </if>
+    </where>
+  </sql>
+
+  <!-- 마지막 방문이 오래된 순 (구매가 없으면 가입일) -->
+  <select id="find" resultMap="row">
+    SELECT c.id, c.name, c.phone_last4, s.current_grade, s.last_visit_at, c.created_at, c.staff_id,
+           (c.marketing_sms_agreed_at IS NOT NULL OR c.marketing_kakao_agreed_at IS NOT NULL) AS marketing_allowed
+    FROM customer c
+    JOIN customer_summary s ON s.customer_id = c.id
+    <include refid="conditions"/>
+    ORDER BY COALESCE(s.last_visit_at, c.created_at) ASC, c.id ASC
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="count" resultType="long">
+    SELECT COUNT(*)
+    FROM customer c
+    JOIN customer_summary s ON s.customer_id = c.id
+    <include refid="conditions"/>
+  </select>
+
+</mapper>
