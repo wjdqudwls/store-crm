@@ -8,6 +8,7 @@ import ChoiceButtons from '@/components/ChoiceButtons.vue'
 import ReminderFields from '@/components/ReminderFields.vue'
 import { createNote, deleteNote, getNotes, updateNote } from '@/api/customers'
 import { getStaff } from '@/api/sales'
+import { apiMessage } from '@/utils/apiMessage'
 import { useSessionStore } from '@/stores/session'
 import {
   callResultLabels,
@@ -93,7 +94,7 @@ async function save() {
     )
     await load()
   } catch (e) {
-    ElMessage.error(e?.body?.message ?? '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요')
+    ElMessage.error(apiMessage(e, '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요'))
   } finally {
     saving.value = false
   }
@@ -121,7 +122,12 @@ function startEdit(n) {
 }
 async function saveEdit(n) {
   if (!editText.value.trim()) return
-  await updateNote(n.id, editText.value.trim())
+  try {
+    await updateNote(n.id, editText.value.trim())
+  } catch (e) {
+    ElMessage.error(apiMessage(e, '고쳤는지 확인하지 못했습니다. 다시 눌러 주세요'))
+    return
+  }
   editingId.value = null
   await load()
 }
@@ -135,7 +141,12 @@ async function remove(n) {
   } catch {
     return
   }
-  await deleteNote(n.id)
+  try {
+    await deleteNote(n.id)
+  } catch (e) {
+    ElMessage.error(apiMessage(e, '지웠는지 확인하지 못했습니다. 다시 눌러 주세요'))
+    return
+  }
   ElMessage.success('메모를 지웠습니다')
   await load()
 }

@@ -10,6 +10,7 @@ describe('실서버 연결: 고객 (03 3.2·4.3·4.3a·4.4)', () => {
     vi.resetModules()
     vi.stubEnv('VITE_API_MODE', 'real')
     Object.values(http).forEach((f) => f.mockReset().mockResolvedValue({}))
+    http.delete = vi.fn().mockResolvedValue({})
     api = await import('./customers')
   })
   afterEach(() => vi.unstubAllEnvs())
@@ -38,6 +39,21 @@ describe('실서버 연결: 고객 (03 3.2·4.3·4.3a·4.4)', () => {
     expect(http.get).toHaveBeenCalledWith('/customers/5/purchases', {
       params: { keyword: '코트', size: 100 },
     })
+  })
+
+  it('should_메모_주소와_본문_when_목록_작성_수정_삭제', async () => {
+    await api.getNotes(5)
+    expect(http.get).toHaveBeenCalledWith('/customers/5/notes', { params: { size: 100 } })
+    await api.createNote(5, { type: 'CONSULT', content: '메모', staffId: 4 })
+    expect(http.post).toHaveBeenCalledWith('/customers/5/notes', {
+      type: 'CONSULT',
+      content: '메모',
+      staffId: 4,
+    })
+    await api.updateNote(9, '고침')
+    expect(http.patch).toHaveBeenCalledWith('/notes/9', { content: '고침' })
+    await api.deleteNote(9)
+    expect(http.delete).toHaveBeenCalledWith('/notes/9')
   })
 
   it('should_PATCH_when_고객_수정', async () => {
