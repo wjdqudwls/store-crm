@@ -39,7 +39,10 @@ const router = useRouter()
 function onAccount(cmd) {
   if (cmd === 'password') router.push('/me/password')
   else if (cmd === 'notify') router.push('/me/notifications')
-  else if (cmd === 'logout') router.push('/login')
+  else if (cmd === 'logout') {
+    session.logout()
+    router.push('/login')
+  }
 }
 
 function isActive(path) {

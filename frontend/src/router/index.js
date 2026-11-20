@@ -105,8 +105,17 @@ export function firstScreenPath(role, isPhone) {
   return (isPhone ? m.firstPhone : m.firstPc).path
 }
 
-router.beforeEach((to) => {
-  const { me } = useSessionStore()
+router.beforeEach(async (to) => {
+  const session = useSessionStore()
+  // 실서버: 새로고침 뒤 refresh 토큰으로 로그인 상태를 되살린다 (첫 이동에서 한 번)
+  await session.restore()
+  const { me } = session
+  // 실서버: 로그인 전이면 로그인 화면으로 (공개 화면은 제외)
+  if (!showReference && !session.isLoggedIn && !to.meta.public) return '/login'
+  // 이미 로그인했으면 로그인 화면 대신 첫 화면으로
+  if (!showReference && session.isLoggedIn && to.path === '/login') {
+    return firstScreenPath(me.role, isPhoneNow())
+  }
   const first = firstScreenPath(me.role, isPhoneNow())
   // 참고 화면은 실서버에서 첫 화면으로 보낸다 (QR 공개 페이지도 같다)
   if (!showReference && to.meta.reference) return first

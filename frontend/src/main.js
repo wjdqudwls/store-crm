@@ -23,11 +23,19 @@ import './styles/page.css'
 
 import App from './App.vue'
 import router from './router'
+import { setAuthLostHandler } from './api/http'
+import { useSessionStore } from './stores/session'
 
 const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: ko })
+
+// 로그인이 끊기면(갱신 실패·비활성 계정) 계정 정보를 지우고 로그인 화면으로 보낸다 (F13)
+setAuthLostHandler(() => {
+  useSessionStore().logout()
+  router.push('/login')
+})
 
 app.mount('#app')
