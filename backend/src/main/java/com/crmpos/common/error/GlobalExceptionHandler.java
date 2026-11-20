@@ -111,7 +111,8 @@ public class GlobalExceptionHandler {
             // DB 예외 메시지에는 입력값(전화번호 등)이 섞일 수 있어 클래스 이름만 남긴다 (NFR-04b)
             log.error("unexpected database error type={}", e.getClass().getSimpleName());
         } else {
-            log.error("unexpected error type={}", e.getClass().getSimpleName(), e);
+            // 예외 메시지에도 입력값이 섞일 수 있어 메시지와 스택 전체는 남기지 않는다. 종류와 우리 코드의 첫 위치만 남긴다 (NFR-04b)
+            log.error("unexpected error type={} at={}", e.getClass().getSimpleName(), originOf(e));
         }
         return ResponseEntity.status(ErrorCode.INTERNAL_ERROR.getStatus())
                 .body(ErrorResponse.from(ErrorCode.INTERNAL_ERROR, traceId()));
@@ -120,6 +121,22 @@ public class GlobalExceptionHandler {
     private ResponseEntity<ErrorResponse> validationResponse(List<FieldError> fieldErrors) {
         return ResponseEntity.status(ErrorCode.VALIDATION_FAILED.getStatus())
                 .body(ErrorResponse.validation(fieldErrors, traceId()));
+    }
+
+    /** 우리 코드(com.crmpos)에서 처음 나오는 위치 (클래스.메서드:줄). 없으면 첫 프레임. */
+    static String originOf(Throwable e) {
+        StackTraceElement[] trace = e.getStackTrace();
+        for (StackTraceElement frame : trace) {
+            if (frame.getClassName().startsWith("com.crmpos")) {
+                return simpleClass(frame) + "." + frame.getMethodName() + ":" + frame.getLineNumber();
+            }
+        }
+        return trace.length == 0 ? "unknown" : simpleClass(trace[0]) + "." + trace[0].getMethodName();
+    }
+
+    private static String simpleClass(StackTraceElement frame) {
+        String name = frame.getClassName();
+        return name.substring(name.lastIndexOf('.') + 1);
     }
 
     private String traceId() {
