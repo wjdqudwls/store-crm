@@ -187,4 +187,14 @@ class GlobalExceptionHandlerTest {
                 .contains("DataIntegrityViolationException")
                 .doesNotContain("2943");
     }
+
+    @Test
+    @DisplayName("예상 못 한 예외는 로그에 종류와 우리 코드의 위치만 남고 예외 메시지(입력값)는 남지 않는다")
+    void should_logTypeAndOriginOnly_when_unexpectedException(CapturedOutput output) throws Exception {
+        mockMvc.perform(get("/api/v1/test/boom")).andExpect(status().isInternalServerError());
+
+        assertThat(output.getAll())
+                .contains("unexpected error type=IllegalStateException at=ErrorTestController.boom")
+                .doesNotContain("secret-value");
+    }
 }
