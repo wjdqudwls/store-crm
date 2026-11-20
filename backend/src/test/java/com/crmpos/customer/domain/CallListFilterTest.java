@@ -52,6 +52,17 @@ class CallListFilterTest {
     }
 
     @Test
+    @DisplayName("CAL-01: 매장 계정이 MINE을 고르면 매장 계정이 담당인 고객만 (매장 계정도 담당자가 될 수 있다)")
+    void should_useAccountAsStaff_whenStoreAccountPicksMine() {
+        CallListFilter f = CallListFilter.resolve(StaffRole.STORE, 3L,
+                new CallListFilter.Request(CallListScope.MINE, null, null, null, null, null, null, null));
+
+        assertThat(f.scope()).isEqualTo(CallListScope.MINE);
+        assertThat(f.staffId()).isEqualTo(3L);
+        assertThat(f.promoOnly()).isTrue(); // 매장 계정 기본값은 그대로
+    }
+
+    @Test
     @DisplayName("BR-09: 본사는 매장 계정과 같은 기본값이다 (매장은 storeId로 고른다)")
     void should_applyHqDefaults_sameAsStore() {
         CallListFilter f = CallListFilter.resolve(StaffRole.HQ, 1L, NOTHING);

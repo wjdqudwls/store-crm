@@ -130,6 +130,19 @@ class CallListIntegrationTest {
     }
 
     @Test
+    @DisplayName("매장 계정이 scope=MINE이면 매장 계정이 담당인 고객만 나오고, 매장 전체는 나오지 않는다")
+    void should_showOnlyStoreAccountCustomers_whenMine() throws Exception {
+        long gn = storeId("GN01");
+        long mine = customer("매장이맡음", gn, id("store-gn01"), true, "NORMAL", null, now.minusDays(9));
+        customer("매장고객", gn, null, true, "NORMAL", null, now.minusDays(5));
+        customer("직원담당", gn, id("gn01-junior"), true, "NORMAL", null, now.minusDays(5));
+
+        call("store-gn01", "?scope=MINE").andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(mine));
+        call("store-gn01", "?scope=STORE").andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
     @DisplayName("최소 등급은 컷 순서로 비교하고(B 이상 = B·A), 담당 직원·미방문 일수·대상·품목·가족 관계 조건이 함께 걸린다")
     void should_combineFilters() throws Exception {
         long gn = storeId("GN01");
