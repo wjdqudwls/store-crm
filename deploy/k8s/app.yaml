@@ -55,7 +55,8 @@ spec:
             - name: DB_USER
               value: crm
           envFrom:
-            # DB_PASSWORD, JWT_SECRET, VAPID_* 등 비밀 값 (secret.example.yaml에 키 이름만 있다)
+            # DB_PASSWORD, JWT_SECRET, HQ/STORE/STAFF_INITIAL_PASSWORD, CRYPTO_KEY, HMAC_KEY, VAPID_* 등 비밀 값 (secret.example.yaml에 키 이름만 있다).
+            # 암호화 키·초기 비밀번호가 없거나 약하면 앱이 시작하지 않는다.
             - secretRef:
                 name: app-env
           resources:

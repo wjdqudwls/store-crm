@@ -1,0 +1,67 @@
+# 매일 새벽 4시(한국 시간)에 DB를 mysqldump로 백업한다. 7일 지난 파일은 지운다.
+# 주의: 같은 VM의 같은 디스크에 두는 백업이라 VM이 사라지면 같이 사라진다. 중요해지면 VM 밖으로 복사한다.
+# 복원 방법은 README의 "백업 복원".
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-backup
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: db-backup
+spec:
+  schedule: "0 4 * * *"
+  timeZone: Asia/Seoul
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsUser: 999 # mariadb 이미지의 mysql 사용자
+            runAsGroup: 999
+            fsGroup: 999
+          containers:
+            - name: dump
+              image: mariadb:11
+              command: ["bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  f="/backup/crm-$(date +%F-%H%M).sql.gz"
+                  mariadb-dump -h mariadb -u crm --password="$DB_PASSWORD" \
+                    --single-transaction --routines --triggers crm | gzip > "$f.tmp"
+                  mv "$f.tmp" "$f"
+                  find /backup -name 'crm-*.sql.gz' -mtime +7 -delete
+                  ls -l /backup
+              env:
+                - name: DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: app-env
+                      key: DB_PASSWORD
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: db-backup

@@ -1,14 +1,5 @@
 # Traefik 미들웨어 (k3s 기본 Ingress). 이름은 ingress.yaml의 annotation이 가리킨다.
-# 로그인(B0-3) 전에는 basicAuth로 막는다. 로그인이 들어가면 basic-auth를 Ingress에서 뗀다.
-# 주의: basicAuth와 앱의 `Authorization: Bearer` 헤더는 같은 헤더라 같이 못 쓴다.
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: basic-auth
-spec:
-  basicAuth:
-    secret: basic-auth # Secret의 users 키에 htpasswd 한 줄 (secret.example.yaml 참고)
-    removeHeader: true
+# 접근 제한은 앱의 로그인(JWT, B0-3)이 한다. basicAuth는 앱의 `Authorization: Bearer`와 같은 헤더라 쓰지 않는다.
 ---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
