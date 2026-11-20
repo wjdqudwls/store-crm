@@ -20,11 +20,6 @@ const KNOWN = {
     reason: '가짜 할 일에 noteId(연결된 메모)가 있다. 03 항목에는 없고 화면은 noteContent만 쓴다',
     diffs: ['extra:noteId'],
   },
-  noteItem: {
-    reason:
-      '03 메모 항목에 reminderDate: string|null이 추가된다 (문서 세션). 반영되면 shapes에 넣고 이 항목을 지운다',
-    diffs: ['extra:reminderDate'],
-  },
   saleCreated: {
     reason: '가짜는 영수증 상세 전체를 준다(상위집합). 화면은 id·receiptNo만 쓴다',
     diffs: [

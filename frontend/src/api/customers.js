@@ -44,17 +44,25 @@ export const updateMember = (...args) =>
 export const deleteMember = (...args) =>
   fake ? fake().then((m) => m.deleteMember(...args)) : notConnected('deleteMember')
 
-export const getNotes = (...args) =>
-  fake ? fake().then((m) => m.getNotes(...args)) : notConnected('getNotes')
+/** GET /customers/{id}/notes (최신순, 03 4.12) */
+export const getNotes = (id) =>
+  fake
+    ? fake().then((m) => m.getNotes(id))
+    : http.get(`/customers/${id}/notes`, { params: { size: 100 } })
 
-export const createNote = (...args) =>
-  fake ? fake().then((m) => m.createNote(...args)) : notConnected('createNote')
+/** POST /customers/{id}/notes. 매장 계정은 staffId 필수, 방문 예약·재연락 날짜(reminder)는 서버가 B4-3 전까지 400으로 거절한다 */
+export const createNote = (id, body) =>
+  fake ? fake().then((m) => m.createNote(id, body)) : http.post(`/customers/${id}/notes`, body)
 
-export const updateNote = (...args) =>
-  fake ? fake().then((m) => m.updateNote(...args)) : notConnected('updateNote')
+/** PATCH /notes/{id} — 내용만 고친다 */
+export const updateNote = (noteId, content) =>
+  fake
+    ? fake().then((m) => m.updateNote(noteId, content))
+    : http.patch(`/notes/${noteId}`, { content })
 
-export const deleteNote = (...args) =>
-  fake ? fake().then((m) => m.deleteNote(...args)) : notConnected('deleteNote')
+/** DELETE /notes/{id} (204) */
+export const deleteNote = (noteId) =>
+  fake ? fake().then((m) => m.deleteNote(noteId)) : http.delete(`/notes/${noteId}`)
 
 export const getFollowUps = (...args) =>
   fake ? fake().then((m) => m.getFollowUps(...args)) : notConnected('getFollowUps')

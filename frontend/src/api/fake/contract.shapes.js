@@ -304,6 +304,7 @@ export const shapes = {
     staffName: 'string',
     saleId: 'number|null',
     followUpId: 'number|null',
+    reminderDate: 'string|null',
     createdAt: 'string',
     updatedAt: 'string|null',
     editable: 'boolean',
