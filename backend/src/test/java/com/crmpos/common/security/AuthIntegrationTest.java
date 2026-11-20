@@ -11,6 +11,7 @@ import com.crmpos.common.domain.Staff;
 import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.repository.StoreRepository;
+import com.crmpos.common.web.KstTime;
 import com.crmpos.support.IntegrationTest;
 import com.crmpos.support.TestAuth;
 import java.time.Clock;
@@ -61,7 +62,7 @@ class AuthIntegrationTest {
         loginId = "auth-" + UUID.randomUUID().toString().substring(0, 8);
         staff = staffRepository.saveAndFlush(Staff.create(loginId, passwordEncoder.encode(PASSWORD), "시험 직원",
                 StaffRole.SENIOR, null, storeRepository.findByCode("GN01").orElseThrow(), null,
-                LocalDateTime.now().minusMinutes(5)));
+                LocalDateTime.now(KstTime.ZONE).minusMinutes(5)));
     }
 
     @AfterEach
@@ -167,7 +168,8 @@ class AuthIntegrationTest {
     void should_reject_when_issuedBeforeValidAfter() throws Exception {
         JsonNode tokens = loginOk(PASSWORD);
 
-        jdbc.update("UPDATE staff SET tokens_valid_after = ? WHERE id = ?", LocalDateTime.now().plusMinutes(1),
+        // 서버 시각은 한국 시간 기준이다 (CI는 UTC라 LocalDateTime.now()를 쓰면 9시간 어긋난다)
+        jdbc.update("UPDATE staff SET tokens_valid_after = ? WHERE id = ?", LocalDateTime.now(KstTime.ZONE).plusMinutes(1),
                 staff.getId());
 
         me(bearer(tokens)).andExpect(status().isUnauthorized())
@@ -276,7 +278,7 @@ class AuthIntegrationTest {
     void should_limitKiosk_toMeAndKioskApis() throws Exception {
         Staff kiosk = staffRepository.saveAndFlush(Staff.create("auth-kiosk", passwordEncoder.encode(PASSWORD),
                 "강남 키오스크", StaffRole.KIOSK, null, storeRepository.findByCode("GN01").orElseThrow(), null,
-                LocalDateTime.now().minusMinutes(5)));
+                LocalDateTime.now(KstTime.ZONE).minusMinutes(5)));
         String token = TestAuth.bearer(kiosk.getId());
 
         me(token).andExpect(status().isOk()).andExpect(jsonPath("$.role").value("KIOSK"));

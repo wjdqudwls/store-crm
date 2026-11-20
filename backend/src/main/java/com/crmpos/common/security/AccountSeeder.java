@@ -6,6 +6,7 @@ import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.domain.Store;
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.repository.StoreRepository;
+import com.crmpos.common.web.KstTime;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -51,7 +52,7 @@ public class AccountSeeder implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
+        LocalDateTime now = LocalDateTime.now(KstTime.ZONE).truncatedTo(ChronoUnit.MICROS);
         List<Seed> seeds = List.of(
                 new Seed("hq", "본사 담당", StaffRole.HQ, null, null, null, hqPassword),
                 new Seed("store-gn01", "강남점 매장", StaffRole.STORE, null, "GN01", null, storeGn01Password),
