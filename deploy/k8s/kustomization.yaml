@@ -7,6 +7,7 @@ resources:
   - app.yaml
   - middlewares.yaml
   - ingress.yaml
+  - backup-cronjob.yaml
 images:
   - name: store-crm
     newName: DOCKERHUB_USER/store-crm # Docker Hub 아이디로 바꾼다 (ADR-037)

@@ -28,7 +28,10 @@ RUN ./gradlew --no-daemon bootJar -x test \
 
 # 3단계: 실행
 FROM eclipse-temurin:21-jre
-ENV TZ=Asia/Seoul \
+# 기본값을 prod로 둔다: 이미지를 그냥 docker run으로 돌려도 임시 계정(X-Dev-Account-Id) 같은 local 전용 기능이 켜지지 않게 하는 두 번째 안전장치.
+# 로컬 확인은 -e SPRING_PROFILES_ACTIVE= 등으로 덮어쓴다.
+ENV SPRING_PROFILES_ACTIVE=prod \
+    TZ=Asia/Seoul \
     JAVA_OPTS="-XX:MaxRAMPercentage=70 -Duser.timezone=Asia/Seoul"
 RUN groupadd --system app && useradd --system --uid 10001 --gid app --no-create-home app
 WORKDIR /app
