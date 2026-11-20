@@ -10,7 +10,10 @@ import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.security.CurrentAccount;
 import com.crmpos.common.security.JwtService;
 import com.crmpos.common.security.PasswordRules;
+import com.crmpos.common.security.UnknownLoginAttempts;
 import com.crmpos.common.web.KstTime;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
@@ -29,27 +32,59 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthService {
 
     /** 없는 로그인 ID에도 같은 시간이 걸리게 비교하는 가짜 해시 (아이디 존재 여부를 응답 시간으로 알리지 않는다). */
+    /** 연속 로그인 실패가 이만큼 쌓이면 잠근다 (총괄 결정 11/20). */
+    static final int LOGIN_FAIL_LIMIT = 5;
+    static final Duration LOGIN_LOCK = Duration.ofMinutes(10);
+
     private static final String DUMMY_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoOhi5BbW3O6uV6xV3b8cK9q1m3Q4Zl8mK";
 
     private final StaffRepository staffRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final UnknownLoginAttempts unknownAttempts;
 
-    /** 아이디·비밀번호가 맞으면 토큰을 준다. 틀리면 AUTH_INVALID_CREDENTIALS, 비활성이면 AUTH_ACCOUNT_DISABLED. */
-    @Transactional(readOnly = true)
+    /**
+     * 아이디·비밀번호가 맞으면 토큰을 준다. 틀리면 AUTH_INVALID_CREDENTIALS, 비활성이면 AUTH_ACCOUNT_DISABLED.
+     * 같은 아이디가 5번 연속 틀리면 10분 동안 AUTH_LOGIN_LOCKED로 거절한다(맞는 비밀번호도). 없는 아이디도 같은 규칙으로
+     * 세어서 응답으로 아이디가 있는지 알 수 없다. 실패 횟수가 롤백되지 않도록 예외에도 커밋한다(noRollbackFor).
+     */
+    @Transactional(noRollbackFor = BusinessException.class)
     public TokenResponse login(String loginId, String password) {
-        Staff staff = loginId == null ? null : staffRepository.findByLoginId(loginId.trim()).orElse(null);
+        String id = loginId == null ? "" : loginId.trim();
+        Staff staff = staffRepository.findByLoginId(id).orElse(null);
+        Instant now = Instant.now();
+        LocalDateTime nowLocal = now();
+        boolean locked = staff == null ? unknownAttempts.isLocked(id, now) : staff.isLoginLocked(nowLocal);
+        // 없는 아이디·잠긴 계정에도 같은 비교를 해서 응답 시간으로 구별되지 않게 한다
         boolean matches = passwordEncoder.matches(password == null ? "" : password,
                 staff == null ? DUMMY_HASH : staff.getPasswordHash());
+        if (locked) {
+            log.info("login rejected: locked");
+            throw new BusinessException(ErrorCode.AUTH_LOGIN_LOCKED);
+        }
         if (staff == null || !matches) {
+            recordFailure(staff, id, now, nowLocal);
             log.info("login failed");
             throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
         if (!staff.isActive()) {
             throw new BusinessException(ErrorCode.AUTH_ACCOUNT_DISABLED);
         }
+        if (staff.getFailedLoginCount() > 0 || staff.getLockedUntil() != null) {
+            staff.clearLoginFailures();
+        }
         log.info("login ok staffId={}", staff.getId());
         return tokens(staff);
+    }
+
+    /** 실패를 세고, 5번째면 10분 잠근다. */
+    private void recordFailure(Staff staff, String loginId, Instant now, LocalDateTime nowLocal) {
+        if (staff == null) {
+            unknownAttempts.recordFailure(loginId, now);
+            return;
+        }
+        staffRepository.addLoginFailure(staff.getId());
+        staffRepository.lockIfFailuresReached(staff.getId(), LOGIN_FAIL_LIMIT, nowLocal.plus(LOGIN_LOCK));
     }
 
     /** Refresh로 Access와 Refresh를 새로 받는다(14일 연장). 비활성·기준 시각 이전 토큰은 거절한다. */

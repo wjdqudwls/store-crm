@@ -6,7 +6,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.time.LocalDateTime;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface StaffRepository extends JpaRepository<Staff, Long> {
 
@@ -30,4 +33,15 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
 
         long getCount();
     }
+
+    /** 로그인 실패 횟수를 1 올린다 (한 문장 UPDATE라 동시에 틀려도 세어진다). */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Staff s set s.failedLoginCount = s.failedLoginCount + 1 where s.id = :id")
+    int addLoginFailure(@Param("id") Long id);
+
+    /** 실패가 limit번 이상 쌓였으면 until까지 잠그고 횟수를 0으로 되돌린다. 잠갔으면 1. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update Staff s set s.lockedUntil = :until, s.failedLoginCount = 0 "
+            + "where s.id = :id and s.failedLoginCount >= :limit")
+    int lockIfFailuresReached(@Param("id") Long id, @Param("limit") int limit, @Param("until") LocalDateTime until);
 }

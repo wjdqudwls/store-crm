@@ -57,6 +57,14 @@ public class Staff {
     @Column(nullable = false)
     private boolean active;
 
+    /** 연속 로그인 실패 횟수. 성공하거나 잠기면 0. 올리는 일은 StaffRepository의 한 문장 UPDATE가 한다 (동시 시도에도 정확하게). */
+    @Column(nullable = false)
+    private int failedLoginCount;
+
+    /** 이 시각까지 로그인을 거절한다. null이거나 지났으면 잠기지 않았다. */
+    @Column
+    private LocalDateTime lockedUntil;
+
     /** 이 시각보다 먼저 발급된 토큰은 거절한다 (ADR-025). */
     @Column(nullable = false)
     private LocalDateTime tokensValidAfter;
@@ -86,5 +94,16 @@ public class Staff {
     /** 모든 기기에서 로그아웃: 지금 이전에 발급한 토큰을 거절한다 (AUTH-03, ADR-025). */
     public void invalidateTokens(LocalDateTime now) {
         this.tokensValidAfter = now;
+    }
+
+    /** 지금 로그인이 잠겨 있는가. */
+    public boolean isLoginLocked(LocalDateTime now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
+    /** 로그인에 성공하면 실패 횟수와 잠금을 지운다. */
+    public void clearLoginFailures() {
+        this.failedLoginCount = 0;
+        this.lockedUntil = null;
     }
 }
