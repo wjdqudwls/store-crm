@@ -128,6 +128,73 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.code").value("AUTH_ACCOUNT_DISABLED"));
     }
 
+    // --- 로그인 잠금: 5번 연속 틀리면 10분 ---
+
+    private void fail(String id, int times) throws Exception {
+        for (int i = 0; i < times; i++) {
+            login(id, "Wrong1234").andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.code").value("AUTH_INVALID_CREDENTIALS"));
+        }
+    }
+
+    @Test
+    @DisplayName("4번 틀린 뒤 맞으면 로그인되고 횟수가 0으로 돌아간다 (다시 4번 틀려도 안 잠긴다)")
+    void should_resetCount_when_successAfterFourFailures() throws Exception {
+        fail(loginId, 4);
+        login(loginId, PASSWORD).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT failed_login_count FROM staff WHERE id = ?", Integer.class,
+                staff.getId())).isZero();
+
+        fail(loginId, 4);
+        login(loginId, PASSWORD).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("5번째로 틀리면 잠기고, 잠긴 동안은 맞는 비밀번호도 429 AUTH_LOGIN_LOCKED다")
+    void should_lock_when_fifthFailure() throws Exception {
+        fail(loginId, 5);
+
+        login(loginId, PASSWORD).andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("AUTH_LOGIN_LOCKED")).andExpect(jsonPath("$.traceId").exists());
+        login(loginId, "Wrong1234").andExpect(status().isTooManyRequests());
+        assertThat(jdbc.queryForObject("SELECT locked_until FROM staff WHERE id = ?", java.sql.Timestamp.class,
+                staff.getId())).isNotNull();
+    }
+
+    @Test
+    @DisplayName("잠금은 10분 뒤에 풀려 맞는 비밀번호로 로그인되고, 풀린 뒤에는 처음부터 다시 센다")
+    void should_unlock_after10Minutes() throws Exception {
+        fail(loginId, 5);
+        jdbc.update("UPDATE staff SET locked_until = ? WHERE id = ?", LocalDateTime.now(KstTime.ZONE).minusSeconds(1),
+                staff.getId());
+
+        fail(loginId, 4); // 풀린 뒤 4번 틀려도 아직 안 잠긴다 (횟수는 잠글 때 0으로 돌아갔다)
+        login(loginId, PASSWORD).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("SELECT locked_until FROM staff WHERE id = ?", java.sql.Timestamp.class,
+                staff.getId())).isNull();
+    }
+
+    @Test
+    @DisplayName("없는 아이디도 같은 규칙으로 잠겨서 응답으로 아이디가 있는지 알 수 없다")
+    void should_lockUnknownLoginId_same_as_real() throws Exception {
+        String ghost = "ghost-" + UUID.randomUUID().toString().substring(0, 8);
+
+        fail(ghost, 5);
+
+        login(ghost, PASSWORD).andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("AUTH_LOGIN_LOCKED"));
+    }
+
+    @Test
+    @DisplayName("다른 계정의 실패는 세지 않는다 (잠긴 계정이 있어도 내 계정은 로그인된다)")
+    void should_countPerAccount() throws Exception {
+        fail("hq", 3);
+        fail(loginId, 5);
+
+        login("hq", "hqPass1234").andExpect(status().isOk());
+        login(loginId, PASSWORD).andExpect(status().isTooManyRequests());
+    }
+
     // --- 요청마다 확인 ---
 
     @Test

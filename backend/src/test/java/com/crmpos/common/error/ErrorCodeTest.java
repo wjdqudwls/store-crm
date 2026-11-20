@@ -16,6 +16,7 @@ class ErrorCodeTest {
             Map.entry("AUTH_TOKEN_INVALID", 401),
             Map.entry("AUTH_TOKEN_EXPIRED", 401),
             Map.entry("AUTH_ACCOUNT_DISABLED", 401),
+            Map.entry("AUTH_LOGIN_LOCKED", 429),
             Map.entry("ACCESS_DENIED", 403),
             Map.entry("STORE_REQUIRED", 403),
             Map.entry("CUSTOMER_NOT_FOUND", 404),
