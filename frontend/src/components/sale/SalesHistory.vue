@@ -37,9 +37,9 @@ async function load() {
 onMounted(load)
 defineExpose({ load })
 
-const total = computed(() =>
-  (list.value ?? []).filter((s) => s.status !== 'VOIDED').reduce((a, s) => a + s.totalAmount, 0),
-)
+// 합계는 기록 취소를 뺀 건수·금액이다 (03 4.12)
+const counted = computed(() => (list.value ?? []).filter((s) => s.status !== 'VOIDED'))
+const total = computed(() => counted.value.reduce((a, s) => a + s.totalAmount, 0))
 
 const statusLabels = {
   COMPLETED: '정상',
@@ -78,7 +78,7 @@ const rowClass = ({ row }) =>
       <div class="ft-label">합계</div>
       <div class="ft-value">
         <span v-if="list">
-          {{ list.length }}건 · <strong>{{ formatWon(total) }}</strong>
+          {{ counted.length }}건 · <strong>{{ formatWon(total) }}</strong>
           <span class="muted"> (기록 취소 제외)</span>
         </span>
       </div>

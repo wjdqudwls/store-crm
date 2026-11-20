@@ -1,4 +1,5 @@
 <script setup>
+import { daysAgoLabel } from '@/features/customer/customerDetail'
 import { nextTick, ref } from 'vue'
 import { searchCustomers } from '@/api/customers'
 import GradeBadge from './GradeBadge.vue'
@@ -49,11 +50,6 @@ function reset() {
   results.value = null
 }
 
-function daysAgo(iso) {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-  return days <= 0 ? '오늘' : `${days}일 전`
-}
-
 defineExpose({
   focus: () => nextTick(() => inputRef.value?.focus()),
 })
@@ -96,7 +92,7 @@ defineExpose({
         <span class="customer-search__phone">{{ c.phoneMasked }}</span>
         <GradeBadge :grade="c.grade" />
         <span class="customer-search__meta"
-          >마지막 방문 {{ daysAgo(c.lastVisitAt) }} · 담당 {{ c.staffName }}</span
+          >마지막 방문 {{ daysAgoLabel(c.lastVisitAt) }} · 담당 {{ c.staffName }}</span
         >
       </li>
     </ul>
