@@ -1,10 +1,11 @@
 package com.crmpos.common;
 
+import org.springframework.http.HttpHeaders;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.support.IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class StoreStaffListIntegrationTest {
                 + "WHERE st.code = 'GN01' AND s.active = 1 AND s.role IN ('MANAGER','SENIOR','JUNIOR','STAFF')",
                 Long.class);
 
-        mockMvc.perform(get("/api/v1/stores").header(DevCurrentAccountProvider.HEADER, account("hq")))
+        mockMvc.perform(get("/api/v1/stores").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("hq"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.code=='GN01')].name").value("강남점"))
                 .andExpect(jsonPath("$[?(@.code=='GN01')].activeStaffCount").value((int) expected));
     }
@@ -46,15 +47,14 @@ class StoreStaffListIntegrationTest {
     @Test
     @DisplayName("매장 계정은 매장 목록을 볼 수 없다 (403)")
     void should_forbidStoreList_when_storeAccount() throws Exception {
-        mockMvc.perform(get("/api/v1/stores").header(DevCurrentAccountProvider.HEADER, account("store-gn01")))
+        mockMvc.perform(get("/api/v1/stores").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("store-gn01"))))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
     @DisplayName("매장 계정은 자기 매장의 활성 직원만 받는다: 매장 계정·키오스크는 빠진다")
     void should_listActiveStaffOnly_when_storeAccount() throws Exception {
-        mockMvc.perform(get("/api/v1/stores/" + gangnamId() + "/staff").header(DevCurrentAccountProvider.HEADER,
-                        account("store-gn01")))
+        mockMvc.perform(get("/api/v1/stores/" + gangnamId() + "/staff").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("store-gn01"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.loginId=='gn01-senior')].role").value("SENIOR"))
                 .andExpect(jsonPath("$[?(@.role=='STORE')]").isEmpty())
                 .andExpect(jsonPath("$[?(@.role=='KIOSK')]").isEmpty())
@@ -64,8 +64,7 @@ class StoreStaffListIntegrationTest {
     @Test
     @DisplayName("본사는 매장의 모든 계정을 받는다: 매장 계정도 보인다")
     void should_listAllAccounts_when_hq() throws Exception {
-        mockMvc.perform(get("/api/v1/stores/" + gangnamId() + "/staff").header(DevCurrentAccountProvider.HEADER,
-                        account("hq")))
+        mockMvc.perform(get("/api/v1/stores/" + gangnamId() + "/staff").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("hq"))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[?(@.role=='STORE')]").isNotEmpty());
     }
 
@@ -74,9 +73,8 @@ class StoreStaffListIntegrationTest {
     void should_return403And404() throws Exception {
         long other = jdbc.queryForObject("SELECT id FROM store WHERE code <> 'GN01' LIMIT 1", Long.class);
 
-        mockMvc.perform(get("/api/v1/stores/" + other + "/staff").header(DevCurrentAccountProvider.HEADER,
-                        account("store-gn01"))).andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/v1/stores/999999/staff").header(DevCurrentAccountProvider.HEADER, account("hq")))
+        mockMvc.perform(get("/api/v1/stores/" + other + "/staff").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("store-gn01")))).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/stores/999999/staff").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("hq"))))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("STORE_NOT_FOUND"));
     }
 }

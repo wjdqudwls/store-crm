@@ -10,7 +10,7 @@ import com.crmpos.common.domain.Staff;
 import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.repository.StoreRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.support.IntegrationTest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +29,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -106,7 +107,7 @@ class ReturnIntegrationTest {
             builder.header("Idempotency-Key", key);
         }
         if (asAccount != null) {
-            builder.header(DevCurrentAccountProvider.HEADER, asAccount);
+            builder.header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(asAccount));
         }
         return builder;
     }

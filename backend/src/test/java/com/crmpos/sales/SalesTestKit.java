@@ -4,8 +4,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.crmpos.common.repository.StaffRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -53,7 +54,7 @@ final class SalesTestKit {
 
     MockHttpServletRequestBuilder as(MockHttpServletRequestBuilder builder, String loginId) {
         if (loginId != null) {
-            builder.header(DevCurrentAccountProvider.HEADER, staffId(loginId));
+            builder.header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(staffId(loginId)));
         }
         return builder;
     }

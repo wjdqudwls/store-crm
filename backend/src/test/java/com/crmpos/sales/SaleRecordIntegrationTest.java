@@ -9,7 +9,7 @@ import com.crmpos.common.domain.Staff;
 import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.repository.StoreRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.customer.domain.Customer;
 import com.crmpos.customer.domain.CustomerDraft;
 import com.crmpos.customer.domain.CustomerSource;
@@ -39,6 +39,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -108,7 +109,7 @@ class SaleRecordIntegrationTest {
             builder.header("Idempotency-Key", key);
         }
         if (asAccount != null) {
-            builder.header(DevCurrentAccountProvider.HEADER, asAccount);
+            builder.header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(asAccount));
         }
         return builder;
     }

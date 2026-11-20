@@ -11,6 +11,7 @@ public enum ErrorCode {
     AUTH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     AUTH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "로그인이 만료되었습니다."),
     AUTH_ACCOUNT_DISABLED(HttpStatus.UNAUTHORIZED, "사용할 수 없는 계정입니다."),
+    AUTH_LOGIN_LOCKED(HttpStatus.TOO_MANY_REQUESTS, "로그인을 여러 번 틀려 잠겼습니다. 10분 뒤에 다시 시도해 주세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     STORE_REQUIRED(HttpStatus.FORBIDDEN, "매장 계정으로만 할 수 있습니다."),
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."),

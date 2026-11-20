@@ -1,5 +1,6 @@
 package com.crmpos.customer.controller;
 
+import com.crmpos.support.PermitAllSecurity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -32,6 +33,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(CustomerController.class)
+@PermitAllSecurity
 @ExtendWith(OutputCaptureExtension.class)
 class CustomerControllerTest {
 

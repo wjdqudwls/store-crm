@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.repository.StaffRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.customer.domain.Season;
 import com.crmpos.customer.repository.CustomerRepository;
 import com.crmpos.support.IntegrationTest;
@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -165,9 +166,9 @@ class CustomerSearchDetailUpdateIntegrationTest {
         Long staffAccount = staffRepository.findAll().stream().filter(s -> s.getRole() == StaffRole.STAFF)
                 .findFirst().orElseThrow().getId();
 
-        mockMvc.perform(get("/api/v1/customers/" + id).header(DevCurrentAccountProvider.HEADER, staffAccount))
+        mockMvc.perform(get("/api/v1/customers/" + id).header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(staffAccount)))
                 .andExpect(status().isOk());
-        mockMvc.perform(patch("/api/v1/customers/" + id).header(DevCurrentAccountProvider.HEADER, staffAccount)
+        mockMvc.perform(patch("/api/v1/customers/" + id).header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(staffAccount))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"x","phone":"010-2943-4821","marketing":{"sms":false,"kakao":false}}"""))

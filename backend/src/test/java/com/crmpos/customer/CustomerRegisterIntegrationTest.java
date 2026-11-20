@@ -10,7 +10,7 @@ import com.crmpos.common.crypto.HmacHasher;
 import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.repository.StoreRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.customer.domain.Customer;
 import com.crmpos.customer.domain.CustomerSource;
 import com.crmpos.customer.domain.CustomerSummary;
@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -130,7 +131,7 @@ class CustomerRegisterIntegrationTest {
         Long hqId = staffRepository.findAll().stream().filter(s -> s.getRole() == StaffRole.HQ)
                 .findFirst().orElseThrow().getId();
 
-        mockMvc.perform(post("/api/v1/customers").header(DevCurrentAccountProvider.HEADER, hqId)
+        mockMvc.perform(post("/api/v1/customers").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(hqId))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden());
         register(BODY.replace("\"privacy\":true", "\"privacy\":false"))
@@ -152,7 +153,7 @@ class CustomerRegisterIntegrationTest {
         register(BODY.replace("\"gender\":\"F\"", "\"gender\":\"F\",\"staffId\":" + gangnamStaff))
                 .andExpect(status().isCreated());
         // 홍대점 매장 계정으로 강남점 직원을 고르면 400
-        mockMvc.perform(post("/api/v1/customers").header(DevCurrentAccountProvider.HEADER, hongdaeStore)
+        mockMvc.perform(post("/api/v1/customers").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(hongdaeStore))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(BODY.replace("010-2943-4821", "010-1111-2222")
                                 .replace("\"gender\":\"F\"", "\"gender\":\"F\",\"staffId\":" + gangnamStaff)))
