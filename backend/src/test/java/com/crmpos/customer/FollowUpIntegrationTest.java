@@ -434,6 +434,48 @@ class FollowUpIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM consult_note WHERE customer_id = ?", Integer.class, c)).isZero();
     }
 
+    @Test
+    @DisplayName("완료할 때 재연락(RECALL)이면 reminder로 다시 연락할 날을 정하고, 그날 RECALL 할 일이 생긴다 (CAL-11)")
+    void should_createRecallTask_whenCompleteWithRecallReminder() throws Exception {
+        long c = newCustomer(null, true);
+        long task = insertTask(c, id("gn01-junior"), "SALE", today, "감사 인사", false);
+        LocalDate again = today.plusDays(4);
+
+        postJson("/api/v1/follow-ups/" + task + "/complete", "gn01-junior",
+                "{\"callResult\":\"RECALL\",\"channel\":\"CALL\",\"content\":\"바쁘대서 나중에\","
+                        + "\"reminder\":{\"date\":\"%s\",\"staffId\":%d}}".formatted(again, id("gn01-senior")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("DONE"));
+        em.flush();
+
+        var recall = jdbc.queryForMap("SELECT * FROM follow_up_task WHERE customer_id = ? AND kind = 'RECALL'", c);
+        assertThat(date(recall.get("due_date"))).isEqualTo(again);
+        assertThat(recall.get("staff_id")).isEqualTo(id("gn01-senior"));
+        assertThat(recall.get("status")).isEqualTo("OPEN");
+        assertThat(recall.get("source_note_id")).isEqualTo(jdbc.queryForObject(
+                "SELECT note_id FROM follow_up_task WHERE id = ?", Long.class, task)); // 완료 연락 메모에서 만든 할 일
+        api("/api/v1/customers/" + c + "/notes", "gn01-junior").andExpect(jsonPath("$.content[0].reminderDate").value(again.toString()));
+    }
+
+    @Test
+    @DisplayName("완료할 때 재연락이 아닌 결과에 reminder를 보내거나 과거 날짜면 400이고 할 일은 안 닫힌다 (메모와 같은 문구)")
+    void should_rejectInvalidReminder_whenComplete() throws Exception {
+        long c = newCustomer(null, true);
+        long task = insertTask(c, id("gn01-junior"), "SALE", today, "감사 인사", false);
+
+        postJson("/api/v1/follow-ups/" + task + "/complete", "gn01-junior",
+                "{\"callResult\":\"COMPLETED\",\"channel\":\"CALL\",\"content\":\"통화\",\"reminder\":{\"date\":\"%s\"}}"
+                        .formatted(today.plusDays(1))).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("reminderDate"))
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("방문 예약이나 재연락 메모에만 날짜를 정할 수 있습니다."));
+        postJson("/api/v1/follow-ups/" + task + "/complete", "gn01-junior",
+                "{\"callResult\":\"RECALL\",\"channel\":\"CALL\",\"content\":\"과거\",\"reminder\":{\"date\":\"%s\"}}"
+                        .formatted(today.minusDays(1))).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].reason").value("오늘 이후 날짜를 골라 주세요."));
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT status FROM follow_up_task WHERE id = ?", String.class, task)).isEqualTo("OPEN");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM follow_up_task WHERE kind = 'RECALL'", Integer.class)).isZero();
+    }
+
     // ===== 메모의 방문 예약·재연락 날짜 (CAL-10·11) =====
 
     private ResultActions note(String account, long customerId, String body) throws Exception {
