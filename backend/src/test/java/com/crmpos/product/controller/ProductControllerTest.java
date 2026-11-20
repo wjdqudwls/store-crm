@@ -1,5 +1,6 @@
 package com.crmpos.product.controller;
 
+import com.crmpos.support.PermitAllSecurity;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -29,6 +30,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest({ProductController.class, SizeController.class})
+@PermitAllSecurity
 class ProductControllerTest {
 
     private static final String BODY = """

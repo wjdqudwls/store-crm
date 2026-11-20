@@ -1,5 +1,6 @@
 package com.crmpos.common.controller;
 
+import com.crmpos.support.PermitAllSecurity;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +24,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(StoreController.class)
+@PermitAllSecurity
 class StoreControllerTest {
 
     @Autowired

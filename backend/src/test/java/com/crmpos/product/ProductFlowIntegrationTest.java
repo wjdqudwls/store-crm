@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.crmpos.common.domain.StaffRole;
 import com.crmpos.common.repository.StaffRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.product.api.ProductApi;
 import com.crmpos.product.api.SkuInfo;
 import com.crmpos.support.IntegrationTest;
@@ -21,6 +21,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,7 +89,7 @@ class ProductFlowIntegrationTest {
         Long staffId = staffRepository.findAll().stream()
                 .filter(s -> s.getRole() == StaffRole.STAFF).findFirst().orElseThrow().getId();
 
-        mockMvc.perform(post("/api/v1/products").header(DevCurrentAccountProvider.HEADER, staffId)
+        mockMvc.perform(post("/api/v1/products").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(staffId))
                         .contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));

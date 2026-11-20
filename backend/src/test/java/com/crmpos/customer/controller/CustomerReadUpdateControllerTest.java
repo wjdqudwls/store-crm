@@ -1,5 +1,6 @@
 package com.crmpos.customer.controller;
 
+import com.crmpos.support.PermitAllSecurity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /** 고객 검색·상세·수정의 입력 검증, 권한, 에러 형식 (CUS-01·02·04). */
 @WebMvcTest(CustomerController.class)
+@PermitAllSecurity
 class CustomerReadUpdateControllerTest {
 
     private static final String PATCH_BODY = """

@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.crmpos.common.repository.StaffRepository;
 import com.crmpos.common.repository.StoreRepository;
-import com.crmpos.common.security.DevCurrentAccountProvider;
+import com.crmpos.support.TestAuth;
 import com.crmpos.support.IntegrationTest;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -77,7 +78,7 @@ class DayCloseIntegrationTest {
 
     private ResultActions as(MockHttpServletRequestBuilder builder, String loginId) throws Exception {
         if (loginId != null) {
-            builder.header(DevCurrentAccountProvider.HEADER, staffId(loginId));
+            builder.header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(staffId(loginId)));
         }
         return mockMvc.perform(builder);
     }

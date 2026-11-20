@@ -1,5 +1,6 @@
 package com.crmpos.common.security;
 
+import com.crmpos.support.PermitAllSecurity;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,6 +17,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(controllers = AccountTestController.class)
+@PermitAllSecurity
 class CurrentAccountResolverTest {
 
     @Autowired

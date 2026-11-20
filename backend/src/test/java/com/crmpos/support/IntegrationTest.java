@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @SpringBootTest
-@Import(TestMariaDb.class)
+@Import({TestMariaDb.class, TestAuthConfig.class})
 @ActiveProfiles("test")
 public @interface IntegrationTest {
 }

@@ -1,5 +1,6 @@
 package com.crmpos.sales.controller;
 
+import com.crmpos.support.PermitAllSecurity;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 @WebMvcTest(SaleController.class)
+@PermitAllSecurity
 class SaleControllerTest {
 
     private static final String KEY = "6b0f6c1e-2f7a-4f3c-9a51-1d2c3e4f5a6b";
