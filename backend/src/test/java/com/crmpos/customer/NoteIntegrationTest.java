@@ -147,25 +147,13 @@ class NoteIntegrationTest {
     }
 
     @Test
-    @DisplayName("방문 예약 메모는 후속 연락(B4-3) 전까지 400, 본사는 쓸 수 없고(403), 없는 고객은 404")
-    void should_rejectReservationHqAndMissingCustomer() throws Exception {
-        write("gn01-junior", "{\"type\":\"RESERVATION\",\"content\":\"예약\"}").andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("type"));
+    @DisplayName("본사는 메모를 쓸 수 없고(403), 없는 고객은 404")
+    void should_rejectHqAndMissingCustomer() throws Exception {
         write("hq", "{\"type\":\"ETC\",\"content\":\"메모\"}").andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
         mockMvc.perform(post("/api/v1/customers/999999/notes").header(HttpHeaders.AUTHORIZATION, as("gn01-junior"))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"ETC\",\"content\":\"메모\"}"))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("CUSTOMER_NOT_FOUND"));
-    }
-
-    @Test
-    @DisplayName("reminder(재연락·예약 날짜)를 보내면 조용히 버리지 않고 400 fieldErrors[reminder]다 (B4-3 전까지)")
-    void should_rejectReminder_untilFollowUpTasks() throws Exception {
-        write("gn01-junior", "{\"type\":\"CALL\",\"content\":\"재연락\",\"callResult\":\"RECALL\",\"channel\":\"CALL\","
-                + "\"reminder\":{\"date\":\"2026-12-01\"}}").andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.fieldErrors[0].field").value("reminder"))
-                .andExpect(jsonPath("$.fieldErrors[0].reason").value("재연락 날짜는 아직 쓸 수 없습니다."));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM consult_note", Integer.class)).isZero();
     }
 
     // --- 목록 ---

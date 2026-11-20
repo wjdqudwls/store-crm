@@ -49,4 +49,29 @@ public class FollowUpRule {
 
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    public static FollowUpRule create(String name, int offsetAmount, FollowUpOffsetUnit offsetUnit, boolean promotional,
+            int sortOrder, boolean active, LocalDateTime now) {
+        FollowUpRule rule = new FollowUpRule();
+        rule.apply(name, offsetAmount, offsetUnit, promotional, sortOrder, active, now);
+        return rule;
+    }
+
+    /** 설정을 고친다. 이미 만든 할 일은 복사본을 가지고 있어 그대로다 (BR-14). */
+    public void apply(String name, int offsetAmount, FollowUpOffsetUnit offsetUnit, boolean promotional,
+            int sortOrder, boolean active, LocalDateTime now) {
+        this.name = name;
+        this.offsetAmount = offsetAmount;
+        this.offsetUnit = offsetUnit;
+        this.promotional = promotional;
+        this.sortOrder = sortOrder;
+        this.active = active;
+        this.updatedAt = now;
+    }
+
+    /** 지우지 않고 끈다 (이미 만든 할 일이 이 단계를 가리킨다). */
+    public void disable(LocalDateTime now) {
+        this.active = false;
+        this.updatedAt = now;
+    }
 }

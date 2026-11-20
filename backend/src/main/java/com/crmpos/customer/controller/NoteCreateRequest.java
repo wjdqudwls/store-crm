@@ -20,7 +20,7 @@ public record NoteCreateRequest(
         ContactChannel channel,
         Reminder reminder) {
 
-    /** 방문 날짜·재연락 날짜로 할 일을 만드는 값 (CAL-10·11). 후속 연락 작업(B4-3) 전까지는 보내면 400이다. */
+    /** 방문 날짜·재연락 날짜로 할 일을 만드는 값 (CAL-10·11). RESERVATION이면 필수, CALL+RECALL이면 선택이고 오늘 이후여야 한다. staffId는 할 일을 받을 직원(기본은 작성 직원). */
     public record Reminder(java.time.LocalDate date, Long staffId) {
     }
 
