@@ -65,6 +65,7 @@ class SaleEventIntegrationTest {
         jdbc.update("UPDATE sale SET root_sale_id = NULL, origin_sale_id = NULL");
         jdbc.update("DELETE FROM sale");
         jdbc.update("DELETE FROM receipt_sequence");
+        jdbc.update("DELETE FROM follow_up_task");
         jdbc.update("DELETE FROM processed_event");
         jdbc.update("DELETE FROM consult_note");
         jdbc.update("DELETE FROM customer_purchase");

@@ -85,6 +85,7 @@ class SaleRecordIntegrationTest {
         jdbc.update("DELETE FROM sale");
         jdbc.update("DELETE FROM receipt_sequence");
         jdbc.update("DELETE FROM store_day_close");
+        jdbc.update("DELETE FROM follow_up_task");
         jdbc.update("DELETE FROM customer_member");
         jdbc.update("DELETE FROM customer_summary");
         jdbc.update("DELETE FROM customer");

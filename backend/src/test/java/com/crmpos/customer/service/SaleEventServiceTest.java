@@ -51,6 +51,8 @@ class SaleEventServiceTest {
     CustomerPurchaseRepository purchaseRepository;
     @Mock
     ConsultNoteRepository noteRepository;
+    @Mock
+    FollowUpPlanService followUpPlanService;
     @InjectMocks
     SaleEventService service;
 
