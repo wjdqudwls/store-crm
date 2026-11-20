@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { menuFor } from '@/config/menus'
 import { isPhoneNow } from '@/composables/useIsPhone'
+import { loginErrorMessage } from '@/features/auth/loginError'
+import { isFake } from '@/api/mode'
 
 /**
- * 로그인 `/login` (05 SCR-10, AUTH-01·03). 11단계(B0-3)에서 JWT로 바꾼다.
- * 초안: 가짜 계정의 아이디만 맞으면 들어간다. 비밀번호는 확인하지 않는다.
+ * 로그인 `/login` (05 SCR-10, AUTH-01·03). 실서버는 JWT 로그인, 데모(가짜)는 아이디만 맞으면 들어간다.
+ * 같은 아이디를 5번 틀리면 10분 잠긴다(429 AUTH_LOGIN_LOCKED, 03 5장).
  */
 const router = useRouter()
 const session = useSessionStore()
@@ -22,15 +24,15 @@ async function login() {
     return
   }
   loading.value = true
-  await new Promise((r) => setTimeout(r, 300))
-  loading.value = false
-  const account = session.accounts.find((a) => a.loginId === form.loginId.trim())
-  if (!account) {
-    error.value = '아이디 또는 비밀번호가 맞지 않습니다'
+  try {
+    await session.login(form.loginId.trim(), form.password)
+  } catch (e) {
+    error.value = loginErrorMessage(e)
     return
+  } finally {
+    loading.value = false
   }
-  session.switchAccount(account.id)
-  const m = menuFor(account.role)
+  const m = menuFor(session.me.role)
   router.push((isPhoneNow() ? m.firstPhone : m.firstPc).path)
 }
 </script>
@@ -53,7 +55,7 @@ async function login() {
       <el-button type="primary" size="large" native-type="submit" :loading="loading"
         >로그인</el-button
       >
-      <p class="draft-note">
+      <p v-if="isFake" class="draft-note">
         초안(데모): 아이디 gn01 · gn01-jieun · hq-yuna · gn01-kiosk. 비밀번호는 11단계 전까지
         확인하지 않습니다.
       </p>
