@@ -181,3 +181,44 @@ describe('실서버 연결: 매장·직원 목록 (03 3.7)', () => {
     expect(http.get).toHaveBeenLastCalledWith('/stores/1/staff')
   })
 })
+
+describe('실서버 연결: 후속 연락 할 일·단계 설정 (03 3.3·4.7)', () => {
+  let customers
+  let settings
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_MODE', 'real')
+    Object.values(http).forEach((f) => f.mockReset().mockResolvedValue([]))
+    http.put = vi.fn().mockResolvedValue([])
+    customers = await import('./customers')
+    settings = await import('./settings')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('should_오늘_할_일과_고객_할_일_주소', async () => {
+    await customers.getToday()
+    expect(http.get).toHaveBeenLastCalledWith('/follow-ups/today', { params: { size: 100 } })
+    await customers.getFollowUps(5)
+    expect(http.get).toHaveBeenLastCalledWith('/customers/5/follow-ups', { params: { size: 100 } })
+  })
+
+  it('should_완료_건너뛰기_방문함_주소와_본문', async () => {
+    const body = { staffId: 4, callResult: 'COMPLETED', channel: 'CALL', content: '통화' }
+    await customers.completeFollowUp(7, body)
+    expect(http.post).toHaveBeenLastCalledWith('/follow-ups/7/complete', body)
+    await customers.skipFollowUp(7)
+    expect(http.post).toHaveBeenLastCalledWith('/follow-ups/7/skip')
+    await customers.completeVisit(7)
+    expect(http.post).toHaveBeenLastCalledWith('/follow-ups/7/visited')
+  })
+
+  it('should_단계_설정_조회_저장_주소', async () => {
+    await settings.getFollowUpRules()
+    expect(http.get).toHaveBeenLastCalledWith('/follow-up-rules')
+    const list = [
+      { id: 1, name: '감사 인사', amount: 2, unit: 'DAY', promotional: false, enabled: true },
+    ]
+    await settings.saveFollowUpRules(list)
+    expect(http.put).toHaveBeenCalledWith('/follow-up-rules', list)
+  })
+})

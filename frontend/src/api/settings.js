@@ -1,4 +1,4 @@
-import { notConnected } from './http'
+import { http, notConnected } from './http'
 
 /**
  * 등급 기준·후속 연락 설정 API 겉껍데기. 화면은 이 파일만 부른다.
@@ -19,8 +19,10 @@ export const saveDiscounts = (...args) =>
 export const runPeriodic = (...args) =>
   fake ? fake().then((m) => m.runPeriodic(...args)) : notConnected('runPeriodic')
 
-export const getFollowUpRules = (...args) =>
-  fake ? fake().then((m) => m.getFollowUpRules(...args)) : notConnected('getFollowUpRules')
+/** GET /follow-up-rules: [{id,name,amount,unit,promotional,enabled}] (03 3.3) */
+export const getFollowUpRules = () =>
+  fake ? fake().then((m) => m.getFollowUpRules()) : http.get('/follow-up-rules')
 
-export const saveFollowUpRules = (...args) =>
-  fake ? fake().then((m) => m.saveFollowUpRules(...args)) : notConnected('saveFollowUpRules')
+/** PUT /follow-up-rules (본사만). 목록에 없는 단계는 서버가 끈다. 이후 구매부터 적용 */
+export const saveFollowUpRules = (list) =>
+  fake ? fake().then((m) => m.saveFollowUpRules(list)) : http.put('/follow-up-rules', list)

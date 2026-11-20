@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GradeBadge from '@/components/GradeBadge.vue'
+import LoadError from '@/components/LoadError.vue'
+import { useLoadError } from '@/composables/useLoadError'
 import {
   createGradePolicy,
   getFollowUpRules,
@@ -14,6 +16,7 @@ import {
 import { useSessionStore } from '@/stores/session'
 import { showReference } from '@/config/reference'
 import { clone } from '@/utils/clone'
+import { apiMessage } from '@/utils/apiMessage'
 import { nextJuneFirst } from '@/features/grade/june'
 import { formatWon } from '@/utils/format'
 
@@ -25,6 +28,8 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 const canEdit = computed(() => session.isHq && showReference)
+// 후속 연락 단계 설정은 서버(PUT /follow-up-rules)가 있어서 실서버에서도 본사가 고친다. 등급·할인율 고치기는 참고 화면
+const canEditRules = computed(() => session.isHq)
 
 const tabs = computed(() => ({
   grade: '등급 기준',
@@ -37,9 +42,18 @@ const selectTab = (t) => router.replace({ query: { tab: t } })
 
 const policy = ref(null)
 const rules = ref(null)
-async function load() {
-  ;[policy.value, rules.value] = await Promise.all([getGradePolicy(), getFollowUpRules()])
-}
+// 등급 기준과 후속 연락 단계는 따로 불러서, 한쪽 API가 아직 없어도 다른 쪽은 열린다
+const policyLoad = useLoadError()
+const rulesLoad = useLoadError()
+const loadPolicy = () =>
+  policyLoad.run(async () => {
+    policy.value = await getGradePolicy()
+  })
+const loadRules = () =>
+  rulesLoad.run(async () => {
+    rules.value = await getFollowUpRules()
+  })
+const load = () => Promise.all([loadPolicy(), loadRules()])
 onMounted(load)
 
 const nextDate = nextJuneFirst()
@@ -85,9 +99,9 @@ async function saveDiscount() {
     await saveDiscounts(discountDraft.value)
     discountDraft.value = null
     ElMessage.success('할인율을 저장했습니다. 바로 적용됩니다')
-    load()
+    loadRules()
   } catch (e) {
-    ElMessage.error(e?.body?.message ?? '저장됐는지 확인하지 못했습니다')
+    ElMessage.error(apiMessage(e, '저장됐는지 확인하지 못했습니다'))
   }
 }
 
@@ -149,7 +163,18 @@ async function run() {
       <h1 class="page__title">{{ canEdit ? '설정' : '기준 보기' }}</h1>
     </header>
 
-    <el-skeleton v-if="!policy" animated :rows="5" class="card" />
+    <el-skeleton
+      v-if="!policy && !policyLoad.error.value && tab !== 'follow-up'"
+      animated
+      :rows="5"
+      class="card"
+    />
+    <LoadError
+      v-else-if="!policy && tab !== 'follow-up'"
+      :error="policyLoad.error.value"
+      :busy="policyLoad.retrying.value"
+      @retry="loadPolicy"
+    />
     <section v-else class="card">
       <nav class="set__tabs" role="tablist">
         <button
@@ -287,7 +312,12 @@ async function run() {
           회원 구매 뒤 만들 연락 할 일 단계입니다. 홍보 단계는 문자·카톡 수신 동의가 없으면 안부
           연락만 합니다.
         </p>
-        <el-table v-if="!rulesDraft" :data="rules" size="small">
+        <LoadError
+          :error="rulesLoad.error.value"
+          :busy="rulesLoad.retrying.value"
+          @retry="loadRules"
+        />
+        <el-table v-if="!rulesDraft && rules" :data="rules" size="small">
           <el-table-column prop="name" label="단계" min-width="160" />
           <el-table-column label="구매 뒤" width="100">
             <template #default="{ row }">{{ row.amount }}{{ unitLabels[row.unit] }}</template>
@@ -316,12 +346,12 @@ async function run() {
           </div>
           <el-button size="small" @click="addRule">단계 추가</el-button>
         </div>
-        <div v-if="canEdit" class="set__actions">
+        <div v-if="canEditRules" class="set__actions">
           <template v-if="rulesDraft">
             <el-button @click="rulesDraft = null">돌아가기</el-button>
             <el-button type="primary" @click="saveRules">저장</el-button>
           </template>
-          <el-button v-else @click="startRules">고치기</el-button>
+          <el-button v-else :disabled="!rules" @click="startRules">고치기</el-button>
         </div>
       </template>
 

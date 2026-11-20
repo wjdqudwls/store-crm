@@ -64,20 +64,29 @@ export const updateNote = (noteId, content) =>
 export const deleteNote = (noteId) =>
   fake ? fake().then((m) => m.deleteNote(noteId)) : http.delete(`/notes/${noteId}`)
 
-export const getFollowUps = (...args) =>
-  fake ? fake().then((m) => m.getFollowUps(...args)) : notConnected('getFollowUps')
+/** GET /customers/{id}/follow-ups (열린 것 먼저, 만기일 순, 03 4.12) */
+export const getFollowUps = (id) =>
+  fake
+    ? fake().then((m) => m.getFollowUps(id))
+    : http.get(`/customers/${id}/follow-ups`, { params: { size: 100 } })
 
-export const completeFollowUp = (...args) =>
-  fake ? fake().then((m) => m.completeFollowUp(...args)) : notConnected('completeFollowUp')
+/** POST /follow-ups/{id}/complete — 연락 결과로 완료. 본문은 연락 메모와 같다(staffId·callResult·channel·content) */
+export const completeFollowUp = (id, body) =>
+  fake
+    ? fake().then((m) => m.completeFollowUp(id, body))
+    : http.post(`/follow-ups/${id}/complete`, body)
 
-export const completeVisit = (...args) =>
-  fake ? fake().then((m) => m.completeVisit(...args)) : notConnected('completeVisit')
+/** POST /follow-ups/{id}/visited — 방문 예약 할 일을 방문함으로 완료 */
+export const completeVisit = (id) =>
+  fake ? fake().then((m) => m.completeVisit(id)) : http.post(`/follow-ups/${id}/visited`)
 
-export const skipFollowUp = (...args) =>
-  fake ? fake().then((m) => m.skipFollowUp(...args)) : notConnected('skipFollowUp')
+/** POST /follow-ups/{id}/skip — 기록 없이 건너뛰기 */
+export const skipFollowUp = (id) =>
+  fake ? fake().then((m) => m.skipFollowUp(id)) : http.post(`/follow-ups/${id}/skip`)
 
-export const getToday = (...args) =>
-  fake ? fake().then((m) => m.getToday(...args)) : notConnected('getToday')
+/** GET /follow-ups/today — 만기일이 오늘이거나 지난 열린 할 일 (직원은 내 할 일, 매장 계정은 매장 전체) */
+export const getToday = () =>
+  fake ? fake().then((m) => m.getToday()) : http.get('/follow-ups/today', { params: { size: 100 } })
 
 export const getCallList = (...args) =>
   fake ? fake().then((m) => m.getCallList(...args)) : notConnected('getCallList')
