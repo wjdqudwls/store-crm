@@ -55,4 +55,32 @@ public class StaffNotification {
     /** null이면 안 읽음. */
     @Column
     private LocalDateTime readAt;
+
+    public static StaffNotification create(Staff staff, NotificationType type, Long customerId, Long refId,
+            String message, LocalDateTime now) {
+        StaffNotification n = new StaffNotification();
+        n.staff = staff;
+        n.type = type;
+        n.customerId = customerId;
+        n.refId = refId;
+        n.message = message;
+        n.createdAt = now;
+        return n;
+    }
+
+    public boolean isRead() {
+        return readAt != null;
+    }
+
+    /** 읽음 표시. 이미 읽었으면 처음 읽은 시각을 그대로 둔다. */
+    public void markRead(LocalDateTime now) {
+        if (readAt == null) {
+            readAt = now;
+        }
+    }
+
+    @Override
+    public String toString() {
+        return "StaffNotification[id=" + id + "]";
+    }
 }

@@ -6,7 +6,9 @@ import com.crmpos.common.error.BusinessException;
 import com.crmpos.common.error.ErrorCode;
 import com.crmpos.common.error.FieldError;
 import com.crmpos.common.error.ValidationFailedException;
+import com.crmpos.common.domain.NotificationType;
 import com.crmpos.common.repository.StaffRepository;
+import com.crmpos.common.service.StaffNotifier;
 import com.crmpos.common.security.CurrentAccount;
 import com.crmpos.common.web.BodyValidation;
 import com.crmpos.common.web.KstTime;
@@ -55,6 +57,7 @@ public class NoteService {
     private final CustomerRepository customerRepository;
     private final StaffRepository staffRepository;
     private final FollowUpTaskRepository taskRepository;
+    private final StaffNotifier notifier;
     private final Validator validator;
 
     @Transactional
@@ -89,7 +92,25 @@ public class NoteService {
             taskRepository.save(FollowUpTask.manual(customer, receiver.getId(), reminderKind, note.getId(),
                     reminderDate, now));
         }
+        notifyOwner(customer, author, note);
         return NoteItem.from(note, author.getName(), canEdit(note, account, author), reminderDate, null);
+    }
+
+    /**
+     * 담당 직원이 아닌 사람이 메모를 남기면 담당 직원 알림함에 알린다 (CAL-09). 문구에 메모 내용은 넣지 않는다.
+     * 담당이 없거나 매장 계정이거나 본인이 쓴 메모면 알리지 않는다.
+     */
+    private void notifyOwner(Customer customer, Staff author, ConsultNote note) {
+        Long ownerId = customer.getStaffId();
+        if (ownerId == null || ownerId.equals(author.getId())) {
+            return;
+        }
+        Staff owner = staffRepository.findById(ownerId).orElse(null);
+        if (owner == null || !owner.isActive() || !EMPLOYEE_RANKS.contains(owner.getRole())) {
+            return;
+        }
+        notifier.send(ownerId, NotificationType.NOTE, customer.getId(), note.getId(),
+                author.getName() + "님이 " + customer.getName() + "님 메모를 남겼어요.");
     }
 
     /**
