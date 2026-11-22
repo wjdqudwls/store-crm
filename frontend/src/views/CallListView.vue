@@ -7,6 +7,7 @@ import GradeBadge from '@/components/GradeBadge.vue'
 import StaffSelect from '@/components/StaffSelect.vue'
 import ContactResultDialog from '@/components/ContactResultDialog.vue'
 import { getCallList } from '@/api/customers'
+import { getStores } from '@/api/stores'
 import { useSessionStore } from '@/stores/session'
 import { daysAgoLabel } from '@/features/customer/customerDetail'
 import { gradeLabel, itemTypeLabels, targetLabels } from '@/utils/format'
@@ -26,7 +27,13 @@ const defaults = () =>
     ? { scope: 'STORE', staffId: null, minGrade: null, inactiveDays: null, promoOnly: true }
     : { scope: 'MINE', staffId: null, minGrade: 'D', inactiveDays: 90, promoOnly: false }
 
-const filters = reactive({ ...defaults(), target: null, itemType: null, memberRelation: null })
+const filters = reactive({
+  ...defaults(),
+  storeId: null,
+  target: null,
+  itemType: null,
+  memberRelation: null,
+})
 const draft = reactive({ ...filters })
 const list = ref(null)
 
@@ -36,7 +43,19 @@ const load = () =>
     list.value = null
     list.value = (await getCallList({ ...filters })).content
   })
-onMounted(load)
+// 본사는 매장을 골라야 콜리스트를 볼 수 있다 (03: storeId 필수). 처음에는 첫 매장
+const stores = ref([])
+onMounted(async () => {
+  if (session.isHq) {
+    try {
+      stores.value = await getStores()
+      draft.storeId = filters.storeId = stores.value[0]?.id ?? null
+    } catch {
+      // 매장 목록이 없으면 서버가 매장을 고르라는 오류를 돌려주고 아래 띠로 보인다
+    }
+  }
+  load()
+})
 
 const summary = computed(() => {
   const parts = [filters.scope === 'MINE' ? '내 담당' : '이 매장 고객 전체']
@@ -60,7 +79,12 @@ function applyFilters() {
   load()
 }
 function resetDraft() {
-  Object.assign(draft, defaults(), { target: null, itemType: null, memberRelation: null })
+  Object.assign(draft, defaults(), {
+    storeId: filters.storeId,
+    target: null,
+    itemType: null,
+    memberRelation: null,
+  })
 }
 
 function visitLabel(c) {
@@ -165,6 +189,11 @@ const grades = ['A', 'B', 'C', 'D']
 
     <el-dialog v-model="dialogOpen" title="콜리스트 조건" width="min(520px, 94vw)" align-center>
       <el-form label-position="top" class="cl__form">
+        <el-form-item v-if="session.isHq" label="매장">
+          <el-select v-model="draft.storeId">
+            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="범위">
           <el-radio-group v-model="draft.scope">
             <el-radio-button value="MINE" :disabled="session.isStore">내 담당</el-radio-button>
