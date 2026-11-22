@@ -169,6 +169,8 @@ describe('실서버 연결: 매장·직원 목록 (03 3.7)', () => {
     expect(http.get).toHaveBeenLastCalledWith('/stores')
     await api.getStoreAccounts(2)
     expect(http.get).toHaveBeenLastCalledWith('/stores/2/staff')
+    await api.getStore(2)
+    expect(http.get).toHaveBeenLastCalledWith('/stores/2')
   })
 
   it('should_내_매장_직원을_받음_when_판매_사원_고르기', async () => {
