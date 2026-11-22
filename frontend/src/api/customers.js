@@ -1,4 +1,5 @@
 import { http, notConnected } from './http'
+import { callListParams } from '@/features/customer/callList'
 
 /**
  * 고객·가족·메모·후속 연락 API 겉껍데기. 화면은 이 파일만 부른다.
@@ -88,5 +89,8 @@ export const skipFollowUp = (id) =>
 export const getToday = () =>
   fake ? fake().then((m) => m.getToday()) : http.get('/follow-ups/today', { params: { size: 100 } })
 
-export const getCallList = (...args) =>
-  fake ? fake().then((m) => m.getCallList(...args)) : notConnected('getCallList')
+/** GET /call-list — 마지막 방문이 오래된 순 (03 3.3). 비운 조건은 서버 기본값이 되살아나지 않게 끄는 값으로 보낸다 */
+export const getCallList = (filters = {}) =>
+  fake
+    ? fake().then((m) => m.getCallList(filters))
+    : http.get('/call-list', { params: callListParams(filters) })

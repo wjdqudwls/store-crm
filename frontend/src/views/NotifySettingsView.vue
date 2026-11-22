@@ -5,6 +5,8 @@ import { useLoadError } from '@/composables/useLoadError'
 import { ElMessage } from 'element-plus'
 import { getNotifySetting, saveNotifySetting } from '@/api/notifications'
 import { timingLabels } from '@/features/customer/reminder'
+import { isFake } from '@/api/mode'
+import { apiMessage } from '@/utils/apiMessage'
 
 /**
  * 내 알림 설정 `/me/notifications` (01 CAL-12·13, 직원만).
@@ -29,11 +31,22 @@ const load = () =>
 onMounted(load)
 
 async function save() {
-  await saveNotifySetting({ timing: timing.value, push: push.value })
-  ElMessage.success('알림 설정을 저장했습니다')
+  try {
+    await saveNotifySetting({ timing: timing.value, push: push.value })
+    ElMessage.success('알림 설정을 저장했습니다')
+  } catch (e) {
+    ElMessage.error(apiMessage(e, '저장됐는지 확인하지 못했습니다. 다시 눌러 주세요'))
+    load() // 화면 값을 서버 값으로 되돌린다
+  }
 }
 
 async function togglePush(on) {
+  // 실서버: 폰 푸시 구독은 서비스 워커·VAPID 키가 준비된 뒤에 연결한다 (웹 푸시 작업). 지금은 알림함에서만 받는다
+  if (!isFake) {
+    push.value = false
+    ElMessage.info('폰 푸시 알림은 준비 중입니다. 알림은 알림함에서 확인할 수 있어요')
+    return
+  }
   if (on && permission.value !== 'granted') {
     if (permission.value === 'unsupported') {
       ElMessage.warning(
@@ -86,6 +99,7 @@ const timingOptions = Object.entries(timingLabels)
         <div class="ft-value">
           <div class="ft-inline">
             <el-switch v-model="push" active-text="이 폰에서 받기" @change="togglePush" />
+            <span v-if="!isFake" class="muted">준비 중</span>
             <el-button v-if="push && permission === 'granted'" size="small" @click="testPush">
               시험 알림 보내기
             </el-button>

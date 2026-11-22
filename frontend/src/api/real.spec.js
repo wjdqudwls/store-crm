@@ -222,3 +222,43 @@ describe('실서버 연결: 후속 연락 할 일·단계 설정 (03 3.3·4.7)',
     expect(http.put).toHaveBeenCalledWith('/follow-up-rules', list)
   })
 })
+
+describe('실서버 연결: 콜리스트 (03 3.3)', () => {
+  it('should_call-list_주소와_끈_기본값', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_MODE', 'real')
+    Object.values(http).forEach((f) => f.mockReset().mockResolvedValue({}))
+    const { getCallList } = await import('./customers')
+    await getCallList({ scope: 'MINE', minGrade: null, inactiveDays: null, promoOnly: false })
+    expect(http.get).toHaveBeenLastCalledWith('/call-list', {
+      params: { scope: 'MINE', minGrade: 'NORMAL', inactiveDays: 0, promoOnly: false, size: 100 },
+    })
+    vi.unstubAllEnvs()
+  })
+})
+
+describe('실서버 연결: 알림함·알림 설정 (03 3.3, 4.12)', () => {
+  let api
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_MODE', 'real')
+    Object.values(http).forEach((f) => f.mockReset().mockResolvedValue({}))
+    http.put = vi.fn().mockResolvedValue({})
+    api = await import('./notifications')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('should_알림함_조회와_읽음_주소', async () => {
+    await api.getNotifications()
+    expect(http.get).toHaveBeenLastCalledWith('/notifications', { params: { size: 100 } })
+    await api.markRead(9001)
+    expect(http.post).toHaveBeenLastCalledWith('/notifications/9001/read')
+  })
+
+  it('should_알림_시점만_PUT_when_설정_저장(푸시는_별도_구독_API)', async () => {
+    await api.getNotifySetting()
+    expect(http.get).toHaveBeenLastCalledWith('/me/notification-settings')
+    await api.saveNotifySetting({ timing: 'BOTH', push: true })
+    expect(http.put).toHaveBeenCalledWith('/me/notification-settings', { timing: 'BOTH' })
+  })
+})
