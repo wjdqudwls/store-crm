@@ -23,6 +23,9 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
     /** 매장의 활성 계정 중 지정한 역할만 (판매 사원 고르기용). */
     List<Staff> findByStoreIdAndActiveTrueAndRoleInOrderByIdAsc(Long storeId, Collection<StaffRole> roles);
 
+    /** 한 매장의 활성 직원 수 (직급 계정만). */
+    long countByStoreIdAndActiveTrueAndRoleIn(Long storeId, Collection<StaffRole> roles);
+
     /** 매장별 활성 직원 수. 직원 직급(MANAGER~STAFF)만 센다. 직원이 없는 매장은 결과에 없다. */
     @Query("select s.store.id as storeId, count(s) as count from Staff s "
             + "where s.active = true and s.role in :roles and s.store is not null group by s.store.id")

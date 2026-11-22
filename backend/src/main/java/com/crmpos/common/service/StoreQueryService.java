@@ -3,6 +3,7 @@ package com.crmpos.common.service;
 import com.crmpos.common.controller.StaffItem;
 import com.crmpos.common.controller.StoreItem;
 import com.crmpos.common.domain.StaffRole;
+import com.crmpos.common.domain.Store;
 import com.crmpos.common.error.BusinessException;
 import com.crmpos.common.error.ErrorCode;
 import com.crmpos.common.repository.StaffRepository;
@@ -40,6 +41,19 @@ public class StoreQueryService {
                 .forEach(c -> counts.put(c.getStoreId(), (int) c.getCount()));
         return storeRepository.findAllByOrderByIdAsc().stream()
                 .map(store -> StoreItem.from(store, counts.getOrDefault(store.getId(), 0))).toList();
+    }
+
+    /**
+     * 매장 상세 요약: 매장 정보와 활성 직원 수 (ADM-03). 본사는 어느 매장이나, 매장 계정은 자기 매장만 본다.
+     * 권한 → 매장 존재 순서로 검사해 다른 매장은 있는지 없는지 알려 주지 않고 403이다. 판매 데이터는 읽지 않는다 (ADR-012).
+     */
+    public StoreItem getStore(Long storeId, CurrentAccount account) {
+        account.requireRole(StaffRole.HQ, StaffRole.STORE);
+        if (account.role() == StaffRole.STORE && !storeId.equals(account.storeId())) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+        Store store = storeRepository.findById(storeId).orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
+        return StoreItem.from(store, (int) staffRepository.countByStoreIdAndActiveTrueAndRoleIn(storeId, STAFF_ROLES));
     }
 
     /** 권한 → 매장 존재 순서로 검사한다: 다른 매장은 있는지 없는지 알려 주지 않고 403. */

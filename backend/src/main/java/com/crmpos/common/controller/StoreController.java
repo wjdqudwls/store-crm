@@ -24,6 +24,12 @@ public class StoreController {
         return service.listStores(account);
     }
 
+    @Operation(summary = "매장 상세 요약", description = "매장 정보(id·code·name)와 활성 직원 수. 본사는 어느 매장이나, 매장 계정은 자기 매장만(다른 매장 ACCESS_DENIED 403). 없는 매장은 STORE_NOT_FOUND 404. 오늘 판매 수·마감 여부는 GET /sales/daily-summary로 따로 받아 합친다.")
+    @GetMapping("/stores/{storeId}")
+    public StoreItem store(CurrentAccount account, @PathVariable Long storeId) {
+        return service.getStore(storeId, account);
+    }
+
     @Operation(summary = "매장의 계정 목록", description = "본사는 그 매장의 모든 계정, 매장 계정은 자기 매장의 활성 직원만(판매 사원 고르기용). 다른 매장 403, 없는 매장 STORE_NOT_FOUND 404.")
     @GetMapping("/stores/{storeId}/staff")
     public List<StaffItem> staff(CurrentAccount account, @PathVariable Long storeId) {
