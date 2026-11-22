@@ -29,12 +29,12 @@ class SchemaTest {
     }
 
     @Test
-    @DisplayName("빈 DB에서 V1~V5가 순서대로 성공적으로 적용되고 이력에 남는다")
+    @DisplayName("빈 DB에서 V1~V6이 순서대로 성공적으로 적용되고 이력에 남는다")
     void should_recordV1AndV2_when_emptyDb() {
         var history = jdbcTemplate.queryForList(
                 "SELECT version, success FROM flyway_schema_history WHERE version IS NOT NULL ORDER BY installed_rank");
 
-        assertThat(history).extracting(r -> r.get("version")).containsExactly("1", "2", "3", "4", "5");
+        assertThat(history).extracting(r -> r.get("version")).containsExactly("1", "2", "3", "4", "5", "6");
         assertThat(history).extracting(r -> r.get("success")).containsOnly(true);
     }
 }

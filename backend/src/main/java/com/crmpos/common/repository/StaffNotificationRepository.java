@@ -1,11 +1,11 @@
 package com.crmpos.common.repository;
 
-import com.crmpos.common.domain.NotificationType;
 import com.crmpos.common.domain.StaffNotification;
 import java.time.LocalDateTime;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,7 +19,13 @@ public interface StaffNotificationRepository extends JpaRepository<StaffNotifica
 
     long countByStaffIdAndReadAtIsNull(Long staffId);
 
-    /** 같은 문구의 알림을 오늘 이미 쌓았는가 (9시 알림을 다시 돌려도 겹치지 않게). */
-    boolean existsByStaffIdAndTypeAndMessageAndCreatedAtGreaterThanEqual(Long staffId, NotificationType type,
-            String message, LocalDateTime since);
+    /**
+     * 알림을 넣는다. 같은 직원·종류·대상(ref)·날짜의 알림이 이미 있으면(UNIQUE) 건너뛰고 0을 돌려준다 (배포 중 앱이 둘 떠서
+     * 9시 작업이 겹쳐도 하나만 쌓인다). 넣었으면 1.
+     */
+    @Modifying
+    @Query(value = "INSERT IGNORE INTO staff_notification (staff_id, type, customer_id, ref_id, message, created_at) "
+            + "VALUES (:staffId, :type, :customerId, :refId, :message, :createdAt)", nativeQuery = true)
+    int insertIfAbsent(@Param("staffId") Long staffId, @Param("type") String type, @Param("customerId") Long customerId,
+            @Param("refId") Long refId, @Param("message") String message, @Param("createdAt") LocalDateTime createdAt);
 }

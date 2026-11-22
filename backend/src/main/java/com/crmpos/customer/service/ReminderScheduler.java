@@ -2,9 +2,13 @@ package com.crmpos.customer.service;
 
 import com.crmpos.common.web.KstTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -36,6 +40,27 @@ public class ReminderScheduler {
             reminderService.notifyDueSaleTasks(LocalDate.now(KstTime.ZONE));
         } catch (RuntimeException e) {
             log.error("due task notification failed type={}", e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * 앱이 켜질 때 놓친 알림을 채운다: 9시가 지났으면 오늘 아침 알림을, 자정 작업은 언제든 다시 돈다. 앱이 9시에 꺼져 있었던
+     * 날의 알림이 빠지지 않게 한다. 알림은 (직원·종류·대상·날짜) UNIQUE라 이미 쌓인 것은 건너뛰므로 여러 번 켜져도 겹치지 않는다.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void catchUpOnStart() {
+        catchUp(LocalDateTime.now(KstTime.ZONE));
+    }
+
+    void catchUp(LocalDateTime now) {
+        LocalDate today = now.toLocalDate();
+        try {
+            reminderService.notifyDueSaleTasks(today);
+            if (!now.toLocalTime().isBefore(LocalTime.of(9, 0))) {
+                reminderService.run(today);
+            }
+        } catch (RuntimeException e) {
+            log.error("reminder catch-up failed type={}", e.getClass().getSimpleName());
         }
     }
 }
