@@ -236,4 +236,34 @@ class NotificationIntegrationTest {
 
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_notification", Integer.class)).isZero();
     }
+
+    @Test
+    @DisplayName("같은 직원·종류·대상의 알림은 문구가 달라도 하루 하나만 쌓고 푸시도 한 번만 보낸다 (UNIQUE)")
+    void should_storeOnce_whenSameStaffTypeRefSameDay() throws Exception {
+        long junior = id("gn01-junior");
+        api("gn01-junior", post("/api/v1/me/push-subscriptions").contentType(MediaType.APPLICATION_JSON).content(SUB));
+        em.flush();
+
+        notifier.send(junior, NotificationType.FOLLOW_UP, 1L, 7L, "첫 문구");
+        notifier.send(junior, NotificationType.FOLLOW_UP, 1L, 7L, "다른 문구"); // 두 앱이 동시에 돈 경우
+        assertThat(notifier.sendOncePerDay(junior, NotificationType.FOLLOW_UP, 1L, 7L, "첫 문구")).isFalse();
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_notification WHERE ref_id = 7", Integer.class)).isEqualTo(1);
+        assertThat(push.messages).containsExactly("첫 문구");
+    }
+
+    @Test
+    @DisplayName("어제 쌓은 같은 알림이 있어도 오늘은 새로 쌓는다")
+    void should_storeAgain_whenSameAlertWasYesterday() throws Exception {
+        long junior = id("gn01-junior");
+        jdbc.update("INSERT INTO staff_notification (staff_id, type, customer_id, ref_id, message, created_at) "
+                + "VALUES (?, 'FOLLOW_UP', 1, 8, '어제 알림', DATE_SUB(NOW(6), INTERVAL 1 DAY))", junior);
+        em.clear();
+
+        assertThat(notifier.sendOncePerDay(junior, NotificationType.FOLLOW_UP, 1L, 8L, "오늘 알림")).isTrue();
+        em.flush();
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_notification WHERE ref_id = 8", Integer.class)).isEqualTo(2);
+    }
 }
