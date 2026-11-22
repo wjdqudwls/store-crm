@@ -6,7 +6,6 @@ import ChoiceButtons from '@/components/ChoiceButtons.vue'
 import ReminderFields from '@/components/ReminderFields.vue'
 import { completeFollowUp, createNote } from '@/api/customers'
 import { useSessionStore } from '@/stores/session'
-import { isFake } from '@/api/mode'
 import { apiMessage } from '@/utils/apiMessage'
 import { useIsPhone } from '@/composables/useIsPhone'
 import { callResultLabels, channelLabels } from '@/features/customer/customerDetail'
@@ -54,10 +53,6 @@ const title = computed(() => {
   return name ? `연락 결과 · ${name}` : '연락 결과'
 })
 
-// 할 일을 연락 결과로 완료할 때 서버는 다시 연락 날짜(reminder)를 받지 않는다 (03 complete 본문). 실서버에서는 숨겨서
-// 정한 날짜가 조용히 사라지지 않게 한다. 할 일 없는 연락 메모(POST notes)는 날짜를 받는다.
-const showReminder = computed(() => !props.task || isFake)
-
 async function save() {
   const e = {}
   if (session.isStore && !form.staffId) e.staffId = '연락한 직원을 골라 주세요'
@@ -77,7 +72,7 @@ async function save() {
       content: form.content.trim() || callResultLabels[form.callResult],
     }
     if (session.isStore) body.staffId = form.staffId
-    if (form.callResult === 'RECALL' && form.reminderOn && showReminder.value) {
+    if (form.callResult === 'RECALL' && form.reminderOn) {
       body.reminder = { date: form.reminderDate, staffId: form.reminderStaffId ?? undefined }
     }
     if (props.task) await completeFollowUp(props.task.id, body)
@@ -122,7 +117,7 @@ async function save() {
       <ChoiceButtons v-model="form.channel" :options="channelOptions" size="small" />
       <p v-if="errors.channel" class="field-error">{{ errors.channel }}</p>
       <ReminderFields
-        v-if="form.callResult === 'RECALL' && showReminder"
+        v-if="form.callResult === 'RECALL'"
         v-model:enabled="form.reminderOn"
         v-model:date="form.reminderDate"
         v-model:staff-id="form.reminderStaffId"
@@ -159,7 +154,7 @@ async function save() {
       <ChoiceButtons v-model="form.channel" :options="channelOptions" size="small" />
       <p v-if="errors.channel" class="field-error">{{ errors.channel }}</p>
       <ReminderFields
-        v-if="form.callResult === 'RECALL' && showReminder"
+        v-if="form.callResult === 'RECALL'"
         v-model:enabled="form.reminderOn"
         v-model:date="form.reminderDate"
         v-model:staff-id="form.reminderStaffId"
