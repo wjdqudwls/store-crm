@@ -123,4 +123,22 @@ class StoreQueryServiceTest {
         assertThatThrownBy(() -> service.listStaff(999L, HQ)).isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.STORE_NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("매장 상세: 본사는 매장 정보와 활성 직원 수, 매장 계정은 자기 매장만, 다른 매장·직원은 403, 없는 매장은 404")
+    void should_getStoreDetail_withPermissions() {
+        Store gn = store(1L, "GN01", "강남점");
+        given(storeRepository.findById(1L)).willReturn(java.util.Optional.of(gn));
+        given(staffRepository.countByStoreIdAndActiveTrueAndRoleIn(org.mockito.ArgumentMatchers.eq(1L), any())).willReturn(4L);
+        given(storeRepository.findById(999L)).willReturn(java.util.Optional.empty());
+
+        assertThat(service.getStore(1L, HQ)).isEqualTo(new StoreItem(1L, "GN01", "강남점", 4));
+        assertThat(service.getStore(1L, STORE_1).activeStaffCount()).isEqualTo(4);
+        assertThatThrownBy(() -> service.getStore(2L, STORE_1)).extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ACCESS_DENIED);
+        assertThatThrownBy(() -> service.getStore(1L, new CurrentAccount(17L, StaffRole.SENIOR, 1L)))
+                .extracting(e -> ((BusinessException) e).getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED);
+        assertThatThrownBy(() -> service.getStore(999L, HQ)).extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.STORE_NOT_FOUND);
+    }
 }

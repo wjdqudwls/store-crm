@@ -77,4 +77,33 @@ class StoreStaffListIntegrationTest {
         mockMvc.perform(get("/api/v1/stores/999999/staff").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("hq"))))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("STORE_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("매장 상세: 본사는 어느 매장이나 정보와 활성 직원 수를 받고, 직급 계정만 센다 (B4-7, ADM-03)")
+    void should_showStoreDetail_toHq() throws Exception {
+        long expected = jdbc.queryForObject("SELECT COUNT(*) FROM staff WHERE store_id = ? AND active = 1 "
+                + "AND role IN ('MANAGER','SENIOR','JUNIOR','STAFF')", Long.class, gangnamId());
+
+        mockMvc.perform(get("/api/v1/stores/" + gangnamId()).header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("hq"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(gangnamId()))
+                .andExpect(jsonPath("$.code").value("GN01")).andExpect(jsonPath("$.name").value("강남점"))
+                .andExpect(jsonPath("$.activeStaffCount").value((int) expected));
+    }
+
+    @Test
+    @DisplayName("매장 상세: 매장 계정은 자기 매장만(다른 매장 403), 직원은 403, 없는 매장은 본사에게 404")
+    void should_limitStoreDetail_byAccount() throws Exception {
+        long other = jdbc.queryForObject("SELECT id FROM store WHERE code <> 'GN01' LIMIT 1", Long.class);
+
+        mockMvc.perform(get("/api/v1/stores/" + gangnamId()).header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("store-gn01"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("GN01"));
+        mockMvc.perform(get("/api/v1/stores/" + other).header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("store-gn01"))))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+        mockMvc.perform(get("/api/v1/stores/999999").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("store-gn01"))))
+                .andExpect(status().isForbidden()); // 다른 매장은 있는지 없는지 알려 주지 않는다
+        mockMvc.perform(get("/api/v1/stores/" + gangnamId()).header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("gn01-junior"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/stores/999999").header(HttpHeaders.AUTHORIZATION, TestAuth.bearer(account("hq"))))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("STORE_NOT_FOUND"));
+    }
 }

@@ -74,4 +74,18 @@ class StoreControllerTest {
         mockMvc.perform(get("/api/v1/stores/999/staff")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("STORE_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("GET /stores/{id}는 200과 매장 정보·활성 직원 수, 권한·없는 매장은 403·404")
+    void should_returnStoreDetail() throws Exception {
+        given(service.getStore(org.mockito.ArgumentMatchers.eq(1L), any())).willReturn(new StoreItem(1L, "GN01", "강남점", 4));
+        given(service.getStore(org.mockito.ArgumentMatchers.eq(2L), any())).willThrow(new BusinessException(ErrorCode.ACCESS_DENIED));
+        given(service.getStore(org.mockito.ArgumentMatchers.eq(999L), any())).willThrow(new BusinessException(ErrorCode.STORE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/stores/1")).andExpect(status().isOk()).andExpect(jsonPath("$.code").value("GN01"))
+                .andExpect(jsonPath("$.activeStaffCount").value(4));
+        mockMvc.perform(get("/api/v1/stores/2")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/stores/999")).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("STORE_NOT_FOUND"));
+    }
 }
