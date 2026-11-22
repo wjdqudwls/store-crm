@@ -7,11 +7,12 @@ import { http, notConnected } from './http'
  */
 const fake = import.meta.env.VITE_API_MODE !== 'real' ? () => import('./fake/stores') : null
 
-/** GET /stores (본사만, 03 3.7). 매장 상세 `GET /stores/{id}`는 서버에 아직 없다 */
+/** GET /stores (본사만, 03 3.7) */
 export const getStores = () => (fake ? fake().then((m) => m.getStores()) : http.get('/stores'))
 
-export const getStore = (...args) =>
-  fake ? fake().then((m) => m.getStore(...args)) : notConnected('getStore')
+/** GET /stores/{id} → { id, code, name, activeStaffCount }. 본사는 어느 매장이나, 매장 계정은 자기 매장만 (03 3.7) */
+export const getStore = (id) =>
+  fake ? fake().then((m) => m.getStore(id)) : http.get(`/stores/${id}`)
 
 /** GET /stores/{storeId}/staff: 본사는 매장 계정·직원·키오스크 모두 (03 3.7) */
 export const getStoreAccounts = (storeId) =>
