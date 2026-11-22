@@ -135,7 +135,7 @@ public class FollowUpService {
     public FollowUpItem complete(Long taskId, FollowUpCompleteRequest request, CurrentAccount account) {
         FollowUpTask task = findHandleable(taskId, account);
         NoteItem note = noteService.create(task.getCustomer().getId(), new NoteCreateRequest(NoteType.CALL,
-                request.content(), request.staffId(), request.callResult(), request.channel(), null), account);
+                request.content(), request.staffId(), request.callResult(), request.channel(), request.reminder()), account);
         task.complete(note.id(), now());
         return item(task, lookups(List.of(task)));
     }
