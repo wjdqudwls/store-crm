@@ -3,7 +3,6 @@ package com.crmpos.common.service;
 import com.crmpos.common.domain.NotificationType;
 import com.crmpos.common.domain.PushSubscription;
 import com.crmpos.common.domain.Staff;
-import com.crmpos.common.domain.StaffNotification;
 import com.crmpos.common.repository.PushSubscriptionRepository;
 import com.crmpos.common.repository.StaffNotificationRepository;
 import com.crmpos.common.repository.StaffRepository;
@@ -33,25 +32,29 @@ public class InboxStaffNotifier implements StaffNotifier {
     @Override
     @Transactional
     public void send(Long staffId, NotificationType type, Long customerId, Long refId, String message) {
-        Staff staff = staffRepository.findById(staffId).orElse(null);
-        if (staff == null || !staff.isActive()) {
-            return;
-        }
-        StaffNotification saved = notificationRepository.save(
-                StaffNotification.create(staff, type, customerId, refId, message, now()));
-        push(staff.getId(), message);
-        log.info("notification sent staffId={} notificationId={}", staffId, saved.getId());
+        store(staffId, type, customerId, refId, message);
     }
 
+    /** 같은 직원·종류·대상(ref)의 알림을 오늘 이미 쌓았으면 건너뛴다 (DB UNIQUE가 막는다). */
     @Override
     @Transactional
     public boolean sendOncePerDay(Long staffId, NotificationType type, Long customerId, Long refId, String message) {
-        LocalDateTime startOfToday = now().toLocalDate().atStartOfDay();
-        if (notificationRepository.existsByStaffIdAndTypeAndMessageAndCreatedAtGreaterThanEqual(staffId, type, message,
-                startOfToday)) {
+        return store(staffId, type, customerId, refId, message);
+    }
+
+    /** 알림함에 넣고 새로 들어간 경우에만 푸시를 보낸다. 이미 있어 건너뛰었으면 false. */
+    private boolean store(Long staffId, NotificationType type, Long customerId, Long refId, String message) {
+        Staff staff = staffRepository.findById(staffId).orElse(null);
+        if (staff == null || !staff.isActive()) {
             return false;
         }
-        send(staffId, type, customerId, refId, message);
+        int inserted = notificationRepository.insertIfAbsent(staffId, type.name(), customerId, refId, message, now());
+        if (inserted == 0) {
+            log.info("notification skipped (already exists) staffId={}", staffId);
+            return false;
+        }
+        push(staff.getId(), message);
+        log.info("notification sent staffId={}", staffId);
         return true;
     }
 
