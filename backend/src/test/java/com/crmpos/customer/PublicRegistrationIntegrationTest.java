@@ -19,6 +19,7 @@ import com.crmpos.customer.repository.CustomerRepository;
 import com.crmpos.support.IntegrationTest;
 import com.crmpos.support.TestAuth;
 import java.time.LocalDateTime;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,13 @@ class PublicRegistrationIntegrationTest {
         return customerRepository.findByPhoneHash(hasher.hash(normalizedPhone)).orElseThrow();
     }
 
+    /** 고객 한 줄의 모든 칸. 암호문(byte[])은 배열이라 같은지 비교가 안 되어 문자열로 바꾼다. */
+    private Map<String, Object> row() {
+        Map<String, Object> row = new java.util.HashMap<>(jdbc.queryForMap("SELECT * FROM customer WHERE phone_last4 = '2222'"));
+        row.replaceAll((k, v) -> v instanceof byte[] b ? java.util.Arrays.toString(b) : v);
+        return row;
+    }
+
     private long storeId(String code) {
         return storeRepository.findByCode(code).orElseThrow().getId();
     }
@@ -106,17 +114,30 @@ class PublicRegistrationIntegrationTest {
     }
 
     @Test
-    @DisplayName("기존 번호로 등록해도 같은 200 응답이고 기존 고객 정보를 바꾸지 않으며 새로 만들지 않는다 (REG-05)")
-    void should_returnSameResponse_andKeepExisting_when_phoneExists() throws Exception {
-        String first = qr(body("GN01", null, "김가온", "010-0000-2222")).andExpect(status().isOk())
+    @DisplayName("기존 번호로 등록해도 같은 200 응답이고, 이름·주소·사이즈·동의·가입매장·담당 직원 등 기존 고객의 모든 칸이 그대로다 (REG-05)")
+    void should_returnSameResponse_andKeepEveryExistingColumn_when_phoneExists() throws Exception {
+        String first = qr(body("GN01", "S002", "김가온", "010-0000-2222")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         long before = customerRepository.count();
+        em.flush();
+        Map<String, Object> rowBefore = row();
+        long summariesBefore = jdbc.queryForObject("SELECT COUNT(*) FROM customer_summary", Long.class);
 
-        String second = qr(body("HD01", "S101", "남의이름", "+82 10 0000 2222")).andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+        // 남이 같은 번호로 이름·주소·사이즈·동의·매장·직원을 모두 다르게 보낸다
+        String attack = """
+                {"storeCode":"HD01","staffCode":"S101","name":"남의이름","nameEn":null,"phone":"+82 10 0000 2222",
+                 "nationality":"DOMESTIC",
+                 "agreements":{"privacy":true,"age14":true,"marketingSms":false,"marketingKakao":true},
+                 "birthYear":1980,"birthMd":"0101","address":{"sido":"부산","gu":"해운대구","detail":"바꾸려는 주소"},
+                 "gender":"M","preferredItemTypes":["SHOES"],"sizes":{"top":"XL"},"contactChannel":"CALL"}""";
+        String second = qr(attack).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        em.flush();
+        em.clear();
 
         assertThat(second).isEqualTo(first);
         assertThat(customerRepository.count()).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM customer_summary", Long.class)).isEqualTo(summariesBefore);
+        assertThat(row()).isEqualTo(rowBefore);
         Customer customer = find("+821000002222");
         assertThat(customer.getName()).isEqualTo("김가온");
         assertThat(customer.getHomeStoreId()).isEqualTo(storeId("GN01"));
