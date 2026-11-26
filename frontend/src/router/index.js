@@ -52,7 +52,7 @@ const router = createRouter({
           path: '/sales/:id(\\d+)/edit',
           component: SaleCorrectionView,
           // 판매 기록의 정정 모드 (05 SCR-02). 본사는 마감 뒤에도 고친다
-          meta: { title: '판매 정정', allowedAs: [s.sales.path, s.stores.path], reference: true },
+          meta: { title: '판매 정정', allowedAs: [s.sales.path, s.stores.path] },
         },
         page(s.customers, CustomerListView),
         page(s.customerNew, CustomerNewView),

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 실서버 모드(VITE_API_MODE=real)에서 B1 함수가 03의 주소·본문으로 http를 부르는지 (F2·F4 연결)
-const http = { get: vi.fn(), post: vi.fn(), patch: vi.fn() }
+const http = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn() }
 vi.mock('./http', () => ({ http, notConnected: (n) => Promise.reject(new Error(n)) }))
 
 describe('실서버 연결: 고객 (03 3.2·4.3·4.3a·4.4)', () => {
@@ -118,6 +118,14 @@ describe('실서버 연결: 판매·반품·마감 (03 4.1·4.2·4.9·4.10·4.12
         headers: { 'Idempotency-Key': KEY },
       },
     )
+  })
+
+  it('should_PUT_sales_id_본문과_키_when_정정', async () => {
+    const body = { staffId: 4, customerId: 5, lines: [{ skuId: 2, qty: 1, lineAmount: 1000 }] }
+    await api.correctSale(7, body, KEY)
+    expect(http.put).toHaveBeenLastCalledWith('/sales/7', body, {
+      headers: { 'Idempotency-Key': KEY },
+    })
   })
 
   it('should_같은_키로_다시_보냄_when_두_번_눌러도(재시도)', async () => {
