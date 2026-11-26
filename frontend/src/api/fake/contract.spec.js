@@ -7,11 +7,6 @@ import { compareShape, shapes } from './contract.shapes'
  * 알려진 차이는 이유와 함께 아래에 적는다. 새 차이가 생기거나 차이가 사라지면 이 테스트가 깨져서 목록을 고치게 한다.
  */
 const KNOWN = {
-  joinInfo: {
-    reason:
-      '참고 화면(키오스크·QR) · 03은 서버가 동의 문구(consents)를 주지만 화면이 직접 갖고 있다',
-    diffs: ['missing:consents'],
-  },
   gradePolicy: {
     reason: "참고 화면(설정) · '지난 버전' 목록(versions)은 03에 넣지 않기로 했다 (총괄 결정)",
     diffs: ['extra:versions'],

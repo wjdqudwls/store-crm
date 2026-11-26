@@ -1,4 +1,4 @@
-import { http, notConnected } from './http'
+import { http } from './http'
 
 /**
  * 공개(키오스크·QR) 정보 API 겉껍데기. 화면은 이 파일만 부른다.
@@ -9,8 +9,16 @@ const fake = import.meta.env.VITE_API_MODE !== 'real' ? () => import('./fake/pub
 
 export const getSizes = () => (fake ? fake().then((m) => m.getSizes()) : http.get('/public/sizes'))
 
-export const getJoinInfo = (...args) =>
-  fake ? fake().then((m) => m.getJoinInfo(...args)) : notConnected('getJoinInfo')
+/** GET /public/join-info?store=&staff= → { store, consents, sizes }. 로그인 없이 연다 (03 4.5) */
+export const getJoinInfo = (store, staff) =>
+  fake
+    ? fake().then((m) => m.getJoinInfo(store))
+    : http.get('/public/join-info', { params: staff ? { store, staff } : { store } })
 
-export const publicRegister = (...args) =>
-  fake ? fake().then((m) => m.publicRegister(...args)) : notConnected('publicRegister')
+/** POST /public/registrations (QR). IP당 분당 5번, 넘으면 429 TOO_MANY_REQUESTS. 기존 번호도 같은 200 */
+export const publicRegister = (body) =>
+  fake ? fake().then((m) => m.publicRegister(body)) : http.post('/public/registrations', body)
+
+/** POST /kiosk/registrations (매장 iPad, KIOSK 계정). 매장은 토큰에서 정한다 */
+export const kioskRegister = (body) =>
+  fake ? fake().then((m) => m.publicRegister(body)) : http.post('/kiosk/registrations', body)

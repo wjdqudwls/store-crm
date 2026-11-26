@@ -2,8 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import CustomerForm from '@/components/CustomerForm.vue'
 import DevAccountSwitch from '@/components/DevAccountSwitch.vue'
-import ReferenceBanner from '@/components/ReferenceBanner.vue'
-import { publicRegister } from '@/api/public'
+import { getJoinInfo, kioskRegister } from '@/api/public'
 import { useSessionStore } from '@/stores/session'
 
 /**
@@ -39,6 +38,16 @@ function done() {
   doneTimer = setTimeout(reset, 5000)
 }
 
+// 동의 문구는 서버 것을 쓴다 (초안, 03 4.5). 못 받으면 폼의 기본 문구가 보인다
+const consents = ref(null)
+onMounted(async () => {
+  try {
+    consents.value = (await getJoinInfo(session.me.storeCode)).consents
+  } catch {
+    // 문구 없이도 등록 폼은 열린다
+  }
+})
+
 const events = ['pointerdown', 'keydown', 'input']
 onMounted(() => events.forEach((e) => window.addEventListener(e, touch, true)))
 onBeforeUnmount(() => {
@@ -51,7 +60,6 @@ onBeforeUnmount(() => {
 <template>
   <div class="kiosk size-kiosk">
     <div class="kiosk__dev"><DevAccountSwitch /></div>
-    <ReferenceBanner />
 
     <section v-if="step === 'start'" class="kiosk__start">
       <p class="kiosk__store">{{ session.me.storeName }}</p>
@@ -70,7 +78,8 @@ onBeforeUnmount(() => {
         :show-staff="false"
         :collapse-optional="false"
         lock-until-consent
-        :submit-fn="publicRegister"
+        :submit-fn="kioskRegister"
+        :consents="consents"
         :store-name="session.me.storeName"
         @created="done"
       />

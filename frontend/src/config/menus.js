@@ -18,7 +18,7 @@ export const screens = {
   gradeView: { path: '/settings/grade', label: '기준 보기', task: 'F9' },
   settings: { path: '/settings/grade', label: '설정', task: 'F9' },
   stores: { path: '/hq/stores', label: '매장 목록', task: 'F8' },
-  kiosk: { path: '/kiosk', label: '키오스크 등록', task: 'F5', reference: true },
+  kiosk: { path: '/kiosk', label: '키오스크 등록', task: 'F5' },
   password: { path: '/me/password', label: '비밀번호 바꾸기', task: 'F13' },
   notifySettings: { path: '/me/notifications', label: '알림 설정', task: 'F10' },
 }

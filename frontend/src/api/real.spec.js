@@ -264,3 +264,30 @@ describe('실서버 연결: 알림함·알림 설정 (03 3.3, 4.12)', () => {
     expect(http.put).toHaveBeenCalledWith('/me/notification-settings', { timing: 'BOTH' })
   })
 })
+
+describe('실서버 연결: QR·키오스크 등록 (03 4.5)', () => {
+  let api
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_MODE', 'real')
+    Object.values(http).forEach((f) => f.mockReset().mockResolvedValue({}))
+    api = await import('./public')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('should_join-info에_매장·직원_코드를_보냄', async () => {
+    await api.getJoinInfo('GN01', 'S001')
+    expect(http.get).toHaveBeenLastCalledWith('/public/join-info', {
+      params: { store: 'GN01', staff: 'S001' },
+    })
+    await api.getJoinInfo('GN01')
+    expect(http.get).toHaveBeenLastCalledWith('/public/join-info', { params: { store: 'GN01' } })
+  })
+
+  it('should_QR은_public_키오스크는_kiosk_주소로_등록', async () => {
+    await api.publicRegister({ storeCode: 'GN01' })
+    expect(http.post).toHaveBeenLastCalledWith('/public/registrations', { storeCode: 'GN01' })
+    await api.kioskRegister({ name: 'x' })
+    expect(http.post).toHaveBeenLastCalledWith('/kiosk/registrations', { name: 'x' })
+  })
+})

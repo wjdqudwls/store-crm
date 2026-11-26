@@ -1,5 +1,4 @@
 <script setup>
-import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import CustomerForm from '@/components/CustomerForm.vue'
@@ -17,7 +16,10 @@ const tooMany = ref(false)
 
 onMounted(async () => {
   try {
-    info.value = await getJoinInfo(String(route.query.store ?? ''))
+    info.value = await getJoinInfo(
+      String(route.query.store ?? ''),
+      route.query.staff ? String(route.query.staff) : undefined,
+    )
   } catch (e) {
     if (e?.status === 404) invalid.value = true
     else if (e?.status === 429) tooMany.value = true
@@ -32,7 +34,6 @@ function submit(body) {
 
 <template>
   <div class="join">
-    <ReferenceBanner />
     <p v-if="invalid" class="join__msg">QR 코드가 올바르지 않습니다. 직원에게 문의해 주세요.</p>
     <p v-else-if="tooMany" class="join__msg">잠시 후 다시 시도해 주세요.</p>
     <el-skeleton v-else-if="!info" animated :rows="6" class="join__card" />
@@ -49,6 +50,7 @@ function submit(body) {
         lock-until-consent
         :submit-fn="submit"
         :store-name="info.store.name"
+        :consents="info.consents"
         @created="done = true"
       />
     </section>

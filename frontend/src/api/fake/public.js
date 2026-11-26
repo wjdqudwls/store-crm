@@ -11,7 +11,17 @@ export function getSizes() {
 export function getJoinInfo(storeCode) {
   const store = stores.find((s) => s.code === storeCode)
   if (!store) return fakeError(404, 'STORE_NOT_FOUND', 'QR 코드가 올바르지 않습니다.')
-  return fakeResponse({ store: { code: store.code, name: store.name }, sizes: sizeOptions })
+  return fakeResponse({
+    store: { code: store.code, name: store.name },
+    consents: {
+      privacy:
+        '[개인정보 수집·이용 동의 (필수)]\n· 수집 목적: 단골 관리, 구매 이력·등급 할인 안내, 사이즈 상담, 연락\n· 동의하지 않으면 등록과 등급 할인을 받을 수 없습니다.',
+      age14: '만 14세 이상입니다. (필수)',
+      marketing:
+        '[마케팅 수신 동의 (선택)]\n신상품·행사 소식을 문자 또는 카카오톡으로 받는 것에 동의합니다. 동의하지 않아도 등록과 등급 할인은 받을 수 있습니다.',
+    },
+    sizes: sizeOptions,
+  })
 }
 
 /**

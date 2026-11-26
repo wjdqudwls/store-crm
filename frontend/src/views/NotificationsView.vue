@@ -25,7 +25,7 @@ const load = () =>
 onMounted(load)
 
 const typeLabels = {
-  FOLLOW_UP: '새 할 일',
+  FOLLOW_UP: '할 일 알림', // 묶음 방문·재연락 알림도 이 종류로 온다 (문장은 message에)
   NOTE: '담당 고객의 새 메모',
   VISIT: '방문 예정',
   RECALL: '다시 연락',
