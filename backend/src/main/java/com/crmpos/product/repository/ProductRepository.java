@@ -1,6 +1,8 @@
 package com.crmpos.product.repository;
 
 import com.crmpos.product.domain.Product;
+import java.util.Collection;
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,6 +12,10 @@ import org.springframework.data.repository.query.Param;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByProductCode(String productCode);
+
+    /** 이미 등록된 품번만 골라 돌려준다 (엑셀 올리기의 중복 검사). */
+    @Query("select p.productCode from Product p where p.productCode in :codes")
+    List<String> findExistingCodes(@Param("codes") Collection<String> codes);
 
     boolean existsByProductCodeAndIdNot(String productCode, Long id);
 
