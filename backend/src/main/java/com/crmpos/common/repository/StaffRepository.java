@@ -15,6 +15,9 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
 
     Optional<Staff> findByLoginId(String loginId);
 
+    /** QR의 직원 코드로 그 매장의 직원 찾기 (REG-03). */
+    Optional<Staff> findFirstByStoreIdAndStaffCode(Long storeId, String staffCode);
+
     Optional<Staff> findFirstByRoleAndActiveTrueOrderByIdAsc(StaffRole role);
 
     /** 매장의 모든 계정(매장 계정·직원·키오스크), 등록 순서대로. */
