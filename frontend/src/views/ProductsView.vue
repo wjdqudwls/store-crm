@@ -1,11 +1,12 @@
 <script setup>
-import { showReference } from '@/config/reference'
-import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import { onMounted, ref } from 'vue'
 import LoadError from '@/components/LoadError.vue'
 import { useLoadError } from '@/composables/useLoadError'
 import { useRouter } from 'vue-router'
-import { getProducts, importProducts } from '@/api/products'
+import { ElMessage } from 'element-plus'
+import { downloadImportTemplate, getProducts, importProducts } from '@/api/products'
+import { apiMessage } from '@/utils/apiMessage'
+import { saveBlob } from '@/utils/saveBlob'
 import { formatWon, itemTypeLabels, sizeLabel, targetLabels } from '@/utils/format'
 
 /**
@@ -27,11 +28,18 @@ const colorsOf = (p) => [...new Set(p.skus.map((s) => s.color).filter(Boolean))]
 const sizesOf = (p) =>
   [...new Set(p.skus.map((s) => s.size))].map((s) => sizeLabel(s, p.itemType, p.target)).join(', ')
 
-// ---- 엑셀 올리기 (초안: 실패 예시) ----
+// ---- 엑셀 올리기 ----
 const importOpen = ref(false)
 const importFile = ref(null)
 const importing = ref(false)
 const importResult = ref(null)
+async function downloadTemplate() {
+  try {
+    saveBlob(await downloadImportTemplate(), 'product-import-template.xlsx')
+  } catch (e) {
+    ElMessage.error(apiMessage(e, '폼을 내려받지 못했습니다. 다시 눌러 주세요'))
+  }
+}
 function onFile(file) {
   importFile.value = file
   importResult.value = null
@@ -39,13 +47,15 @@ function onFile(file) {
 async function upload() {
   importing.value = true
   try {
-    const res = await importProducts(importFile.value)
+    // el-upload가 주는 값은 { raw: File, name }이다
+    const res = await importProducts(importFile.value.raw ?? importFile.value)
     importResult.value = { ok: true, message: `${res.importedCount}개 상품을 등록했습니다` }
     load()
   } catch (e) {
     importResult.value = {
       ok: false,
-      message: e.body.message,
+      // 파일 문제(400 VALIDATION_FAILED)는 fieldErrors의 사유까지 보인다
+      message: apiMessage(e, '올렸는지 확인하지 못했습니다. 상품 목록을 확인해 주세요'),
       errors: e.body.details?.errors ?? [],
     }
   } finally {
@@ -60,7 +70,7 @@ async function upload() {
       <h1 class="page__title">상품</h1>
       <div class="page__actions">
         <el-button type="primary" plain @click="load">조회</el-button>
-        <el-button v-if="showReference" @click="importOpen = true">엑셀 올리기</el-button>
+        <el-button @click="importOpen = true">엑셀 올리기</el-button>
         <el-button type="primary" @click="router.push('/products/new')">상품 등록</el-button>
       </div>
     </header>
@@ -118,17 +128,13 @@ async function upload() {
     </section>
 
     <el-dialog v-model="importOpen" title="엑셀 올리기" width="min(560px, 94vw)" align-center>
-      <ReferenceBanner />
       <div class="imp">
         <p class="muted">
           엑셀 폼에 한 행에 상품 하나, 사이즈·색상은 쉼표로 여러 개 적습니다. 잘못된 행이 하나라도
           있으면 아무것도 저장하지 않습니다.
         </p>
-        <p class="draft-note">
-          초안: 파일 읽기는 백엔드(B1-2)에서 만듭니다. 지금은 실패 예시를 보여 줍니다.
-        </p>
         <div class="imp__row">
-          <el-button link type="primary">엑셀 폼 내려받기</el-button>
+          <el-button link type="primary" @click="downloadTemplate">엑셀 폼 내려받기</el-button>
           <el-upload
             :auto-upload="false"
             :show-file-list="false"
