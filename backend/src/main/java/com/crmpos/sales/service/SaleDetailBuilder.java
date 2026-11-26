@@ -58,7 +58,7 @@ public class SaleDetailBuilder {
 
     private static SaleDetailResponse.Line line(SaleLine l) {
         return new SaleDetailResponse.Line(l.getId(), l.getSkuId(), l.getProductCode(), l.getProductName(),
-                l.getItemType(), l.getColor() == null || l.getColor().isEmpty() ? null : l.getColor(), l.getSize(),
+                l.getItemType(), l.getTarget(), l.getColor() == null || l.getColor().isEmpty() ? null : l.getColor(), l.getSize(),
                 l.getListPrice(), l.getQty(), l.getLineAmount(), l.getReturnedQty(), l.getReturnedAmount(),
                 l.getWearerLabel());
     }

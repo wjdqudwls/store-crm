@@ -2,6 +2,7 @@ package com.crmpos.sales.controller;
 
 import com.crmpos.common.type.GradeCode;
 import com.crmpos.common.type.ItemType;
+import com.crmpos.common.type.Target;
 import com.crmpos.sales.domain.ReturnKind;
 import com.crmpos.sales.domain.SaleKind;
 import com.crmpos.sales.domain.SaleStatus;
@@ -18,7 +19,7 @@ public record SaleDetailResponse(Long id, String receiptNo, OffsetDateTime soldA
     }
 
     public record Line(Long lineId, Long skuId, String productCode, String productName, ItemType itemType,
-            String color, String size, Long listPrice, int qty, long lineAmount, int returnedQty, long returnedAmount,
+            Target target, String color, String size, Long listPrice, int qty, long lineAmount, int returnedQty, long returnedAmount,
             String wearerLabel) {
     }
 

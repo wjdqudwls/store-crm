@@ -1,6 +1,7 @@
 package com.crmpos.sales;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -119,6 +120,34 @@ class CorrectionIntegrationTest {
         assertThat(ret.get("new_sale_id")).isEqualTo(newId);
         assertThat(ret.get("staff_id")).isEqualTo(kit.staffId("gn01-junior"));
         assertThat(ret.get("amount")).isEqualTo(4000L);
+    }
+
+    @Test
+    @DisplayName("영수증 상세 줄에 target이 있어, 직접 입력 줄을 정정할 때 그대로 보내면 대상이 유지된다 (고객 구매 기록 포함)")
+    void should_keepTarget_whenCorrectingDirectLine() throws Exception {
+        long customerId = customer("010-0000-7009");
+        String saleBody = "{\"sellerStaffId\":%d,\"customerId\":%d,\"lines\":[{\"productName\":\"원피스\",\"itemType\":\"TOP\",\"target\":\"WOMEN\",\"size\":\"M\",\"qty\":1,\"lineAmount\":3000},{\"productName\":\"양말\",\"itemType\":\"ACC\",\"size\":\"FREE\",\"qty\":1,\"lineAmount\":1000}]}"
+                .formatted(kit.staffId("gn01-senior"), customerId);
+        long saleId = kit.mapper.readTree(kit.send(kit.as(post("/api/v1/sales").header("Idempotency-Key", SalesTestKit.newKey())
+                        .contentType(MediaType.APPLICATION_JSON).content(saleBody), null))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        publishAll();
+        JsonNode lines = kit.mapper.readTree(kit.send(kit.as(get("/api/v1/sales/" + saleId), null))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.lines[0].target").value("WOMEN"))
+                .andExpect(jsonPath("$.lines[1].target").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn().getResponse().getContentAsString()).get("lines");
+
+        // 화면의 정정 창처럼 상세 줄의 값을 그대로 보낸다
+        String target = lines.get(0).get("target").asString();
+        String correction = "{\"staffId\":%d,\"customerId\":%d,\"lines\":[{\"productName\":\"원피스\",\"itemType\":\"TOP\",\"target\":\"%s\",\"size\":\"L\",\"qty\":1,\"lineAmount\":3000}]}"
+                .formatted(kit.staffId("gn01-senior"), customerId, target);
+        long newId = kit.mapper.readTree(correct(saleId, null, SalesTestKit.newKey(), correction)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        publishAll();
+
+        kit.send(kit.as(get("/api/v1/sales/" + newId), null)).andExpect(jsonPath("$.lines[0].target").value("WOMEN"));
+        assertThat(jdbc.queryForObject("SELECT target FROM customer_purchase WHERE sale_id = ?", String.class, newId))
+                .isEqualTo("WOMEN");
     }
 
     @Test
