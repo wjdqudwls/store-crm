@@ -155,6 +155,20 @@ public class Sale {
         return sale;
     }
 
+    /**
+     * 교환으로 받은 새 판매를 기록한다 (SAL-06, BR-17): 원 판매의 매장·고객·판매 당시 등급을 그대로 쓰고 원 판매와 처음 판매를
+     * 잇는다. 판매 시각은 교환한 지금이고 판매 사원은 교환을 처리한 직원이다. 새 구매(티켓)로 세지 않는다.
+     */
+    public static Sale exchange(Sale original, String receiptNo, String idempotencyKey, String requestHash, Long staffId,
+            Long recordedBy, LocalDateTime now, List<SaleLine> lines) {
+        Sale sale = record(original.storeId, receiptNo, idempotencyKey, requestHash, staffId, recordedBy,
+                original.customerId, original.appliedGrade, now, now, lines);
+        sale.kind = SaleKind.EXCHANGE;
+        sale.originSale = original;
+        sale.rootSale = original.rootSale;
+        return sale;
+    }
+
     /** 일반 판매의 처음 판매는 자기 자신이다 (ADR-022). */
     public void assignRootToSelf() {
         this.rootSale = this;

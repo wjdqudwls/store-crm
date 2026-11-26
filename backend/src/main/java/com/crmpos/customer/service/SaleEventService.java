@@ -38,6 +38,7 @@ public class SaleEventService {
     private static final String KIND_NORMAL = "NORMAL";
     private static final String KIND_CORRECTION = "CORRECTION";
     private static final String RETURN_KIND_VOID = "VOID";
+    private static final String RETURN_KIND_EXCHANGE = "EXCHANGE";
 
     private final ProcessedEventRepository processedEventRepository;
     private final CustomerRepository customerRepository;
@@ -100,7 +101,10 @@ public class SaleEventService {
         }
         refreshVisits(event.customerId());
         purchaseRepository.flush();
-        followUpPlanService.onPurchaseGroupsReduced(event.customerId(), groups);
+        // 교환은 새 상품이 같은 구매 건에 이어서 들어오므로(다음 이벤트) 지금 비어 보여도 할 일을 취소하지 않는다 (BR-14)
+        if (!RETURN_KIND_EXCHANGE.equals(event.kind())) {
+            followUpPlanService.onPurchaseGroupsReduced(event.customerId(), groups);
+        }
     }
 
     /** 처음 보는 이벤트면 기록하고 true, 이미 처리했으면 false. */

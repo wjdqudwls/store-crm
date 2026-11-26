@@ -106,6 +106,15 @@ public class SaleReturn {
         return ret;
     }
 
+    /**
+     * 교환의 돌려받는 쪽을 기록한다 (SAL-06): 환불 금액·남은 수량 규칙은 반품과 같고(BR-11), 짝인 새 판매는
+     * {@link #pairWith}로 잇는다. 판매 상태도 반품처럼 바뀐다.
+     */
+    public static SaleReturn recordExchange(Sale sale, String idempotencyKey, String requestHash, Long staffId,
+            Long recordedBy, LocalDateTime returnedAt, List<Item> items) {
+        return record(ReturnKind.EXCHANGE, sale, idempotencyKey, requestHash, staffId, recordedBy, returnedAt, items);
+    }
+
     /** 짝인 새 판매를 잇는다 (정정: 원 판매를 기록 취소한 행이 정정 판매를 가리킨다, BR-16). */
     public void pairWith(Sale replacement) {
         this.newSale = replacement;
@@ -128,7 +137,7 @@ public class SaleReturn {
             total += refund;
         }
         ret.amount = total;
-        if (kind == ReturnKind.RETURN) {
+        if (kind != ReturnKind.VOID) {
             sale.refreshReturnStatus();
         }
         return ret;

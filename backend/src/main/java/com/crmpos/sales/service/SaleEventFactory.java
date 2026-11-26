@@ -21,6 +21,11 @@ public class SaleEventFactory {
     private final ObjectMapper objectMapper;
 
     public OutboxEvent completed(Sale sale, String memo, LocalDateTime now) {
+        return completed(sale, memo, null, now);
+    }
+
+    /** 교환이면 {@code exchange}에 짝 반품(영수증 사실)을 담는다 (03-api.md 6장). */
+    public OutboxEvent completed(Sale sale, String memo, SaleCompletedPayload.Exchange exchange, LocalDateTime now) {
         String eventId = UUID.randomUUID().toString();
         List<SaleCompletedPayload.Line> lines = sale.getLines().stream()
                 .map(l -> new SaleCompletedPayload.Line(l.getId(), l.getTarget(), l.getItemType(), l.getQty(),
@@ -30,7 +35,7 @@ public class SaleEventFactory {
                 DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(KstTime.toOffset(sale.getSoldAt())), sale.getId(),
                 sale.getReceiptNo(), sale.getStoreId(), sale.getCustomerId(), sale.getStaffId(), sale.getRecordedBy(),
                 sale.getKind().name(), sale.getOriginSale() == null ? null : sale.getOriginSale().getId(),
-                sale.getRootSale().getId(), null, memo, lines);
+                sale.getRootSale().getId(), exchange, memo, lines);
         return OutboxEvent.pending(eventId, SaleEventType.SALE_COMPLETED, sale.getRootSale().getId(),
                 objectMapper.writeValueAsString(payload), now);
     }
