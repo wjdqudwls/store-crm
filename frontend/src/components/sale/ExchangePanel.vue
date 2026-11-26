@@ -68,17 +68,8 @@ const pickedLines = computed(() =>
 // ---- 새 상품 (할인은 판매 전 등급, BR-10) ----
 const discountRate = computed(() => customer.value?.grade.discountRate ?? 0)
 const members = computed(() => customer.value?.members ?? [])
-const {
-  lines,
-  sum,
-  invalid,
-  addLine,
-  removeLine,
-  changeQty,
-  changeAmount,
-  changeWearer,
-  toBody,
-} = useSaleLines(discountRate)
+const { lines, sum, invalid, addLine, removeLine, changeQty, changeAmount, changeWearer, toBody } =
+  useSaleLines(discountRate)
 
 const diff = computed(() => exchangeDiff(returned.value, sum.value.amount))
 const diffLabel = computed(
