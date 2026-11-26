@@ -85,7 +85,7 @@ public class ReturnWriter {
     }
 
     /** 반품·교환은 기록하는 오늘이 마감 전이어야 한다. 판매한 날이 지났어도 오늘이 열려 있으면 된다 (05 SCR-03). */
-    private void checkTodayNotClosed(Long storeId) {
+    void checkTodayNotClosed(Long storeId) {
         LocalDate today = LocalDate.now(KstTime.ZONE);
         dayCloseRepository.findById(new StoreDayCloseId(storeId, today))
                 .filter(close -> close.getReopenedAt() == null)
@@ -95,7 +95,7 @@ public class ReturnWriter {
     }
 
     /** 요청의 줄을 이 판매의 라인으로 바꾼다. 다른 영수증의 줄은 400, 남은 수량보다 많으면 409. */
-    private List<SaleReturn.Item> resolveItems(Sale sale, ReturnRequest request) {
+    List<SaleReturn.Item> resolveItems(Sale sale, ReturnRequest request) {
         Map<Long, SaleLine> byId = sale.getLines().stream().collect(Collectors.toMap(SaleLine::getId, Function.identity()));
         List<FieldError> errors = new ArrayList<>();
         List<SaleReturn.Item> items = new ArrayList<>();

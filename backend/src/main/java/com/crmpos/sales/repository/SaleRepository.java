@@ -28,6 +28,10 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @Query("select s.storeId from Sale s where s.id = :id")
     Optional<Long> findStoreId(@Param("id") Long id);
 
+    /** 판매의 고객만 가볍게 읽는다 (비회원이면 비어 있다). 교환이 새 상품의 착용자를 확인할 때 쓴다. */
+    @Query("select s.customerId from Sale s where s.id = :id")
+    Optional<Long> findCustomerId(@Param("id") Long id);
+
     /** 판매 내역: 한 매장의 기간 안 판매를 최신순으로 (기록 취소도 status로 보인다). */
     @Query(value = "select s from Sale s left join fetch s.originSale "
             + "where s.storeId = :storeId and s.soldAt >= :from and s.soldAt < :to order by s.soldAt desc, s.id desc",
