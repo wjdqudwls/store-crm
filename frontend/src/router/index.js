@@ -88,11 +88,11 @@ const router = createRouter({
       ],
     },
     // 레이아웃 밖: 키오스크는 메뉴가 없고, QR·로그인은 로그인 없이 연다
-    { path: s.kiosk.path, component: KioskView, meta: { title: s.kiosk.label, reference: true } },
+    { path: s.kiosk.path, component: KioskView, meta: { title: s.kiosk.label } },
     {
       path: '/join',
       component: JoinView,
-      meta: { title: '고객 등록', public: true, reference: true },
+      meta: { title: '고객 등록', public: true },
     },
     { path: '/login', component: LoginView, meta: { title: '로그인', public: true } },
     { path: '/:pathMatch(.*)*', redirect: '/' },

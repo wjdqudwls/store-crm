@@ -38,6 +38,8 @@ const props = defineProps({
   submitFn: { type: Function, default: null },
   /** 키오스크·QR: 필수 동의 2개 전에는 [등록]을 끈다 (SCR-01, U6) */
   lockUntilConsent: { type: Boolean, default: false },
+  /** 키오스크·QR: 서버가 준 동의 문구 { privacy, age14, marketing } (GET /public/join-info) */
+  consents: { type: Object, default: null },
   /** 가입매장 이름 (QR은 로그인 계정이 없다) */
   storeName: { type: String, default: '' },
   /** 화면 위에 [등록]을 따로 둘 때 폼 아래 버튼을 숨긴다 (PC 고객 등록 화면) */
@@ -270,7 +272,10 @@ defineExpose({ isDirty, submit, saving, consentsOk })
               {{ showConsentText ? '접기' : '내용 보기' }}
             </el-button>
           </div>
-          <div v-if="showConsentText" class="cform__consent-text">
+          <div v-if="showConsentText && consents" class="cform__consent-text cform__consent-server">
+            {{ consents.privacy }}
+          </div>
+          <div v-else-if="showConsentText" class="cform__consent-text">
             <p><b>수집 목적</b> 매장 단골 관리, 구매이력·등급 할인 안내, 사이즈 맞춤 상담, 연락</p>
             <p>
               <b>수집 항목</b> 필수: 이름, 전화번호, 내/외국인 · 선택: 생년·생일, 주소, 성별, 선호
@@ -284,7 +289,9 @@ defineExpose({ isDirty, submit, saving, consentsOk })
 
         <div class="ft-label is-required">나이 확인</div>
         <div class="ft-value" data-field="age14">
-          <el-checkbox v-model="form.age14">만 14세 이상입니다</el-checkbox>
+          <el-checkbox v-model="form.age14">{{
+            consents?.age14 ?? '만 14세 이상입니다'
+          }}</el-checkbox>
           <p v-if="errors.age14" class="cfield__error">{{ errors.age14 }}</p>
         </div>
       </template>
@@ -294,6 +301,9 @@ defineExpose({ isDirty, submit, saving, consentsOk })
           <el-checkbox v-model="form.marketingSms">문자</el-checkbox>
           <el-checkbox v-model="form.marketingKakao">카톡</el-checkbox>
         </div>
+        <p v-if="consents?.marketing" class="cform__hint cform__consent-server">
+          {{ consents.marketing }}
+        </p>
       </div>
 
       <!-- 직원 화면만 -->
@@ -436,6 +446,9 @@ defineExpose({ isDirty, submit, saving, consentsOk })
   margin: 0;
   color: var(--color-danger);
   font-size: var(--font-size-sm);
+}
+.cform__consent-server {
+  white-space: pre-line;
 }
 .cform__consent-text {
   padding: 10px 12px;
