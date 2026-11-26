@@ -120,6 +120,14 @@ describe('실서버 연결: 판매·반품·마감 (03 4.1·4.2·4.9·4.10·4.12
     )
   })
 
+  it('should_POST_exchanges_본문과_키_when_교환', async () => {
+    const body = { staffId: 4, returnLines: [{ lineId: 1, qty: 1 }], newLines: [] }
+    await api.exchangeSale(7, body, KEY)
+    expect(http.post).toHaveBeenLastCalledWith('/sales/7/exchanges', body, {
+      headers: { 'Idempotency-Key': KEY },
+    })
+  })
+
   it('should_PUT_sales_id_본문과_키_when_정정', async () => {
     const body = { staffId: 4, customerId: 5, lines: [{ skuId: 2, qty: 1, lineAmount: 1000 }] }
     await api.correctSale(7, body, KEY)

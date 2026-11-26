@@ -8,7 +8,6 @@ import { useLoadError } from '@/composables/useLoadError'
 import StaffSelect from '@/components/StaffSelect.vue'
 import { getSale, returnSale, voidSale } from '@/api/sales'
 import { useSaleChangeRules } from '@/composables/useSaleChangeRules'
-import { showReference } from '@/config/reference'
 import { useSessionStore } from '@/stores/session'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { leftQty, refundTotal } from '@/features/sale/returnAmount'
@@ -152,7 +151,7 @@ async function saveVoid() {
           </el-tag>
           <div v-if="canReturn || canVoid" class="sd__btns">
             <el-button v-if="canReturn" type="primary" @click="openReturn">반품</el-button>
-            <el-button v-if="canReturn && showReference" @click="openExchange">교환</el-button>
+            <el-button v-if="canReturn" @click="openExchange">교환</el-button>
             <el-button v-if="canVoid" @click="router.push(`/sales/${sale.id}/edit`)"
               >정정</el-button
             >

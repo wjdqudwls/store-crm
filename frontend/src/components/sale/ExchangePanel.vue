@@ -3,7 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
-import ReferenceBanner from '@/components/ReferenceBanner.vue'
 import CustomerSearch from '@/components/CustomerSearch.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
@@ -13,12 +12,14 @@ import { exchangeSale, getCustomerForSale, getSale, getStaff } from '@/api/sales
 import { exchangeDiff, refundTotal } from '@/features/sale/returnAmount'
 import { useSaleLines } from '@/composables/useSaleLines'
 import { useSaleShortcuts } from '@/composables/useSaleShortcuts'
+import { apiMessage } from '@/utils/apiMessage'
 import { formatWon } from '@/utils/format'
 
 /**
  * 판매 기록의 교환 모드 (05 SCR-02, SAL-06, S13). 위에 돌려받을 상품(환불과 같은 찾기, 한 영수증),
  * 아래에 새 상품(구매와 같은 상품 고르기). 처리 직원이 새 상품의 판매 사원이다 (03 4.8).
  * 영수증 상세의 [교환]으로 들어오면(saleId) 그 영수증에서 고른다. 비회원 판매도 이 길로 교환한다.
+ * 저장하면 새 영수증 상세로 옮긴다.
  */
 const props = defineProps({
   dayClosed: { type: Boolean, default: false },
@@ -67,18 +68,8 @@ const pickedLines = computed(() =>
 // ---- 새 상품 (할인은 판매 전 등급, BR-10) ----
 const discountRate = computed(() => customer.value?.grade.discountRate ?? 0)
 const members = computed(() => customer.value?.members ?? [])
-const {
-  lines,
-  sum,
-  invalid,
-  addLine,
-  removeLine,
-  changeQty,
-  changeAmount,
-  changeWearer,
-  reset: resetLines,
-  toBody,
-} = useSaleLines(discountRate)
+const { lines, sum, invalid, addLine, removeLine, changeQty, changeAmount, changeWearer, toBody } =
+  useSaleLines(discountRate)
 
 const diff = computed(() => exchangeDiff(returned.value, sum.value.amount))
 const diffLabel = computed(
@@ -119,10 +110,7 @@ async function save() {
       message: `교환이 기록되었습니다 · 새 영수증 ${res.newSale.receiptNo}`,
       duration: 5000,
     })
-    staffId.value = null
-    resetLines()
-    errors.value = {}
-    pickerRef.value?.reload()
+    router.push(`/sales/${res.newSale.id}`)
   } catch (err) {
     const code = err?.body?.code
     if (code === 'DAY_CLOSED') emit('day-closed')
@@ -131,9 +119,10 @@ async function save() {
       pickerRef.value?.reload()
     } else {
       ElMessage.error(
-        err?.body?.message ??
-          '저장됐는지 확인하지 못했습니다. 다시 누르면 같은 요청으로 다시 보냅니다',
+        apiMessage(err, '저장됐는지 확인하지 못했습니다. 다시 누르면 같은 요청으로 다시 보냅니다'),
       )
+      // 그 사이 기록 취소·정정된 영수증은 고를 줄이 없어진다
+      if (code === 'SALE_ALREADY_VOIDED') pickerRef.value?.reload()
     }
   } finally {
     saving.value = false
@@ -147,7 +136,6 @@ useSaleShortcuts({ confirmOpen, onSave: save, onRequest: requestSave })
 <template>
   <div class="sp" :class="{ 'sp--phone': phone }">
     <div class="sp__main">
-      <ReferenceBanner />
       <div class="ftable">
         <label class="ft-label is-required" for="exchange-staff">처리 직원</label>
         <div class="ft-value">

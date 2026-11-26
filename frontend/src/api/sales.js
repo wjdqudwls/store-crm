@@ -1,4 +1,4 @@
-import { http, notConnected } from './http'
+import { http } from './http'
 import { getCustomer, getMembers } from './customers'
 import { useSessionStore } from '@/stores/session'
 
@@ -66,9 +66,11 @@ export const returnSale = (id, body, key) =>
     ? fake().then((m) => m.returnSale(id, body, key))
     : http.post(`/sales/${id}/returns`, body, keyed(key))
 
-/** 교환은 참고 화면이라 실서버에 없다 */
-export const exchangeSale = (...args) =>
-  fake ? fake().then((m) => m.exchangeSale(...args)) : notConnected('exchangeSale')
+/** 교환: 돌려받은 줄을 반품하고 새 영수증을 만든다 (03 4.8) */
+export const exchangeSale = (id, body, key) =>
+  fake
+    ? fake().then((m) => m.exchangeSale(id, body, key))
+    : http.post(`/sales/${id}/exchanges`, body, keyed(key))
 
 /** 정정: 원 판매는 기록 취소되고 새 판매가 만들어진다 (03 4.9) */
 export const correctSale = (id, body, key) =>
