@@ -81,7 +81,7 @@ export function updateProduct(id, body) {
 
 /**
  * POST /products/import (03 4.6). 화면 초안에서는 파일을 읽지 않고 실패 예시를 돌려준다.
- * 실제 처리는 B1-2(Apache POI)에서 만든다.
+ * 실제 처리는 서버(Apache POI)가 한다.
  */
 export function importProducts() {
   return fakeError(
@@ -98,4 +98,9 @@ export function importProducts() {
       delayMs: 600,
     },
   )
+}
+
+/** 데모에는 서버가 만든 폼이 없다 */
+export function downloadImportTemplate() {
+  return fakeError(400, 'VALIDATION_FAILED', '데모에서는 엑셀 폼을 내려받을 수 없습니다.')
 }

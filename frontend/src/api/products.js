@@ -1,4 +1,4 @@
-import { http, notConnected } from './http'
+import { http } from './http'
 
 /**
  * 상품 API 겉껍데기. 화면은 이 파일만 부른다.
@@ -19,5 +19,16 @@ export const createProduct = (body) =>
 export const updateProduct = (id, body) =>
   fake ? fake().then((m) => m.updateProduct(id, body)) : http.patch(`/products/${id}`, body)
 
-export const importProducts = (...args) =>
-  fake ? fake().then((m) => m.importProducts(...args)) : notConnected('importProducts')
+/** POST /products/import — multipart의 file 하나(.xlsx, 5MB·1,000행 이하). 응답 { importedCount } (03 4.6) */
+export const importProducts = (file) => {
+  if (fake) return fake().then((m) => m.importProducts(file))
+  const form = new FormData()
+  form.append('file', file)
+  return http.post('/products/import', form)
+}
+
+/** GET /products/import-template — 엑셀 폼(.xlsx) Blob. 로그인 토큰이 필요해서 링크가 아니라 요청으로 받는다 */
+export const downloadImportTemplate = () =>
+  fake
+    ? fake().then((m) => m.downloadImportTemplate())
+    : http.get('/products/import-template', { responseType: 'blob' })

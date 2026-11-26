@@ -291,3 +291,28 @@ describe('실서버 연결: QR·키오스크 등록 (03 4.5)', () => {
     expect(http.post).toHaveBeenLastCalledWith('/kiosk/registrations', { name: 'x' })
   })
 })
+
+describe('실서버 연결: 상품 엑셀 (03 4.6)', () => {
+  let api
+  beforeEach(async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_MODE', 'real')
+    Object.values(http).forEach((f) => f.mockReset().mockResolvedValue({}))
+    api = await import('./products')
+  })
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('should_file_하나를_multipart로_보냄_when_올리기', async () => {
+    const file = new File(['x'], 'a.xlsx')
+    await api.importProducts(file)
+    const [url, body, config] = http.post.mock.calls.at(-1)
+    expect(url).toBe('/products/import')
+    expect(body.get('file').name).toBe('a.xlsx')
+    expect(config).toBeUndefined() // Content-Type은 axios가 boundary와 함께 정한다
+  })
+
+  it('should_blob으로_받음_when_폼_내려받기', async () => {
+    await api.downloadImportTemplate()
+    expect(http.get).toHaveBeenLastCalledWith('/products/import-template', { responseType: 'blob' })
+  })
+})
