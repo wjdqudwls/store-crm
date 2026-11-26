@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-/** 기본 계정 시드: 계정 8개, 비밀번호는 환경변수 값의 BCrypt, 다시 실행해도 늘지 않고 바꾼 비밀번호를 덮어쓰지 않는다 (ADR-019). */
+/** 기본 계정 시드: 계정 10개, 비밀번호는 환경변수 값의 BCrypt, 다시 실행해도 늘지 않고 바꾼 비밀번호를 덮어쓰지 않는다 (ADR-019). */
 @IntegrationTest
 class AccountSeederTest {
 
@@ -33,6 +33,16 @@ class AccountSeederTest {
                 });
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff WHERE login_id IN ('hq','store-gn01','store-hd01',"
                 + "'gn01-manager','gn01-senior','gn01-junior','gn01-staff','hd01-senior')", Integer.class)).isEqualTo(8);
+    }
+
+    @Test
+    @DisplayName("매장마다 키오스크 계정이 하나 있고 비밀번호는 매장 계정과 같은 값의 BCrypt다 (REG-02)")
+    void should_haveKioskPerStore_withStorePassword() {
+        for (String[] kiosk : new String[][] {{"gn01-kiosk", "GN01"}, {"hd01-kiosk", "HD01"}}) {
+            String hash = jdbc.queryForObject("SELECT s.password_hash FROM staff s JOIN store t ON t.id = s.store_id "
+                    + "WHERE s.login_id = ? AND s.role = 'KIOSK' AND t.code = ? AND s.active = 1", String.class, kiosk[0], kiosk[1]);
+            assertThat(passwordEncoder.matches("storePass1234", hash)).as(kiosk[0]).isTrue();
+        }
     }
 
     @Test

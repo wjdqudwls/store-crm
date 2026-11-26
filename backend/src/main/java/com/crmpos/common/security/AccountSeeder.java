@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 기본 계정을 앱이 켜질 때 코드로 넣는다 (ADR-019, B0-3): 본사 1, 매장 계정 2(비밀번호 공통), 데모 직원(공통). 비밀번호는 환경변수로 받아
+ * 기본 계정을 앱이 켜질 때 코드로 넣는다 (ADR-019, B0-3): 본사 1, 매장 계정 2·키오스크 2(비밀번호 공통), 데모 직원(공통). 비밀번호는 환경변수로 받아
  * BCrypt로 저장하고 코드·설정에 쓰지 않는다 (NFR-06). 이미 있는 계정은 건드리지 않는다. 다만 로그인 전(B0-6)에
  * 임시 값으로 만든 계정은 비밀번호만 채운다. 직원 등록 API(ADM-01)가 생기기 전까지의 시작용 데이터다.
  */
@@ -65,7 +65,10 @@ public class AccountSeeder implements ApplicationRunner {
                 new Seed("gn01-senior", "강남 시니어", StaffRole.SENIOR, null, "GN01", "S002", staffPassword),
                 new Seed("gn01-junior", "강남 주니어", StaffRole.JUNIOR, null, "GN01", "S003", staffPassword),
                 new Seed("gn01-staff", "강남 스태프", StaffRole.STAFF, null, "GN01", "S004", staffPassword),
-                new Seed("hd01-senior", "홍대 시니어", StaffRole.SENIOR, null, "HD01", "S101", staffPassword));
+                new Seed("hd01-senior", "홍대 시니어", StaffRole.SENIOR, null, "HD01", "S101", staffPassword),
+                // 매장 iPad(고객 등록, REG-02). 매장에 두는 기기라 비밀번호는 매장 계정과 같은 값을 쓴다
+                new Seed("gn01-kiosk", "강남 키오스크", StaffRole.KIOSK, null, "GN01", null, storePassword),
+                new Seed("hd01-kiosk", "홍대 키오스크", StaffRole.KIOSK, null, "HD01", null, storePassword));
         int created = 0;
         for (Seed seed : seeds) {
             Staff existing = staffRepository.findByLoginId(seed.loginId()).orElse(null);
