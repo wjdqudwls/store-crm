@@ -16,7 +16,7 @@ public enum ErrorCode {
     STORE_REQUIRED(HttpStatus.FORBIDDEN, "매장 계정으로만 할 수 있습니다."),
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "고객을 찾을 수 없습니다."),
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."),
-    PRODUCT_IMPORT_FAILED(HttpStatus.BAD_REQUEST, "상품 엑셀에 잘못된 행이 있습니다."),
+    PRODUCT_IMPORT_FAILED(HttpStatus.BAD_REQUEST, "엑셀에 잘못된 행이 있어 아무것도 저장하지 않았습니다."),
     PRODUCT_CODE_DUPLICATED(HttpStatus.CONFLICT, "이미 있는 품번입니다."),
     SALE_NOT_FOUND(HttpStatus.NOT_FOUND, "판매를 찾을 수 없습니다."),
     STORE_NOT_FOUND(HttpStatus.NOT_FOUND, "매장을 찾을 수 없습니다."),

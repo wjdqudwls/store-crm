@@ -12,6 +12,9 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -94,6 +97,14 @@ public class GlobalExceptionHandler {
         log.info("unsupported media type");
         return ResponseEntity.status(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
                 .body(ErrorResponse.from(ErrorCode.UNSUPPORTED_MEDIA_TYPE, traceId()));
+    }
+
+    /** 파일 올리기 요청에 파일이 없거나, 너무 크거나, multipart 본문이 깨진 경우 */
+    @ExceptionHandler({MissingServletRequestPartException.class, MaxUploadSizeExceededException.class, MultipartException.class})
+    public ResponseEntity<ErrorResponse> handleUpload(Exception e) {
+        log.warn("upload failed type={}", e.getClass().getSimpleName());
+        String reason = e instanceof MaxUploadSizeExceededException ? "파일이 너무 큽니다 (최대 5MB)." : "파일을 올려 주세요.";
+        return validationResponse(List.of(new FieldError("file", reason)));
     }
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)

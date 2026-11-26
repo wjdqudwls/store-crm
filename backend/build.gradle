@@ -34,6 +34,8 @@ dependencies {
     // 매장·직원 QR 이미지 (ADR-019, B1-4)
     implementation 'com.google.zxing:core:3.5.3'
     implementation 'com.google.zxing:javase:3.5.3'
+    // 상품 엑셀 폼과 올리기 (ADR-015, B1-2)
+    implementation 'org.apache.poi:poi-ooxml:5.4.1'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
     annotationProcessor 'org.projectlombok:lombok'
