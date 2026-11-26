@@ -10,7 +10,15 @@ import { useSessionStore } from '@/stores/session'
 export function useSaleChangeRules() {
   const session = useSessionStore()
   const todayClosed = ref(false)
-  if (session.isStore) getDailySummary().then((d) => (todayClosed.value = d.closed))
+  /** 오늘 마감 여부를 다시 읽는다. 못 읽어도 화면은 열고, 서버가 저장할 때 다시 검사한다 */
+  const refreshClosed = () =>
+    session.isStore
+      ? getDailySummary().then(
+          (d) => (todayClosed.value = d.closed),
+          () => {},
+        )
+      : Promise.resolve()
+  refreshClosed()
 
   const ctx = () => ({
     role: session.me.role,
@@ -20,6 +28,7 @@ export function useSaleChangeRules() {
   })
   return {
     todayClosed,
+    refreshClosed,
     canChange: (sale) => canChangeSale(sale, ctx()),
     canReturn: (sale) => canReturnSale(sale, ctx()),
     isOwnStore: (sale) => isOwnStoreSale(sale, session.me.storeId),

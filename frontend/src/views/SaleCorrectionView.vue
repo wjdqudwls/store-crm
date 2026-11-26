@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import StaffSelect from '@/components/StaffSelect.vue'
-import ReferenceBanner from '@/components/ReferenceBanner.vue'
+import LoadError from '@/components/LoadError.vue'
 import CustomerSearch from '@/components/CustomerSearch.vue'
 import GradeBadge from '@/components/GradeBadge.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
@@ -13,9 +13,11 @@ import { useSaleChangeRules } from '@/composables/useSaleChangeRules'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { leftAmount, leftQty } from '@/features/sale/returnAmount'
 import { useIsPhone } from '@/composables/useIsPhone'
+import { useLoadError } from '@/composables/useLoadError'
 import { useSaleLines } from '@/composables/useSaleLines'
 import { useSaleShortcuts } from '@/composables/useSaleShortcuts'
 import { useSessionStore } from '@/stores/session'
+import { apiMessage } from '@/utils/apiMessage'
 import { formatWon } from '@/utils/format'
 
 /**
@@ -48,7 +50,7 @@ const {
   toBody,
 } = useSaleLines(discountRate)
 
-const { canChange, isOwnStore } = useSaleChangeRules()
+const { canChange, isOwnStore, refreshClosed } = useSaleChangeRules()
 
 /** 고칠 수 있는지: 매장 계정은 판매한 날·마감 전, 본사는 언제나. 기록 취소·전부 반품이면 안 됨 */
 const blockedReason = computed(() => {
@@ -62,33 +64,40 @@ const blockedReason = computed(() => {
   return null
 })
 
+// 고객을 못 읽은 채로 열면 저장할 때 고객 연결이 지워지므로, 다 읽은 뒤에만 화면을 연다
+const { error, retrying, run } = useLoadError({ ignore: (e) => e?.status === 404 })
+
+async function fetchSale() {
+  const [s] = await Promise.all([getSale(Number(route.params.id)), refreshClosed()])
+  customer.value = s.customerId ? await getCustomerForSale(s.customerId) : null
+  const byLabel = (label) => customer.value?.members.find((m) => m.label === label)?.id ?? null
+  setLines(
+    s.lines
+      .filter((l) => leftQty(l) > 0)
+      .map((l) => ({
+        skuId: l.skuId,
+        productCode: l.productCode,
+        productName: l.productName,
+        itemType: l.itemType,
+        color: l.color,
+        size: l.size,
+        target: l.target ?? null,
+        listPrice: l.listPrice,
+        qty: leftQty(l),
+        lineAmount: leftAmount(l),
+        memberId: byLabel(l.wearerLabel),
+      })),
+  )
+  sale.value = s
+}
+
 async function load() {
   notFound.value = false
   sale.value = null
   try {
-    const s = await getSale(Number(route.params.id))
-    sale.value = s
-    customer.value = s.customerId ? await getCustomerForSale(s.customerId) : null
-    const byLabel = (label) => customer.value?.members.find((m) => m.label === label)?.id ?? null
-    setLines(
-      s.lines
-        .filter((l) => leftQty(l) > 0)
-        .map((l) => ({
-          skuId: l.skuId,
-          productCode: l.productCode,
-          productName: l.productName,
-          itemType: l.itemType,
-          color: l.color,
-          size: l.size,
-          target: null,
-          listPrice: l.listPrice,
-          qty: leftQty(l),
-          lineAmount: leftAmount(l),
-          memberId: byLabel(l.wearerLabel),
-        })),
-    )
-  } catch (e) {
-    if (e?.status === 404) notFound.value = true
+    await run(fetchSale)
+  } catch {
+    notFound.value = true
   }
 }
 watch(() => route.params.id, load, { immediate: true })
@@ -137,8 +146,7 @@ async function save() {
     router.replace(`/sales/${res.id}`)
   } catch (err) {
     ElMessage.error(
-      err?.body?.message ??
-        '저장됐는지 확인하지 못했습니다. 다시 누르면 같은 요청으로 다시 보냅니다',
+      apiMessage(err, '저장됐는지 확인하지 못했습니다. 다시 누르면 같은 요청으로 다시 보냅니다'),
     )
     if (err?.status === 409) load()
   } finally {
@@ -159,6 +167,7 @@ useSaleShortcuts({ confirmOpen, onSave: save, onRequest: requestSave })
       찾을 수 없습니다.
       <el-button link type="primary" @click="router.push('/sales')">판매 내역으로</el-button>
     </div>
+    <LoadError v-else-if="error && !sale" :error="error" :busy="retrying" @retry="load" />
     <el-skeleton v-else-if="!sale" animated :rows="6" class="card" />
 
     <div v-else-if="blockedReason" class="card empty">
@@ -169,7 +178,6 @@ useSaleShortcuts({ confirmOpen, onSave: save, onRequest: requestSave })
     </div>
 
     <template v-else>
-      <ReferenceBanner />
       <header class="sc__head">
         <h1 class="page__title">정정 · {{ sale.receiptNo }}</h1>
         <span class="sc__tag">정정</span>

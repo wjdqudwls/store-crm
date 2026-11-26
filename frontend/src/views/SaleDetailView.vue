@@ -153,9 +153,7 @@ async function saveVoid() {
           <div v-if="canReturn || canVoid" class="sd__btns">
             <el-button v-if="canReturn" type="primary" @click="openReturn">반품</el-button>
             <el-button v-if="canReturn && showReference" @click="openExchange">교환</el-button>
-            <el-button
-              v-if="canVoid && showReference"
-              @click="router.push(`/sales/${sale.id}/edit`)"
+            <el-button v-if="canVoid" @click="router.push(`/sales/${sale.id}/edit`)"
               >정정</el-button
             >
             <el-button v-if="canVoid" type="danger" plain @click="openVoid">기록 취소</el-button>

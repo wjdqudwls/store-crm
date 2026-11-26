@@ -66,12 +66,15 @@ export const returnSale = (id, body, key) =>
     ? fake().then((m) => m.returnSale(id, body, key))
     : http.post(`/sales/${id}/returns`, body, keyed(key))
 
-/** 교환·정정은 참고 화면이라 실서버에 없다 */
+/** 교환은 참고 화면이라 실서버에 없다 */
 export const exchangeSale = (...args) =>
   fake ? fake().then((m) => m.exchangeSale(...args)) : notConnected('exchangeSale')
 
-export const correctSale = (...args) =>
-  fake ? fake().then((m) => m.correctSale(...args)) : notConnected('correctSale')
+/** 정정: 원 판매는 기록 취소되고 새 판매가 만들어진다 (03 4.9) */
+export const correctSale = (id, body, key) =>
+  fake
+    ? fake().then((m) => m.correctSale(id, body, key))
+    : http.put(`/sales/${id}`, body, keyed(key))
 
 export const voidSale = (id, body, key) =>
   fake
