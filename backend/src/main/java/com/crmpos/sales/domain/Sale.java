@@ -141,6 +141,20 @@ public class Sale {
         return sale;
     }
 
+    /**
+     * 정정 판매를 기록한다 (SAL-07, BR-16): 원 판매의 매장·판매 시각·판매 사원을 그대로 쓰고, 원 판매와 처음 판매를 잇는다.
+     * 원 판매는 호출한 쪽이 기록 취소한다. 라인과 합계 규칙은 일반 판매와 같다.
+     */
+    public static Sale correction(Sale original, String receiptNo, String idempotencyKey, String requestHash,
+            Long recordedBy, Long customerId, GradeCode appliedGrade, LocalDateTime now, List<SaleLine> lines) {
+        Sale sale = record(original.storeId, receiptNo, idempotencyKey, requestHash, original.staffId, recordedBy,
+                customerId, appliedGrade, original.soldAt, now, lines);
+        sale.kind = SaleKind.CORRECTION;
+        sale.originSale = original;
+        sale.rootSale = original.rootSale;
+        return sale;
+    }
+
     /** 일반 판매의 처음 판매는 자기 자신이다 (ADR-022). */
     public void assignRootToSelf() {
         this.rootSale = this;

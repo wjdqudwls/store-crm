@@ -106,6 +106,11 @@ public class SaleReturn {
         return ret;
     }
 
+    /** 짝인 새 판매를 잇는다 (정정: 원 판매를 기록 취소한 행이 정정 판매를 가리킨다, BR-16). */
+    public void pairWith(Sale replacement) {
+        this.newSale = replacement;
+    }
+
     private static SaleReturn record(ReturnKind kind, Sale sale, String idempotencyKey, String requestHash,
             Long staffId, Long recordedBy, LocalDateTime returnedAt, List<Item> items) {
         SaleReturn ret = new SaleReturn();

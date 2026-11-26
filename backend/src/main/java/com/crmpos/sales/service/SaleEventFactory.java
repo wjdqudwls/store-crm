@@ -29,7 +29,8 @@ public class SaleEventFactory {
         SaleCompletedPayload payload = new SaleCompletedPayload(eventId, SaleEventType.SALE_COMPLETED.name(), 1,
                 DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(KstTime.toOffset(sale.getSoldAt())), sale.getId(),
                 sale.getReceiptNo(), sale.getStoreId(), sale.getCustomerId(), sale.getStaffId(), sale.getRecordedBy(),
-                sale.getKind().name(), null, sale.getRootSale().getId(), null, memo, lines);
+                sale.getKind().name(), sale.getOriginSale() == null ? null : sale.getOriginSale().getId(),
+                sale.getRootSale().getId(), null, memo, lines);
         return OutboxEvent.pending(eventId, SaleEventType.SALE_COMPLETED, sale.getRootSale().getId(),
                 objectMapper.writeValueAsString(payload), now);
     }

@@ -156,7 +156,7 @@ public class SaleRecordingService {
         return soldAt.isAfter(exactNow) ? exactNow : soldAt;
     }
 
-    private static void checkLineShapes(SaleRequest request, List<FieldError> errors) {
+    static void checkLineShapes(SaleRequest request, List<FieldError> errors) {
         List<SaleRequest.Line> lines = request.lines();
         for (int i = 0; i < lines.size(); i++) {
             SaleRequest.Line line = lines.get(i);
@@ -183,7 +183,7 @@ public class SaleRecordingService {
     }
 
     /** 직접 입력한 사이즈는 품목·대상의 허용값이어야 한다 (02-erd.md 3.2). */
-    private static void checkDirectSizes(SaleRequest request) {
+    static void checkDirectSizes(SaleRequest request) {
         List<String> invalid = new ArrayList<>();
         for (SaleRequest.Line line : request.lines()) {
             if (line.skuId() == null && !SizeRule.isAllowed(line.itemType(), line.target(), line.size().trim())) {
@@ -195,7 +195,7 @@ public class SaleRecordingService {
         }
     }
 
-    private List<SaleLine> buildLines(SaleRequest request, SaleCustomer customer) {
+    List<SaleLine> buildLines(SaleRequest request, SaleCustomer customer) {
         Set<Long> skuIds = new HashSet<>();
         Set<Long> memberIds = new HashSet<>();
         for (SaleRequest.Line line : request.lines()) {
