@@ -33,17 +33,17 @@ export const getPurchases = (id, keyword = '') =>
 export const getGradeHistory = (...args) =>
   fake ? fake().then((m) => m.getGradeHistory(...args)) : notConnected('getGradeHistory')
 
-export const getMembers = (...args) =>
-  fake ? fake().then((m) => m.getMembers(...args)) : notConnected('getMembers')
+export const getMembers = (id) =>
+  fake ? fake().then((m) => m.getMembers(id)) : http.get(`/customers/${id}/members`)
 
-export const createMember = (...args) =>
-  fake ? fake().then((m) => m.createMember(...args)) : notConnected('createMember')
+export const createMember = (id, body) =>
+  fake ? fake().then((m) => m.createMember(id, body)) : http.post(`/customers/${id}/members`, body)
 
-export const updateMember = (...args) =>
-  fake ? fake().then((m) => m.updateMember(...args)) : notConnected('updateMember')
+export const updateMember = (id, body) =>
+  fake ? fake().then((m) => m.updateMember(id, body)) : http.patch(`/members/${id}`, body)
 
-export const deleteMember = (...args) =>
-  fake ? fake().then((m) => m.deleteMember(...args)) : notConnected('deleteMember')
+export const deleteMember = (id) =>
+  fake ? fake().then((m) => m.deleteMember(id)) : http.delete(`/members/${id}`)
 
 /** GET /customers/{id}/notes (최신순, 03 4.12) */
 export const getNotes = (id) =>

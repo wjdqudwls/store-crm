@@ -56,6 +56,18 @@ describe('실서버 연결: 고객 (03 3.2·4.3·4.3a·4.4)', () => {
     expect(http.delete).toHaveBeenCalledWith('/notes/9')
   })
 
+  it('should_가족_구성원_주소와_본문_when_목록_추가_수정_삭제', async () => {
+    await api.getMembers(5)
+    expect(http.get).toHaveBeenLastCalledWith('/customers/5/members')
+    const body = { nickname: '첫째', relation: 'CHILD', sizes: { top: '130' } }
+    await api.createMember(5, body)
+    expect(http.post).toHaveBeenLastCalledWith('/customers/5/members', body)
+    await api.updateMember(9, body)
+    expect(http.patch).toHaveBeenLastCalledWith('/members/9', body)
+    await api.deleteMember(9)
+    expect(http.delete).toHaveBeenLastCalledWith('/members/9')
+  })
+
   it('should_PATCH_when_고객_수정', async () => {
     await api.updateCustomer(7, { phone: '010-1' })
     expect(http.patch).toHaveBeenCalledWith('/customers/7', { phone: '010-1' })
@@ -141,6 +153,18 @@ describe('실서버 연결: 판매·반품·마감 (03 4.1·4.2·4.9·4.10·4.12
     await api.createSale({ sellerStaffId: 4, lines: [] }, KEY)
     const keys = http.post.mock.calls.map((c) => c[2].headers['Idempotency-Key'])
     expect(keys).toEqual([KEY, KEY])
+  })
+
+  it('should_착용자를_id와_label로_바꿈_when_판매용_고객', async () => {
+    http.get.mockImplementation((url) =>
+      Promise.resolve(
+        url.endsWith('/members')
+          ? [{ id: 3, nickname: '첫째', relation: 'CHILD' }]
+          : { id: 5, name: '김하늘', phone: '010-0000-1234', grade: { current: 'NORMAL' } },
+      ),
+    )
+    const c = await api.getCustomerForSale(5)
+    expect(c.members).toEqual([{ id: 3, label: '첫째' }])
   })
 
   it('should_첫_항목을_줌_when_daily-summary가_배열', async () => {

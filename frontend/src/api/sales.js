@@ -30,18 +30,18 @@ export const getDailySummaries = () =>
   fake ? fake().then((m) => m.getDailySummaries()) : http.get('/sales/daily-summary')
 
 /**
- * 판매 기록·반품 화면이 쓰는 고객 정보(등급·할인율·가족). GET /customers/{id}에서 필요한 칸만 뽑는다.
- * 가족(착용자)은 구성원 API가 연결되기 전까지 빈 목록이다.
+ * 판매 기록·반품 화면이 쓰는 고객 정보(등급·할인율·가족). 고객과 구성원 API에서 필요한 칸만 뽑는다.
+ * 구성원을 못 읽으면 실패로 둔다. 빈 목록으로 열면 정정할 때 착용자가 지워진다.
  */
 export const getCustomerForSale = async (id) => {
   if (fake) return fake().then((m) => m.getCustomerForSale(id))
-  const [c, members] = await Promise.all([getCustomer(id), getMembers(id).catch(() => [])])
+  const [c, members] = await Promise.all([getCustomer(id), getMembers(id)])
   return {
     id: c.id,
     name: c.name,
     phoneMasked: `****-${String(c.phone).replace(/\D/g, '').slice(-4)}`,
     grade: { current: c.grade.current, discountRate: c.grade.discountRate },
-    members,
+    members: members.map((m) => ({ id: m.id, label: m.nickname })),
   }
 }
 

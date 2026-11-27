@@ -56,6 +56,11 @@ describe('사이즈 칸 (REG-01: 성별이 없으면 아우터·하의 숨김)',
   it('should_use_common_list_when_item_has_no_target', () => {
     expect(sizeChoices(table, 'TOP', null)).toEqual(['S', 'M'])
   })
+  it('should_use_common_list_when_item_also_has_kids_group', () => {
+    const real = [...table, { itemType: 'TOP', target: 'KIDS', sizes: ['4', '6'] }]
+    expect(sizeChoices(real, 'TOP', null)).toEqual(['S', 'M'])
+    expect(sizeChoices(real, 'TOP', 'F')).toEqual(['S', 'M'])
+  })
   it('should_return_empty_when_gendered_item_without_gender', () => {
     expect(sizeChoices(table, 'OUTER', null)).toEqual([])
   })

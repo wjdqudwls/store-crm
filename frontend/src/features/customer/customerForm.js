@@ -68,7 +68,9 @@ export function visibleSizeFields(gender) {
 /** 고객 프로필의 사이즈 선택지: 성별이 나뉘는 품목은 고객 성별 목록 (02 3.2) */
 export function sizeChoices(table, itemType, gender) {
   const rows = table.filter((r) => r.itemType === itemType)
-  if (rows.every((r) => r.target === null)) return rows.flatMap((r) => r.sizes)
+  // 상의처럼 대상 없는 목록이 있으면 그것을 쓴다 (서버는 아동 목록을 따로 더 준다)
+  const common = rows.filter((r) => r.target === null)
+  if (common.length) return common.flatMap((r) => r.sizes)
   const target = genderTarget[gender]
   if (!target) return []
   return rows.filter((r) => r.target === target).flatMap((r) => r.sizes)
