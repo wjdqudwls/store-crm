@@ -7,18 +7,18 @@ import ChoiceButtons from '@/components/ChoiceButtons.vue'
 import { createMember, deleteMember, getMembers, updateMember } from '@/api/customers'
 import { getSizes } from '@/api/public'
 import { useSessionStore } from '@/stores/session'
-import { showReference } from '@/config/reference'
 import { genderLabels, relationLabels } from '@/features/customer/customerDetail'
 import { sizeChoices, sizeItemType } from '@/features/customer/customerForm'
+import { apiMessage } from '@/utils/apiMessage'
 
 /**
  * 가족 구성원 (05 SCR-06, CUS-05). 이름 대신 호칭으로 받는다 (BR-13).
  * 매장 계정만 추가·수정·삭제한다. 직원·본사는 보기만.
- * 사이즈는 구성원 성별의 목록에서 고르고, 자녀는 아동 사이즈를 직접 적을 수 있다.
+ * 사이즈는 구성원 성별의 목록에서 고르고, 자녀만 아동 사이즈를 직접 적을 수 있다 (20자).
  */
 const props = defineProps({ customerId: { type: Number, required: true } })
 const session = useSessionStore()
-const canEdit = computed(() => session.isStore && showReference)
+const canEdit = computed(() => session.isStore)
 
 const list = ref(null)
 const { error, retrying, run } = useLoadError()
@@ -75,6 +75,10 @@ function openEdit(m) {
 const relationOptions = Object.entries(relationLabels).map(([value, label]) => ({ value, label }))
 const genderOptions = Object.entries(genderLabels).map(([value, label]) => ({ value, label }))
 const optionsFor = (key) => sizeChoices(sizeTable.value, sizeItemType[key], form.gender)
+const sizePlaceholder = (key) => {
+  if (form.relation === 'CHILD') return '직접 입력'
+  return optionsFor(key).length ? '선택' : '성별 먼저'
+}
 
 async function save() {
   const e = {}
@@ -104,7 +108,15 @@ async function save() {
     ElMessage.success(editingId.value ? '구성원을 고쳤습니다' : '구성원을 추가했습니다')
     load()
   } catch (err) {
-    ElMessage.error(err?.body?.message ?? '저장됐는지 확인하지 못했습니다')
+    // 어느 사이즈 칸이 틀렸는지는 창 안에 적는다
+    const bad = (err?.body?.fieldErrors ?? [])
+      .map((f) => {
+        const label = sizeKeys.find(([k]) => f.field === `sizes.${k}`)?.[1]
+        return label && `${label}: ${f.reason}`
+      })
+      .filter(Boolean)
+    if (bad.length) errors.value = { sizes: bad.join(' ') }
+    ElMessage.error(apiMessage(err, '저장됐는지 확인하지 못했습니다'))
   } finally {
     saving.value = false
   }
@@ -120,8 +132,12 @@ async function remove(m) {
   } catch {
     return
   }
-  await deleteMember(m.id)
-  ElMessage.success('구성원을 지웠습니다')
+  try {
+    await deleteMember(m.id)
+    ElMessage.success('구성원을 지웠습니다')
+  } catch (err) {
+    ElMessage.error(apiMessage(err, '지웠는지 확인하지 못했습니다'))
+  }
   load()
 }
 </script>
@@ -193,14 +209,16 @@ async function remove(m) {
               <el-select
                 v-model="form.sizes[k]"
                 filterable
-                allow-create
+                :allow-create="form.relation === 'CHILD'"
+                default-first-option
                 clearable
-                :placeholder="form.relation === 'CHILD' ? '직접 입력' : '선택'"
+                :placeholder="sizePlaceholder(k)"
               >
                 <el-option v-for="s in optionsFor(k)" :key="s" :label="s" :value="s" />
               </el-select>
             </label>
           </div>
+          <p v-if="errors.sizes" class="field-error">{{ errors.sizes }}</p>
         </div>
       </div>
       <template #footer>
