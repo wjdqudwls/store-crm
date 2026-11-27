@@ -62,4 +62,28 @@ public class CustomerMember {
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    /** 구성원을 만든다 (CUS-05). 호칭만 받고 실명·전화번호는 없다 (BR-13). */
+    public static CustomerMember create(Customer customer, String nickname, MemberRelation relation, Gender gender,
+            Short birthYear, String sizeTop, String sizeOuter, String sizeBottom, String sizeShoes,
+            LocalDateTime now) {
+        CustomerMember member = new CustomerMember();
+        member.customer = customer;
+        member.createdAt = now;
+        member.change(nickname, relation, gender, birthYear, sizeTop, sizeOuter, sizeBottom, sizeShoes);
+        return member;
+    }
+
+    /** 전체를 새 값으로 바꾼다. 보내지 않은 선택 칸은 비운다. 과거 판매의 착용자 호칭은 복사본이라 그대로다. */
+    public void change(String nickname, MemberRelation relation, Gender gender, Short birthYear, String sizeTop,
+            String sizeOuter, String sizeBottom, String sizeShoes) {
+        this.nickname = nickname;
+        this.relation = relation;
+        this.gender = gender;
+        this.birthYear = birthYear;
+        this.sizeTop = sizeTop;
+        this.sizeOuter = sizeOuter;
+        this.sizeBottom = sizeBottom;
+        this.sizeShoes = sizeShoes;
+    }
 }
