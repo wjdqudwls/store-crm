@@ -216,7 +216,15 @@ export function getPurchases(id, keyword = '') {
             l.productName.toLowerCase().includes(q) ||
             (l.productCode ?? '').toLowerCase().includes(q),
         )
-        .map(({ skuId: _skuId, itemType: _itemType, listPrice: _listPrice, ...line }) => line), // 03 구매이력 줄 칸만
+        .map(
+          ({
+            skuId: _skuId,
+            itemType: _itemType,
+            listPrice: _listPrice,
+            wearerMemberId: _wearer,
+            ...line
+          }) => line, // 03 구매이력 줄 칸만
+        ),
     }))
     .filter((p) => p.lines.length)
   return fakeResponse(page(list))

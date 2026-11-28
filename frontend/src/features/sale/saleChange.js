@@ -29,3 +29,11 @@ export function canChangeSale(sale, { role, storeId, todayClosed, today }) {
   if (role !== 'STORE') return false
   return isOwnStoreSale(sale, storeId) && sale.soldAt.slice(0, 10) === today && !todayClosed
 }
+
+/**
+ * 정정으로 불러온 줄의 착용자 구성원 ID. 지워진 구성원은 뺀다 (보내면 404 MEMBER_NOT_FOUND).
+ * 호칭은 바뀌거나 겹칠 수 있어 ID로만 맞춘다.
+ */
+export function wearerIdOf(line, members = []) {
+  return members.some((m) => m.id === line.wearerMemberId) ? line.wearerMemberId : null
+}

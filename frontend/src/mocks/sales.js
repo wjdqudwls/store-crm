@@ -32,6 +32,7 @@ function line(lineId, productCode, productName, itemType, color, size, qty, line
     lineAmount,
     returnedQty: 0,
     returnedAmount: 0,
+    wearerMemberId: null,
     wearerLabel: null,
     ...more,
   }
@@ -77,6 +78,7 @@ const past = [
       line(2, null, '캐시미어 머플러', 'ACC', '오트밀', 'FREE', 1, 217800, {
         returnedQty: 1,
         returnedAmount: 217800,
+        wearerMemberId: 31,
         wearerLabel: '남편',
       }),
     ],
@@ -97,7 +99,10 @@ const past = [
   ),
   receipt(86120, 1, 4, '2026-07-12T16:40:00+09:00', 11, 1024, 'C', [
     line(1, 'D3305', '린넨 셔츠 원피스', 'TOP', '아이보리', 'M', 1, 279000),
-    line(2, 'K1102', '아동 데님 점퍼', 'OUTER', '인디고', '8', 1, 149000, { wearerLabel: '딸' }),
+    line(2, 'K1102', '아동 데님 점퍼', 'OUTER', '인디고', '8', 1, 149000, {
+      wearerMemberId: 32,
+      wearerLabel: '딸',
+    }),
     line(3, 'D2204', '라이트 트렌치코트', 'OUTER', '베이지', '90', 1, 1000000),
   ]),
   receipt(84077, 2, 21, '2026-04-05T12:15:00+09:00', 11, 1024, 'NORMAL', [
