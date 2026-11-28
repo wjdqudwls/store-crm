@@ -2,6 +2,7 @@ package com.crmpos.sales;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,6 +56,7 @@ class CorrectionIntegrationTest {
         jdbc.update("DELETE FROM processed_event");
         jdbc.update("DELETE FROM consult_note");
         jdbc.update("DELETE FROM customer_purchase");
+        jdbc.update("DELETE FROM customer_member");
         kit.cleanUp();
     }
 
@@ -148,6 +150,36 @@ class CorrectionIntegrationTest {
         kit.send(kit.as(get("/api/v1/sales/" + newId), null)).andExpect(jsonPath("$.lines[0].target").value("WOMEN"));
         assertThat(jdbc.queryForObject("SELECT target FROM customer_purchase WHERE sale_id = ?", String.class, newId))
                 .isEqualTo("WOMEN");
+    }
+
+    @Test
+    @DisplayName("영수증 상세 줄에 wearerMemberId가 있어, 가족 호칭을 바꾼 뒤 정정해도 착용자가 유지된다 (직접 입력·비착용 줄은 null)")
+    void should_keepWearer_whenCorrectingAfterNicknameChange() throws Exception {
+        long customerId = customer("010-0000-7010");
+        long memberId = kit.mapper.readTree(kit.send(kit.as(post("/api/v1/customers/" + customerId + "/members")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"nickname\":\"첫째 딸\",\"relation\":\"CHILD\"}"), null))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        String saleBody = "{\"sellerStaffId\":%d,\"customerId\":%d,\"lines\":[{\"productName\":\"모자\",\"itemType\":\"ACC\",\"size\":\"FREE\",\"qty\":1,\"lineAmount\":1000,\"memberId\":%d},{\"productName\":\"양말\",\"itemType\":\"ACC\",\"size\":\"FREE\",\"qty\":1,\"lineAmount\":500}]}"
+                .formatted(kit.staffId("gn01-senior"), customerId, memberId);
+        long saleId = kit.mapper.readTree(kit.send(kit.as(post("/api/v1/sales").header("Idempotency-Key", SalesTestKit.newKey())
+                        .contentType(MediaType.APPLICATION_JSON).content(saleBody), null))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        kit.send(kit.as(patch("/api/v1/members/" + memberId).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"nickname\":\"큰딸\",\"relation\":\"CHILD\"}"), null)).andExpect(status().isOk());
+
+        JsonNode lines = kit.mapper.readTree(kit.send(kit.as(get("/api/v1/sales/" + saleId), null))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lines[0].wearerMemberId").value(memberId))
+                .andExpect(jsonPath("$.lines[0].wearerLabel").value("첫째 딸"))
+                .andExpect(jsonPath("$.lines[1].wearerMemberId").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn().getResponse().getContentAsString()).get("lines");
+
+        // 화면의 정정 창처럼 상세 줄의 착용자 ID를 그대로 보낸다
+        String correction = "{\"staffId\":%d,\"customerId\":%d,\"lines\":[{\"productName\":\"모자\",\"itemType\":\"ACC\",\"size\":\"FREE\",\"qty\":1,\"lineAmount\":900,\"memberId\":%d}]}"
+                .formatted(kit.staffId("gn01-senior"), customerId, lines.get(0).get("wearerMemberId").asLong());
+        correct(saleId, null, SalesTestKit.newKey(), correction).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.lines[0].wearerMemberId").value(memberId))
+                .andExpect(jsonPath("$.lines[0].wearerLabel").value("큰딸"));
     }
 
     @Test

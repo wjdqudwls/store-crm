@@ -20,7 +20,7 @@ public record SaleDetailResponse(Long id, String receiptNo, OffsetDateTime soldA
 
     public record Line(Long lineId, Long skuId, String productCode, String productName, ItemType itemType,
             Target target, String color, String size, Long listPrice, int qty, long lineAmount, int returnedQty, long returnedAmount,
-            String wearerLabel) {
+            Long wearerMemberId, String wearerLabel) {
     }
 
     public record Return(Long returnId, ReturnKind kind, OffsetDateTime returnedAt, String staffName, long amount,
