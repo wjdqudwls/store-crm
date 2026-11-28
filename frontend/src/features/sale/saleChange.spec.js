@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canChangeSale, canReturnSale, isOwnStoreSale } from './saleChange'
+import { canChangeSale, canReturnSale, isOwnStoreSale, wearerIdOf } from './saleChange'
 
 const sale = (storeId, soldAt = '2026-11-18T10:42:00+09:00') => ({ store: { id: storeId }, soldAt })
 const ctx = (over = {}) => ({
@@ -64,5 +64,22 @@ describe('반품·교환 권한 (SAL-03·06)', () => {
   it('본사와 직원 개인 계정은 반품하지 못한다', () => {
     expect(canReturnSale(sale(1), ctx({ role: 'HQ', storeId: null }))).toBe(false)
     expect(canReturnSale(sale(1), ctx({ role: 'SENIOR' }))).toBe(false)
+  })
+})
+
+describe('정정으로 불러온 줄의 착용자 (SAL-04, CUS-05)', () => {
+  const members = [{ id: 31, label: '아들' }]
+
+  it('should_구성원_ID를_유지_when_호칭이_바뀌었어도', () => {
+    expect(wearerIdOf({ wearerMemberId: 31, wearerLabel: '첫째' }, members)).toBe(31)
+  })
+
+  it('should_뺌_when_지워진_구성원(같은_호칭이_새로_있어도)', () => {
+    expect(wearerIdOf({ wearerMemberId: 30, wearerLabel: '아들' }, members)).toBeNull()
+  })
+
+  it('should_뺌_when_착용자가_없거나_비회원', () => {
+    expect(wearerIdOf({ wearerMemberId: null }, members)).toBeNull()
+    expect(wearerIdOf({ wearerMemberId: 31 }, undefined)).toBeNull()
   })
 })

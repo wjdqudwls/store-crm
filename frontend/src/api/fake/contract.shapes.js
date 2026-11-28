@@ -101,6 +101,7 @@ export const shapes = {
         lineAmount: 'number',
         returnedQty: 'number',
         returnedAmount: 'number',
+        wearerMemberId: 'number|null',
         wearerLabel: 'string|null',
       },
     ],

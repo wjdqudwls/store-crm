@@ -12,6 +12,7 @@ import { correctSale, getCustomerForSale, getSale } from '@/api/sales'
 import { useSaleChangeRules } from '@/composables/useSaleChangeRules'
 import { dateTimeLabel } from '@/features/customer/customerDetail'
 import { leftAmount, leftQty } from '@/features/sale/returnAmount'
+import { wearerIdOf } from '@/features/sale/saleChange'
 import { useIsPhone } from '@/composables/useIsPhone'
 import { useLoadError } from '@/composables/useLoadError'
 import { useSaleLines } from '@/composables/useSaleLines'
@@ -70,7 +71,6 @@ const { error, retrying, run } = useLoadError({ ignore: (e) => e?.status === 404
 async function fetchSale() {
   const [s] = await Promise.all([getSale(Number(route.params.id)), refreshClosed()])
   customer.value = s.customerId ? await getCustomerForSale(s.customerId) : null
-  const byLabel = (label) => customer.value?.members.find((m) => m.label === label)?.id ?? null
   setLines(
     s.lines
       .filter((l) => leftQty(l) > 0)
@@ -85,7 +85,7 @@ async function fetchSale() {
         listPrice: l.listPrice,
         qty: leftQty(l),
         lineAmount: leftAmount(l),
-        memberId: byLabel(l.wearerLabel),
+        memberId: wearerIdOf(l, customer.value?.members),
       })),
   )
   sale.value = s

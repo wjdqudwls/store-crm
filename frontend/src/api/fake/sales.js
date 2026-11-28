@@ -100,6 +100,7 @@ function toLines(bodyLines, customer) {
       lineAmount: l.lineAmount,
       returnedQty: 0,
       returnedAmount: 0,
+      wearerMemberId: l.memberId ?? null,
       wearerLabel: customer?.members.find((m) => m.id === l.memberId)?.label ?? null,
     }
   })
